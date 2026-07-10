@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Lunch — Recetario & Menú</title>
+<style>
+:root{--verde:#059669;--verde-osc:#047857;--tinta:#1e293b;--gris:#64748b;--borde:#e2e8f0;--fondo:#f4f6f8}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--fondo);color:var(--tinta);font-size:15px}
+header{background:#fff;border-bottom:1px solid var(--borde);padding:14px 24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;position:sticky;top:0;z-index:40}
+header h1{font-size:19px;font-weight:700}
+header h1 span{color:var(--verde)}
+nav{display:flex;gap:6px}
+nav button{border:none;background:transparent;padding:9px 16px;border-radius:10px;font-size:14.5px;font-weight:600;color:var(--gris);cursor:pointer}
+nav button:hover{background:#f1f5f9}
+nav button.act{background:#d1fae5;color:var(--verde-osc)}
+main{max-width:1240px;margin:0 auto;padding:22px 20px 80px}
+.banner{background:#fef3c7;border:1px solid #fcd34d;color:#92400e;border-radius:12px;padding:12px 16px;margin-bottom:18px;font-size:14px;display:none}
+.card{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:18px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px}
+.btn{border:none;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer;background:#f1f5f9;color:var(--tinta)}
+.btn:hover{filter:brightness(.96)}
+.btn-p{background:var(--verde);color:#fff}
+.btn-p:hover{background:var(--verde-osc);filter:none}
+.btn-sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+.btn-danger{background:#fee2e2;color:#b91c1c}
+input,select,textarea{border:1px solid #cbd5e1;border-radius:9px;padding:8px 11px;font-size:14px;font-family:inherit;background:#fff;color:var(--tinta);outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--verde)}
+label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bottom:4px}
+.filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+.grid-rec{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.rec-card{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:16px;cursor:pointer;transition:box-shadow .15s, transform .15s}
+.rec-card:hover{box-shadow:0 4px 16px rgba(15,23,42,.09);transform:translateY(-2px)}
+.rec-card h3{font-size:15px;margin:8px 0 8px}
+.rec-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:13px;color:var(--gris)}
+.rec-meta b{color:var(--verde-osc);font-size:15px}
+.modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:60;padding:30px 14px;overflow-y:auto}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:620px}
+.modal h2{font-size:17px;margin-bottom:14px}
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{text-align:left;color:var(--gris);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--borde)}
+.tbl td{padding:7px 8px;border-bottom:1px solid #f1f5f9}
+.form-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:12px}
+@media(max-width:760px){.form-grid{grid-template-columns:1fr 1fr}}
+.sugs{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--borde);border-radius:10px;box-shadow:0 8px 24px rgba(15,23,42,.12);z-index:30;max-height:260px;overflow-y:auto;display:none}
+.sugs div{padding:8px 12px;cursor:pointer;font-size:13.5px}
+.sugs div:hover{background:#f0fdf4}
+.crear-cols{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start}
+@media(max-width:960px){.crear-cols{grid-template-columns:1fr}}
+.idea{border:1px solid var(--borde);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.idea h4{font-size:14px;margin-bottom:4px}
+.idea .comp{font-size:12.5px;color:var(--gris)}
+.cal-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.cal-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media(max-width:960px){.cal-grid{grid-template-columns:1fr}}
+.cal-dia{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.cal-dia h4{font-size:13px;text-align:center;color:var(--tinta)}
+.cal-dia h4 small{display:block;font-weight:500;color:var(--gris)}
+.slot{border:1.5px dashed #cbd5e1;border-radius:10px;min-height:74px;padding:8px;font-size:12.5px;cursor:pointer;position:relative;display:flex;flex-direction:column;gap:4px;justify-content:center;min-width:0;overflow:hidden}
+.slot:hover{border-color:var(--verde)}
+.slot.lleno{border-style:solid;border-color:var(--borde);background:#fafcff}
+.slot .quitar{position:absolute;top:4px;right:6px;border:none;background:none;color:#94a3b8;cursor:pointer;font-size:13px}
+.slot .quitar:hover{color:#dc2626}
+.slot-tag{font-size:10.5px;font-weight:700;letter-spacing:.4px;color:#94a3b8;text-transform:uppercase}
+.aviso-dia{font-size:11.5px;color:#b45309;background:#fef3c7;border-radius:8px;padding:5px 8px}
+.avisos-cal{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.vista-tog{display:flex;background:#f1f5f9;border-radius:10px;padding:3px}
+.vista-tog button{border:none;background:transparent;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--gris);cursor:pointer}
+.vista-tog button.act{background:#fff;color:var(--verde-osc);box-shadow:0 1px 3px rgba(15,23,42,.12)}
+.mes-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.mes-cab{font-size:12px;font-weight:700;color:var(--gris);text-align:center;padding:4px 0}
+.mes-dia{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:8px;min-height:118px;display:flex;flex-direction:column;gap:5px;min-width:0;overflow:hidden}
+.mes-dia h5{font-size:11.5px;color:var(--gris);font-weight:600}
+.mes-dia.vacio{background:transparent;border:none;min-height:0}
+.mini-slot{font-size:11px;line-height:1.2;border-radius:7px;padding:4px 6px;cursor:pointer;border:1px solid #f1f5f9;background:#fafcff;display:flex;align-items:center;gap:4px;min-width:0}
+.mini-slot span:not(.dot){min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini-slot:hover{border-color:var(--verde)}
+.mini-slot.libre{color:#94a3b8;border-style:dashed;background:transparent}
+.mini-slot.rep{border-color:#fca5a5;background:#fef2f2}
+.mini-slot .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.drag-over{outline:2px dashed var(--verde);outline-offset:1px}
+[draggable="true"]{cursor:grab}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--tinta);color:#fff;padding:11px 20px;border-radius:12px;font-size:14px;z-index:99;display:none}
+.spin{text-align:center;padding:60px;color:var(--gris)}
+#print-menu{display:none}
+@media print{ body>*{display:none!important} #print-menu{display:block!important} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍱 Easy Lunch — <span>Recetario & Menú</span></h1>
+  <nav>
+    <button id="nav-recetario" class="act" onclick="showTab('recetario')">📖 Recetario</button>
+    <button id="nav-crear" onclick="showTab('crear')">➕ Nueva receta</button>
+    <button id="nav-calendario" onclick="showTab('calendario')">📅 Calendario</button>
+  </nav>
+</header>
+<main>
+  <div class="banner" id="banner-sql">⚠️ Falta preparar la base de datos: ejecutá el archivo <b>agregar_tablas_recetario.sql</b> en Supabase → SQL Editor. Mientras tanto podés mirar el recetario, pero no guardar proteínas ni el calendario.</div>
+
+  <section id="tab-recetario">
+    <div class="filtros">
+      <input id="f-busca" placeholder="🔍 Buscar plato..." style="min-width:220px" oninput="renderRecetario()">
+      <select id="f-tipo" onchange="renderRecetario()"><option value="">Todos los tipos</option></select>
+      <select id="f-prot" onchange="renderRecetario()"><option value="">Todas las proteínas</option></select>
+      <label style="display:flex;align-items:center;gap:5px;margin:0;font-size:13px;cursor:pointer"><input type="checkbox" id="f-hist" onchange="renderRecetario()"> incluir históricos 📜</label>
+      <span id="f-count" style="font-size:13px;color:var(--gris)"></span>
+    </div>
+    <div id="rec-grid" class="grid-rec"><div class="spin">Cargando recetario…</div></div>
+  </section>
+
+  <section id="tab-crear" style="display:none">
+    <div class="crear-cols">
+      <div class="card">
+        <h2 id="form-titulo" style="font-size:17px;margin-bottom:16px">➕ Nueva receta</h2>
+        <div class="form-grid" style="margin-bottom:14px">
+          <div style="grid-column:span 2"><label>Nombre del plato</label><input id="p-nombre" style="width:100%"></div>
+          <div><label>Tipo</label><select id="p-tipo" style="width:100%"></select></div>
+          <div><label>Proteína</label><select id="p-prot" style="width:100%"></select></div>
+          <div><label>Porciones que rinde</label><input id="p-porciones" type="number" min="1" value="1" style="width:100%"></div>
+        </div>
+        <label>Ingredientes (insumos o subrecetas)</label>
+        <div style="position:relative;margin-bottom:10px">
+          <input id="ing-search" placeholder="Escribí para buscar e ir agregando…" style="width:100%" oninput="sugerirIngs()" onfocus="sugerirIngs()">
+          <div class="sugs" id="ing-sugs"></div>
+        </div>
+        <table class="tbl" id="ing-tbl" style="margin-bottom:12px">
+          <thead><tr><th>Ingrediente</th><th style="width:90px">Cantidad</th><th style="width:90px">Unidad</th><th style="width:60px">Crudo</th><th style="width:80px">Costo</th><th></th></tr></thead>
+          <tbody id="ing-body"></tbody>
+        </table>
+        <div style="margin-bottom:14px"><label>Descripción / paso a paso (opcional)</label><textarea id="p-desc" rows="3" style="width:100%"></textarea></div>
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <div style="font-size:14px">Costo total: <b id="c-total" style="color:var(--verde-osc)">$0</b> &nbsp;·&nbsp; Por vianda: <b id="c-vianda" style="color:var(--verde-osc)">$0</b></div>
+          <div style="flex:1"></div>
+          <button class="btn" onclick="limpiarForm()">Limpiar</button>
+          <button class="btn btn-p" onclick="guardarPlato()">💾 Guardar receta</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2 style="font-size:17px;margin-bottom:6px">💡 Generador de ideas</h2>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:12px">Propone platos nuevos y tentadores con la estructura Bad Kitchen — proteína + salsa + guarnición, variantes de milanesa (napolitana, suiza, fugazzeta) y dips — evitando lo que ya está en el recetario y en el histórico.</p>
+        <div style="display:flex;gap:10px;margin-bottom:14px">
+          <select id="idea-prot" style="flex:1"></select>
+          <button class="btn btn-p" onclick="generarIdeas()">✨ Generar</button>
+        </div>
+        <div id="ideas-list"><p style="font-size:13px;color:var(--gris)">Elegí una proteína y generá ideas.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-calendario" style="display:none">
+    <div class="cal-head">
+      <button class="btn" onclick="moverPeriodo(-1)">◀</button>
+      <b id="cal-titulo" style="font-size:15px"></b>
+      <button class="btn" onclick="moverPeriodo(1)">▶</button>
+      <div class="vista-tog">
+        <button id="vt-semana" class="act" onclick="setVista('semana')">Semana</button>
+        <button id="vt-mes" onclick="setVista('mes')">Mes</button>
+      </div>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="imprimirMenu()">🖨 Imprimir</button>
+      <button class="btn" onclick="generarPropuesta()">✨ Generar propuesta</button>
+      <button class="btn btn-p" id="btn-guardar-sem" onclick="guardarSemana()">💾 Guardar</button>
+    </div>
+    <p style="font-size:13px;color:var(--gris);margin-bottom:14px">Regla: cada día lleva 1 plato vegetariano y 2 opciones con proteínas distintas (vacuna, cerdo, pollo o pescado). La propuesta automática evita platos parecidos el mismo día y la misma semana, y no repite platos en el período. Podés arrastrar los platos con el mouse para intercambiarlos de lugar.</p>
+    <div class="avisos-cal" id="cal-avisos"></div>
+    <div id="cal-grid"></div>
+  </section>
+</main>
+
+<div class="modal-bg" id="modal-det"><div class="modal" id="modal-det-body"></div></div>
+<div class="modal-bg" id="modal-pick"><div class="modal" id="modal-pick-body"></div></div>
+<div class="toast" id="toast"></div>
+<div id="print-menu"></div>
+<script>
+// ─── Conexión Supabase (misma base que la plataforma de producción) ─────────
+const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
+const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }
+
+async function sbGet(q){ const r = await fetch(`${SB}/${q}`, { headers: H }); if(!r.ok) throw new Error(await r.text()); return r.json() }
+async function sbPost(t, rows){ const r = await fetch(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body: JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()) }
+async function sbPatch(t, filtro, body){ const r = await fetch(`${SB}/${t}?${filtro}`, { method:'PATCH', headers:H, body: JSON.stringify(body) }); if(!r.ok) throw new Error(await r.text()) }
+async function sbDelete(t, filtro){ const r = await fetch(`${SB}/${t}?${filtro}`, { method:'DELETE', headers:H }); if(!r.ok) throw new Error(await r.text()) }
+
+// ─── Constantes (idénticas a la plataforma de producción) ───────────────────
+const TIPOS_PLATO = [
+  { v:'clasico',     l:'Clásico',     e:'🍽', c:'#dbeafe', t:'#1d4ed8' },
+  { v:'vegetariano', l:'Vegetariano', e:'🌿', c:'#dcfce7', t:'#15803d' },
+  { v:'ensalada',    l:'Ensalada',    e:'🥗', c:'#ecfccb', t:'#4d7c0f' },
+  { v:'sandwich',    l:'Sándwich',    e:'🥪', c:'#fef9c3', t:'#a16207' },
+  { v:'wrap',        l:'Wrap',        e:'🌯', c:'#fef3c7', t:'#b45309' },
+  { v:'tarta',       l:'Tarta',       e:'🥧', c:'#ffedd5', t:'#c2410c' },
+  { v:'postre',      l:'Postre',      e:'🍮', c:'#fce7f3', t:'#be185d' },
+  { v:'sin-tacc',    l:'Sin TACC',    e:'🌾', c:'#f3e8ff', t:'#7e22ce' },
+]
+const PROTEINAS = [
+  { v:'vegetariano', l:'Vegetariano', e:'🌿', c:'#dcfce7', t:'#15803d' },
+  { v:'vacuna',      l:'Vacuna',      e:'🥩', c:'#fee2e2', t:'#b91c1c' },
+  { v:'cerdo',       l:'Cerdo',       e:'🐷', c:'#fce7f3', t:'#be185d' },
+  { v:'pollo',       l:'Pollo',       e:'🍗', c:'#ffedd5', t:'#c2410c' },
+  { v:'pescado',     l:'Pescado',     e:'🐟', c:'#cffafe', t:'#0e7490' },
+  { v:'cordero',     l:'Cordero',     e:'🐑', c:'#ffe4e6', t:'#be123c' },
+  { v:'otra',        l:'Otra',        e:'📋', c:'#f1f5f9', t:'#475569' },
+]
+const CAT2PROT = { vacuno:'vacuna', cerdo:'cerdo', ave:'pollo', pescado:'pescado', cordero:'cordero' }
+const PROT_CARNES = ['vacuna','cerdo','pollo','pescado']
+const PESO_UNITS = new Set(['g','kg','ml','lt'])
+const UNIDADES = ['g','kg','ml','lt','unidad','docena','atado','sobre']
+const DIAS = ['Lunes','Martes','Miércoles','Jueves','Viernes']
+
+// ─── Estado ──────────────────────────────────────────────────────────────────
+let insumos = [], subrecetas = [], platos = []
+let insMap = {}, srMap = {}, platoMap = {}
+let dbListo = true            // proteina + calendario_menu disponibles
+let editingId = null          // id del plato que se está editando en el form
+let formIngs = []             // ingredientes del form
+let weekStart = mondayOf(new Date())
+let vista = 'semana'          // 'semana' | 'mes'
+let dbRot = true              // columna en_rotacion disponible
+let cal = {}                  // fechaISO -> [id|null, id|null, id|null]
+let usage = {}                // plato_id -> última fecha usada (histórico)
+let pickerCtx = null
+let historicos = []           // platos importados del Google Sheet
+let usageNorm = {}            // nombre_norm -> ultima fecha en menus historicos
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id)
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2))
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+const fmt$ = n => '$' + (n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2600) }
+function badge(def, extra){ return `<span class="badge" style="background:${def.c};color:${def.t}">${def.e} ${extra || def.l}</span>` }
+const tipoDef = v => TIPOS_PLATO.find(t => t.v === v) || TIPOS_PLATO[0]
+const protDef = v => PROTEINAS.find(p => p.v === v) || PROTEINAS[6]
+function shuffle(a){ for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] } return a }
+
+function mondayOf(d){ const x = new Date(d); x.setHours(12,0,0,0); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); return x }
+function addDays(d, n){ const x = new Date(d); x.setDate(x.getDate() + n); return x }
+const iso = d => d.toISOString().slice(0, 10)
+const fmtFecha = d => d.getDate() + '/' + (d.getMonth() + 1)
+function weekDates(){ return [0,1,2,3,4].map(i => addDays(weekStart, i)) }
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+function visibleDates(){
+  if(vista === 'semana') return weekDates()
+  const y = weekStart.getFullYear(), m = weekStart.getMonth(), out = []
+  for(let d = new Date(y, m, 1, 12); d.getMonth() === m; d = addDays(d, 1))
+    if(d.getDay() >= 1 && d.getDay() <= 5) out.push(new Date(d))
+  return out
+}
+const diaNombre = fISO => DIAS[(new Date(fISO + 'T12:00:00').getDay() + 6) % 7] || ''
+function diasEntre(fa, fb){ return Math.round((Date.parse(fb) - Date.parse(fa)) / 86400000) }
+
+// ─── Similitud y rotación ────────────────────────────────────────────────────
+const TIPOS_FUERA_ROTACION = new Set(['ensalada','sandwich','wrap','tarta','postre'])
+const RE_FUERA_NOMBRE = /(ensalada|tarta|wrap|sandwich|omelet|pechuga de pollo con vegetales|cubos de calabaza|postre|alfajor|brownie|budin de chocolate|torta|agregar|topping|feriado)/
+const normNombre = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
+function aptoRotacion(p){
+  if(p.en_rotacion === false) return false
+  if(p.historico) return !RE_FUERA_NOMBRE.test(normNombre(p.nombre))
+  return !TIPOS_FUERA_ROTACION.has(p.tipo)
+}
+function lastUsedDe(p){
+  const a = usage[p.id], b = usageNorm[normNombre(p.nombre)]
+  if(a && b) return a > b ? a : b
+  return a || b || null
+}
+const STOP = new Set(['de','del','la','el','los','las','con','y','a','al','en','sin'])
+function claveDe(p){
+  const pr = (p.ingredientes || []).find(i => i.tipo === 'subreceta' && srMap[i.ref_id]?.familia === 'principal')
+  if(pr) return 'sr:' + pr.ref_id
+  const w = p.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(x => x && !STOP.has(x))
+  return 'nm:' + (w[0] || p.nombre.toLowerCase())
+}
+
+// ─── Costos (misma lógica que utils/costos.ts + Platos.tsx) ─────────────────
+function yieldFactor(m, v){ return (1 - m / 100) * (1 + v / 100) }
+function precioRealPorKg(p, m, v){ const yf = yieldFactor(m, v); return yf > 0 ? p / yf : p }
+function toGramos(c, u){ switch(u){ case 'g': return c; case 'kg': return c * 1000; case 'ml': return c; case 'lt': return c * 1000; default: return c } }
+
+function costoSubreceta(sr){
+  return (sr.ingredientes || []).reduce((sum, si) => {
+    const ins = insMap[si.insumo_id]; if(!ins) return sum
+    if(PESO_UNITS.has(si.unidad)){
+      const kg = toGramos(si.cantidad, si.unidad) / 1000
+      return sum + (si.crudo ? ins.precio * kg : precioRealPorKg(ins.precio, ins.merma_crudo, ins.variacion_coccion) * kg)
+    }
+    return sum + si.cantidad * ins.precio
+  }, 0)
+}
+
+function costoIngrediente(ing){
+  if(ing.tipo === 'insumo'){
+    const ins = insMap[ing.ref_id]; if(!ins) return 0
+    if(PESO_UNITS.has(ing.unidad)){
+      const kg = toGramos(ing.cantidad, ing.unidad) / 1000
+      return ing.crudo ? ins.precio * kg : precioRealPorKg(ins.precio, ins.merma_crudo, ins.variacion_coccion) * kg
+    }
+    return ing.cantidad * ins.precio
+  }
+  const sr = srMap[ing.ref_id]; if(!sr) return 0
+  const cSr = costoSubreceta(sr)
+  const rendG = toGramos(sr.rendimiento, sr.unidad_rendimiento)
+  const cantG = toGramos(ing.cantidad, ing.unidad)
+  return rendG > 0 ? (cantG / rendG) * cSr : 0
+}
+
+function calcPlato(p){
+  const total = (p.ingredientes || []).reduce((s, ing) => s + costoIngrediente(ing), 0)
+  return { total, vianda: p.porciones > 0 ? total / p.porciones : total }
+}
+
+// ─── Proteína: valor guardado o inferido de los ingredientes ────────────────
+function catsDePlato(p){
+  const cats = new Set()
+  for(const ing of (p.ingredientes || [])){
+    if(ing.tipo === 'insumo'){ const i = insMap[ing.ref_id]; if(i) cats.add(i.categoria) }
+    else { const sr = srMap[ing.ref_id]; if(sr) for(const si of (sr.ingredientes || [])){ const i = insMap[si.insumo_id]; if(i) cats.add(i.categoria) } }
+  }
+  return cats
+}
+function inferProteina(p){
+  const cats = catsDePlato(p)
+  for(const c of ['vacuno','cerdo','pescado','ave','cordero']) if(cats.has(c)) return CAT2PROT[c]
+  return 'vegetariano'
+}
+function protDe(p){ return p.proteina || (p.historico ? 'otra' : inferProteina(p)) }
+function protInferida(p){ return !p.proteina }
+
+function protDeSubreceta(sr){
+  const cats = new Set(); for(const si of (sr.ingredientes || [])){ const i = insMap[si.insumo_id]; if(i) cats.add(i.categoria) }
+  for(const c of ['vacuno','cerdo','pescado','ave','cordero']) if(cats.has(c)) return CAT2PROT[c]
+  return 'vegetariano'
+}
+
+// ─── Carga inicial ───────────────────────────────────────────────────────────
+async function cargar(){
+  const [ins, srs, srIngs, pls, plIngs] = await Promise.all([
+    sbGet('insumos?select=*&order=nombre'),
+    sbGet('subrecetas?select=*&order=nombre'),
+    sbGet('subreceta_ingredientes?select=*'),
+    sbGet('platos?select=*&order=nombre'),
+    sbGet('plato_ingredientes?select=*'),
+  ])
+  insumos = ins
+  subrecetas = srs.map(s => ({ ...s, ingredientes: srIngs.filter(i => i.subreceta_id === s.id) }))
+  platos = pls.map(p => ({ ...p, ingredientes: plIngs.filter(i => i.plato_id === p.id) }))
+  insMap = Object.fromEntries(insumos.map(i => [i.id, i]))
+  srMap = Object.fromEntries(subrecetas.map(s => [s.id, s]))
+  platoMap = Object.fromEntries(platos.map(p => [p.id, p]))
+
+  dbListo = 'proteina' in (pls[0] || {})
+  if(dbListo){ try{ await sbGet('calendario_menu?select=id&limit=1') } catch(e){ dbListo = false } }
+  dbRot = 'en_rotacion' in (pls[0] || {})
+  const banner = $('banner-sql')
+  if(!dbListo){ banner.style.display = 'block' }
+  else if(!dbRot){ banner.innerHTML = '⚠️ Hay una actualización pendiente de la base: ejecutá la versión nueva de <b>agregar_tablas_recetario.sql</b> en Supabase → SQL Editor para poder marcar platos "fuera de rotación" del menú diario.'; banner.style.display = 'block' }
+  else banner.style.display = 'none'
+
+  if(dbListo){
+    try{
+      const [hs, hm] = await Promise.all([
+        sbGet('platos_historicos?select=*&order=nombre'),
+        sbGet('historico_menu?select=nombre_norm,fecha&order=fecha'),
+      ])
+      historicos = hs.map(h => ({ ...h, historico: true, tipo: h.vegetariano ? 'vegetariano' : 'clasico', porciones: 1, ingredientes: [] }))
+      for(const h of historicos) platoMap[h.id] = h
+      for(const r of hm) if(r.nombre_norm && (!usageNorm[r.nombre_norm] || usageNorm[r.nombre_norm] < r.fecha)) usageNorm[r.nombre_norm] = r.fecha
+      console.log(`[Historicos] ${historicos.length} platos, ${hm.length} registros de menus`)
+    } catch(e){ console.warn('[Historicos] tablas no disponibles', e) }
+  }
+
+  try{
+    const desde = iso(addDays(weekStart, -35))
+    const hist = dbListo ? await sbGet(`calendario_menu?select=fecha,plato_id&fecha=gte.${desde}&order=fecha`) : []
+    for(const r of hist) if(!usage[r.plato_id] || usage[r.plato_id] < r.fecha) usage[r.plato_id] = r.fecha
+  } catch(e){ console.warn(e) }
+
+  llenarSelects()
+  renderRecetario()
+  renderForm()
+  await cargarSemana()
+}
+
+function llenarSelects(){
+  $('f-tipo').innerHTML = '<option value="">Todos los tipos</option>' + TIPOS_PLATO.map(t => `<option value="${t.v}">${t.e} ${t.l}</option>`).join('')
+  $('f-prot').innerHTML = '<option value="">Todas las proteínas</option>' + PROTEINAS.map(p => `<option value="${p.v}">${p.e} ${p.l}</option>`).join('')
+  $('p-tipo').innerHTML = TIPOS_PLATO.map(t => `<option value="${t.v}">${t.e} ${t.l}</option>`).join('')
+  $('p-prot').innerHTML = PROTEINAS.map(p => `<option value="${p.v}">${p.e} ${p.l}</option>`).join('')
+  $('idea-prot').innerHTML = ['vegetariano', ...PROT_CARNES].map(v => { const d = protDef(v); return `<option value="${v}">${d.e} ${d.l}</option>` }).join('')
+}
+
+// ─── Tabs ────────────────────────────────────────────────────────────────────
+function showTab(t){
+  for(const x of ['recetario','crear','calendario']){
+    $('tab-' + x).style.display = x === t ? '' : 'none'
+    $('nav-' + x).classList.toggle('act', x === t)
+  }
+}
+
+// ─── Recetario ───────────────────────────────────────────────────────────────
+function renderRecetario(){
+  const q = $('f-busca').value.trim().toLowerCase()
+  const ft = $('f-tipo').value, fp = $('f-prot').value
+  const base = ($('f-hist') && $('f-hist').checked) ? [...platos, ...historicos].sort((a, b) => a.nombre.localeCompare(b.nombre)) : platos
+  const list = base.filter(p =>
+    (!q || p.nombre.toLowerCase().includes(q)) &&
+    (!ft || p.tipo === ft) &&
+    (!fp || protDe(p) === fp)
+  )
+  $('f-count').textContent = list.length + ' de ' + base.length + ' platos'
+  $('rec-grid').innerHTML = list.length === 0
+    ? '<div class="spin">No hay platos que coincidan.</div>'
+    : list.map(p => {
+        const c = calcPlato(p), td = tipoDef(p.tipo), pd = protDef(protDe(p))
+        const histBadge = p.historico ? '<span class="badge" style="background:#ede9fe;color:#6d28d9">📜 histórico</span>' : badge(td)
+        const metaIzq = p.historico ? (p.fuente === 'catalogo' ? 'del catálogo' : 'de menús anteriores') : `${p.porciones} porc. · ${(p.ingredientes || []).length} ingr.`
+        const metaDer = p.historico ? '' : `<b>${fmt$(c.vianda)}/vianda</b>`
+        return `<div class="rec-card" onclick="abrirDetalle('${p.id}')">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${histBadge}${badge(pd, (protInferida(p) && !p.historico ? '~' : '') + pd.l)}${aptoRotacion(p) ? '' : '<span class="badge" style="background:#f1f5f9;color:#64748b">⏸ fuera de rotación</span>'}</div>
+          <h3>${esc(p.nombre)}</h3>
+          <div class="rec-meta"><span>${metaIzq}</span>${metaDer}</div>
+        </div>`
+      }).join('')
+}
+
+function abrirDetalle(id){
+  const p = platoMap[id]; if(!p) return
+  if(p.historico){ abrirDetalleHist(p); return }
+  const c = calcPlato(p), pd = protDef(protDe(p))
+  const filas = (p.ingredientes || []).map(ing => {
+    const n = ing.tipo === 'insumo' ? (insMap[ing.ref_id]?.nombre || '¿?') : '🧩 ' + (srMap[ing.ref_id]?.nombre || '¿?')
+    return `<tr><td>${esc(n)}</td><td>${ing.cantidad} ${esc(ing.unidad)}${ing.crudo ? ' <small>(crudo)</small>' : ''}</td><td style="text-align:right">${fmt$(costoIngrediente(ing))}</td></tr>`
+  }).join('')
+  $('modal-det-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+      <h2>${tipoDef(p.tipo).e} ${esc(p.nombre)}</h2>
+      <button class="btn btn-sm" onclick="cerrarModal('modal-det')">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${badge(tipoDef(p.tipo))}${badge(pd, (protInferida(p) ? '~' : '') + pd.l)}</div>
+    ${p.descripcion ? `<p style="font-size:13.5px;color:var(--gris);margin-bottom:12px;white-space:pre-wrap">${esc(p.descripcion)}</p>` : ''}
+    <table class="tbl"><thead><tr><th>Ingrediente</th><th>Cantidad</th><th style="text-align:right">Costo</th></tr></thead><tbody>${filas}</tbody></table>
+    <div style="margin:14px 0;font-size:14px">Costo total: <b style="color:var(--verde-osc)">${fmt$(c.total)}</b> &nbsp;·&nbsp; Por vianda (${p.porciones}): <b style="color:var(--verde-osc)">${fmt$(c.vianda)}</b></div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div><label>Proteína ${protInferida(p) ? '(inferida — confirmala)' : ''}</label>
+        <select id="det-prot">${PROTEINAS.map(x => `<option value="${x.v}" ${x.v === protDe(p) ? 'selected' : ''}>${x.e} ${x.l}</option>`).join('')}</select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;margin:0;padding-bottom:9px;font-size:13px;color:var(--tinta);cursor:pointer">
+        <input type="checkbox" id="det-rot" ${aptoRotacion(p) ? 'checked' : ''} ${TIPOS_FUERA_ROTACION.has(p.tipo) ? 'disabled' : ''}> En rotación del menú diario${TIPOS_FUERA_ROTACION.has(p.tipo) ? ' (excluido por tipo)' : ''}
+      </label>
+      <button class="btn btn-sm btn-p" onclick="guardarProteina('${p.id}')">Guardar cambios</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-sm" onclick="editarPlato('${p.id}')">✏️ Editar receta</button>
+      <button class="btn btn-sm btn-danger" onclick="eliminarPlato('${p.id}')">🗑 Eliminar</button>
+    </div>`
+  $('modal-det').classList.add('open')
+}
+function cerrarModal(id){ $(id).classList.remove('open') }
+
+function abrirDetalleHist(p){
+  const pd = protDef(protDe(p))
+  const lu = lastUsedDe(p)
+  $('modal-det-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+      <h2>📜 ${esc(p.nombre)}</h2>
+      <button class="btn btn-sm" onclick="cerrarModal('modal-det')">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${badge(pd)}<span class="badge" style="background:#ede9fe;color:#6d28d9">📜 ${p.fuente === 'catalogo' ? 'del catálogo' : 'de menús anteriores'}</span></div>
+    <p style="font-size:13px;color:var(--gris);margin-bottom:14px">Plato importado del Google Sheet, sin receta cargada (no calcula costo). ${lu ? 'Última vez en el menú: ' + lu + '.' : 'Sin uso registrado.'}</p>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div><label>Proteína</label>
+        <select id="det-prot">${PROTEINAS.map(x => `<option value="${x.v}" ${x.v === protDe(p) ? 'selected' : ''}>${x.e} ${x.l}</option>`).join('')}</select>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;margin:0;padding-bottom:9px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="det-rot" ${p.en_rotacion !== false ? 'checked' : ''}> En rotación
+      </label>
+      <button class="btn btn-sm btn-p" onclick="guardarHist('${p.id}')">Guardar</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-sm" onclick="crearDesdeHistorico('${p.id}')">🍳 Crear receta</button>
+      <button class="btn btn-sm btn-danger" onclick="eliminarHist('${p.id}')">🗑 Quitar</button>
+    </div>`
+  $('modal-det').classList.add('open')
+}
+async function guardarHist(id){
+  const v = $('det-prot').value
+  const body = { proteina: v, vegetariano: v === 'vegetariano', en_rotacion: $('det-rot').checked }
+  try{
+    await sbPatch('platos_historicos', 'id=eq.' + encodeURIComponent(id), body)
+    Object.assign(platoMap[id], body)
+    toast('Guardado ✅'); cerrarModal('modal-det'); renderRecetario()
+  } catch(e){ toast('Error: ' + e.message.slice(0, 80)) }
+}
+function crearDesdeHistorico(id){
+  const p = platoMap[id]
+  cerrarModal('modal-det'); limpiarForm()
+  $('p-nombre').value = p.nombre
+  $('p-prot').value = protDe(p)
+  $('p-tipo').value = protDe(p) === 'vegetariano' ? 'vegetariano' : 'clasico'
+  showTab('crear'); window.scrollTo(0, 0)
+  toast('Agregá los ingredientes para calcular el costo')
+}
+async function eliminarHist(id){
+  if(!confirm('¿Quitar este plato del histórico?')) return
+  try{
+    await sbDelete('platos_historicos', 'id=eq.' + encodeURIComponent(id))
+    historicos = historicos.filter(h => h.id !== id); delete platoMap[id]
+    toast('Quitado'); cerrarModal('modal-det'); renderRecetario()
+  } catch(e){ toast('Error: ' + e.message.slice(0, 80)) }
+}
+
+async function guardarProteina(id){
+  const v = $('det-prot').value
+  if(!dbListo){ toast('Primero ejecutá el SQL en Supabase'); return }
+  const body = { proteina: v }
+  if(dbRot) body.en_rotacion = $('det-rot').checked
+  try{
+    await sbPatch('platos', 'id=eq.' + encodeURIComponent(id), body)
+    Object.assign(platoMap[id], body)
+    toast('Cambios guardados ✅'); cerrarModal('modal-det'); renderRecetario()
+  } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
+}
+
+async function eliminarPlato(id){
+  const p = platoMap[id]
+  if(!confirm(`¿Eliminar "${p.nombre}" del recetario? También se borra de la plataforma de producción.`)) return
+  try{
+    await sbDelete('platos', 'id=eq.' + encodeURIComponent(id))
+    platos = platos.filter(x => x.id !== id); delete platoMap[id]
+    toast('Plato eliminado'); cerrarModal('modal-det'); renderRecetario()
+  } catch(e){ console.error(e); toast('Error: ' + e.message.slice(0, 80)) }
+}
+
+// ─── Form de receta ──────────────────────────────────────────────────────────
+function editarPlato(id){
+  const p = platoMap[id]; if(!p) return
+  cerrarModal('modal-det')
+  editingId = id
+  $('form-titulo').textContent = '✏️ Editando: ' + p.nombre
+  $('p-nombre').value = p.nombre
+  $('p-tipo').value = p.tipo
+  $('p-prot').value = protDe(p)
+  $('p-porciones').value = p.porciones
+  $('p-desc').value = p.descripcion || ''
+  formIngs = (p.ingredientes || []).map(i => ({ ...i }))
+  renderForm(); showTab('crear'); window.scrollTo(0, 0)
+}
+
+function limpiarForm(){
+  editingId = null; formIngs = []
+  $('form-titulo').textContent = '➕ Nueva receta'
+  $('p-nombre').value = ''; $('p-desc').value = ''; $('p-porciones').value = 1
+  $('p-tipo').value = 'clasico'; $('p-prot').value = 'vegetariano'
+  renderForm()
+}
+
+function sugerirIngs(){
+  const q = $('ing-search').value.trim().toLowerCase()
+  const box = $('ing-sugs')
+  if(q.length < 2){ box.style.display = 'none'; return }
+  const res = [
+    ...subrecetas.filter(s => s.nombre.toLowerCase().includes(q)).map(s => ({ tipo:'subreceta', id:s.id, n:'🧩 ' + s.nombre })),
+    ...insumos.filter(i => i.nombre.toLowerCase().includes(q)).map(i => ({ tipo:'insumo', id:i.id, n:i.nombre })),
+  ].slice(0, 12)
+  box.innerHTML = res.length ? res.map(r => `<div onclick="agregarIng('${r.tipo}','${r.id}')">${esc(r.n)}</div>`).join('') : '<div style="color:var(--gris)">Sin resultados</div>'
+  box.style.display = 'block'
+}
+document.addEventListener('click', e => { if(!e.target.closest('#ing-search') && !e.target.closest('#ing-sugs')) $('ing-sugs').style.display = 'none' })
+
+function agregarIng(tipo, refId){
+  formIngs.push({ id: uuid(), tipo, ref_id: refId, cantidad: 100, unidad: 'g', crudo: false })
+  $('ing-search').value = ''; $('ing-sugs').style.display = 'none'
+  renderForm()
+}
+function quitarIng(idx){ formIngs.splice(idx, 1); renderForm() }
+function updIng(idx, campo, val){
+  if(campo === 'cantidad') formIngs[idx].cantidad = parseFloat(val) || 0
+  else if(campo === 'crudo') formIngs[idx].crudo = val
+  else formIngs[idx][campo] = val
+  renderForm()
+}
+
+function renderForm(){
+  $('ing-body').innerHTML = formIngs.map((ing, i) => {
+    const n = ing.tipo === 'insumo' ? (insMap[ing.ref_id]?.nombre || '¿?') : '🧩 ' + (srMap[ing.ref_id]?.nombre || '¿?')
+    return `<tr>
+      <td>${esc(n)}</td>
+      <td><input type="number" min="0" step="any" value="${ing.cantidad}" style="width:80px" onchange="updIng(${i},'cantidad',this.value)"></td>
+      <td><select style="width:85px" onchange="updIng(${i},'unidad',this.value)">${UNIDADES.map(u => `<option ${u === ing.unidad ? 'selected' : ''}>${u}</option>`).join('')}</select></td>
+      <td style="text-align:center">${ing.tipo === 'insumo' ? `<input type="checkbox" ${ing.crudo ? 'checked' : ''} onchange="updIng(${i},'crudo',this.checked)">` : ''}</td>
+      <td style="font-size:12.5px;color:var(--verde-osc);font-weight:600">${fmt$(costoIngrediente(ing))}</td>
+      <td><button class="btn btn-sm" onclick="quitarIng(${i})">✕</button></td>
+    </tr>`
+  }).join('') || '<tr><td colspan="6" style="color:var(--gris);font-size:13px">Todavía no agregaste ingredientes.</td></tr>'
+  const total = formIngs.reduce((s, i) => s + costoIngrediente(i), 0)
+  const porc = parseInt($('p-porciones').value) || 1
+  $('c-total').textContent = fmt$(total)
+  $('c-vianda').textContent = fmt$(total / porc)
+}
+document.addEventListener('DOMContentLoaded', () => { $('p-porciones').addEventListener('input', renderForm) })
+
+async function guardarPlato(){
+  const nombre = $('p-nombre').value.trim()
+  if(!nombre){ toast('Poné un nombre al plato'); return }
+  if(formIngs.length === 0){ toast('Agregá al menos un ingrediente'); return }
+  const id = editingId || uuid()
+  const row = {
+    id, nombre,
+    tipo: $('p-tipo').value,
+    porciones: parseInt($('p-porciones').value) || 1,
+    descripcion: $('p-desc').value.trim() || null,
+  }
+  if(dbListo) row.proteina = $('p-prot').value
+  if(dbRot) row.en_rotacion = editingId ? (platoMap[editingId]?.en_rotacion ?? true) : true
+  try{
+    await sbPost('platos', [row])
+    await sbDelete('plato_ingredientes', 'plato_id=eq.' + encodeURIComponent(id))
+    await sbPost('plato_ingredientes', formIngs.map(i => ({ ...i, plato_id: id })))
+    const nuevo = { ...row, ingredientes: formIngs.map(i => ({ ...i })) }
+    if(editingId){ platos = platos.map(p => p.id === id ? nuevo : p) } else { platos.push(nuevo); platos.sort((a, b) => a.nombre.localeCompare(b.nombre)) }
+    platoMap[id] = nuevo
+    const dup = historicos.find(h => normNombre(h.nombre) === normNombre(nombre))
+    if(dup){ sbDelete('platos_historicos', 'id=eq.' + encodeURIComponent(dup.id)).catch(() => {}); historicos = historicos.filter(h => h.id !== dup.id); delete platoMap[dup.id] }
+    toast(editingId ? 'Receta actualizada ✅' : 'Receta guardada en el recetario ✅')
+    limpiarForm(); renderRecetario(); showTab('recetario')
+  } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
+}
+
+// ─── Generador de ideas ──────────────────────────────────────────────────────
+function costoPorKgSub(sr){
+  const rendG = toGramos(sr.rendimiento, sr.unidad_rendimiento)
+  if(rendG <= 0) return 0
+  return costoSubreceta(sr) / (rendG / 1000)
+}
+
+const BK = {
+  formatos: {
+    pollo: ['Cubos de pollo','Milanesa de pollo','Suprema de pollo','Pechuga rellena','Medallones de pollo','Pollo mechado'],
+    vacuna: ['Cubos de ternera','Carne mechada','Albóndigas de ternera','Pan de carne','Milanesa de ternera','Bifecitos de ternera'],
+    cerdo: ['Cubos de cerdo','Bondiola braseada','Ribs de cerdo','Milanesa de cerdo','Matambre de cerdo','Solomillo de cerdo'],
+    pescado: ['Milanesa de merluza','Filet de merluza','Medallones de pescado','Rolls de pescado rellenos'],
+  },
+  salsas: ['en salsa BBQ','a la mostaza y miel','en salsa de puerro','al strogonoff','al verdeo','al limón y cilantro','al teriyaki','al curry','a la naranja y tomillo','a la criolla','con crema y espinaca','en salsa cremosa de calabaza','al pesto','a la crema de champiñones','en salsa de tomate y albahaca'],
+  dips: ['de salsa criolla','de mostaza y miel','de yogurt y hierbas','de cheddar','de BBQ'],
+  estilosMila: ['a la napolitana','a la suiza','a la fugazzeta','a la parmesana','al roquefort'],
+  guarniciones: ['papas al horno','batatas asadas','calabaza al horno','vegetales asados','puré de papa','puré de calabaza','puré mixto','puré de boniato','puré duquesa','arroz yamaní','arroz primavera','arroz azafranado','tortilla de papa','soufflé de verdura','milhojas de papa','ratatouille','tabule de cuscús'],
+  veggieBase: ['Milanesa de berenjena','Milanesa de zucchini','Milanesa de calabaza','Medallones de quinoa','Medallones de lentejas','Medallones de garbanzos','Falafel','Albóndigas de berenjena','Bombas de papa rellenas'],
+  veggieSolo: ['Risotto de hongos','Risotto de cabutia','Risotto de remolacha','Risotto verde de espinaca','Wok veggie de arroz y vegetales','Pastel de choclo','Berenjenas a la parmiggiana','Lasaña veggie','Tortilla española de papa','Paella de vegetales'],
+  veggiePasta: ['Ñoquis de papa','Ñoquis de calabaza','Ñoquis de remolacha','Canelones de verdura','Malfattis de espinaca'],
+  salsasPasta: ['bolognesa','fileto','4 quesos','roquefort','cheddar','verdeo y panceta','crema de champiñones','alfredo','pesto','parisienne'],
+}
+const azar = a => a[Math.floor(Math.random() * a.length)]
+
+function generarIdeas(){
+  const prot = $('idea-prot').value
+  const existentes = new Set([...platos, ...historicos].map(p => normNombre(p.nombre)))
+  const ideas = [], vistas = new Set()
+  let intentos = 0
+  while(ideas.length < 5 && intentos++ < 300){
+    let nombre
+    if(prot === 'vegetariano'){
+      const r = Math.random()
+      if(r < 0.45) nombre = `${azar(BK.veggieBase)} con ${azar(BK.guarniciones)}`
+      else if(r < 0.75) nombre = azar(BK.veggieSolo)
+      else nombre = `${azar(BK.veggiePasta)} con salsa ${azar(BK.salsasPasta.filter(x => !/panceta|bolognesa|pollo/.test(x)))}`
+    } else {
+      const f = azar(BK.formatos[prot] || [])
+      if(!f) break
+      if(/milanesa/i.test(f)){
+        const r = Math.random()
+        if(r < 0.45) nombre = `${f} ${azar(BK.estilosMila)}, con ${azar(BK.guarniciones)}`
+        else if(r < 0.75) nombre = `${f} con dip ${azar(BK.dips)} y ${azar(BK.guarniciones)}`
+        else nombre = `${f} con ${azar(BK.guarniciones)}`
+      } else {
+        nombre = `${f} ${azar(BK.salsas)}, con ${azar(BK.guarniciones)}`
+      }
+    }
+    const k = normNombre(nombre)
+    if(vistas.has(k) || existentes.has(k)) continue
+    vistas.add(k)
+    ideas.push({ nombre })
+  }
+  window._ideas = ideas
+  $('ideas-list').innerHTML = ideas.length === 0
+    ? '<p style="font-size:13px;color:var(--gris)">No pude generar ideas nuevas. Probá de nuevo.</p>'
+    : ideas.map((idea, i) => `
+    <div class="idea">
+      <h4>${esc(idea.nombre)}</h4>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-sm btn-p" onclick="usarIdea(${i})">Usar como base →</button>
+      </div>
+    </div>`).join('')
+}
+
+function usarIdea(i){
+  const idea = window._ideas[i]
+  limpiarForm()
+  $('p-nombre').value = idea.nombre
+  const prot = $('idea-prot').value
+  $('p-prot').value = prot
+  $('p-tipo').value = prot === 'vegetariano' ? 'vegetariano' : 'clasico'
+  renderForm(); window.scrollTo(0, 0)
+  toast('Agregá los ingredientes para calcular el costo')
+}
+
+// ─── Calendario ──────────────────────────────────────────────────────────────
+async function cargarPeriodo(){
+  const fechas = visibleDates()
+  cal = Object.fromEntries(fechas.map(f => [iso(f), [null, null, null]]))
+  if(dbListo){
+    try{
+      const rows = await sbGet(`calendario_menu?select=*&fecha=gte.${iso(fechas[0])}&fecha=lte.${iso(fechas[fechas.length - 1])}`)
+      for(const r of rows) if(cal[r.fecha] && r.slot >= 0 && r.slot < 3) cal[r.fecha][r.slot] = r.plato_id
+    } catch(e){ console.warn(e) }
+  }
+  renderCal()
+}
+const cargarSemana = cargarPeriodo
+
+function moverPeriodo(n){
+  if(vista === 'semana') weekStart = addDays(weekStart, n * 7)
+  else weekStart = new Date(weekStart.getFullYear(), weekStart.getMonth() + n, 1, 12)
+  cargarPeriodo()
+}
+
+function setVista(v){
+  vista = v
+  $('vt-semana').classList.toggle('act', v === 'semana')
+  $('vt-mes').classList.toggle('act', v === 'mes')
+  if(v === 'semana') weekStart = mondayOf(weekStart)
+  cargarPeriodo()
+}
+
+function validarDia(ids){
+  const msgs = []
+  const ps = ids.map(id => id ? platoMap[id] : null)
+  if(ps[0] && protDe(ps[0]) !== 'vegetariano') msgs.push('El plato 1 debería ser vegetariano')
+  for(const k of [1, 2]) if(ps[k] && protDe(ps[k]) === 'vegetariano') msgs.push(`La opción ${k + 1} es vegetariana (va proteína)`)
+  if(ps[1] && ps[2] && protDe(ps[1]) === protDe(ps[2])) msgs.push('Proteína repetida: ' + protDef(protDe(ps[1])).l)
+  for(let i = 0; i < 3; i++) for(let j = i + 1; j < 3; j++)
+    if(ps[i] && ps[j] && (ps[i].id === ps[j].id || claveDe(ps[i]) === claveDe(ps[j]))) msgs.push('Platos parecidos el mismo día')
+  return [...new Set(msgs)]
+}
+
+function cuentaPeriodo(){
+  const cuenta = {}
+  for(const f of visibleDates()) for(const id of (cal[iso(f)] || [])) if(id) cuenta[id] = (cuenta[id] || 0) + 1
+  return cuenta
+}
+
+function avisosPeriodo(){
+  const fechas = visibleDates(), avisos = []
+  const cuenta = cuentaPeriodo()
+  for(const [id, n] of Object.entries(cuenta))
+    if(n > 1 && platoMap[id]) avisos.push(`🔁 "${platoMap[id].nombre}" aparece ${n} veces en ${vista === 'semana' ? 'la semana' : 'el mes'}`)
+  const porSemana = {}
+  for(const f of fechas){ const wk = iso(mondayOf(f)); porSemana[wk] ??= []; for(const id of cal[iso(f)]) if(id && platoMap[id]) porSemana[wk].push(id) }
+  const similares = new Set()
+  for(const ids of Object.values(porSemana)){
+    const vistos = {}
+    for(const id of ids){ const k = claveDe(platoMap[id]); (vistos[k] ??= []).push(id) }
+    for(const grupo of Object.values(vistos)){
+      const unicos = [...new Set(grupo)]
+      if(unicos.length > 1) similares.add(unicos.map(id => platoMap[id].nombre).join(' / '))
+    }
+  }
+  for(const s of similares) avisos.push(`👀 Platos parecidos en la misma semana: ${s}`)
+  return avisos
+}
+
+function renderCal(){
+  const fechas = visibleDates()
+  $('cal-titulo').textContent = vista === 'semana'
+    ? 'Semana del ' + fmtFecha(fechas[0]) + ' al ' + fmtFecha(fechas[4])
+    : MESES[weekStart.getMonth()] + ' ' + weekStart.getFullYear()
+  $('cal-avisos').innerHTML = avisosPeriodo().map(a => `<div class="aviso-dia">${esc(a)}</div>`).join('')
+  const etiquetas = ['🌿 Vegetariano', 'Opción 2', 'Opción 3']
+  const grid = $('cal-grid')
+  const cuenta = cuentaPeriodo()
+
+  if(vista === 'semana'){
+    grid.className = 'cal-grid'
+    grid.innerHTML = fechas.map((f, di) => {
+      const fi = iso(f), ids = cal[fi]
+      const slots = ids.map((id, s) => {
+        const p = id ? platoMap[id] : null
+        if(!p) return `<div class="slot" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})"><span class="slot-tag">${etiquetas[s]}</span><span style="color:#94a3b8">+ Elegir plato</span></div>`
+        const pd = protDef(protDe(p)), c = calcPlato(p)
+        return `<div class="slot lleno" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onclick="abrirPicker('${fi}',${s})">
+          <button class="quitar" onclick="event.stopPropagation();quitarSlot('${fi}',${s})">✕</button>
+          <span class="slot-tag">${etiquetas[s]}</span>
+          <b style="font-size:12.5px;line-height:1.25">${esc(p.nombre)}</b>
+          <span>${badge(pd)} <small style="color:var(--gris)">${p.historico ? '📜 histórico' : fmt$(c.vianda)}</small>${cuenta[id] > 1 ? ' <small style="color:#dc2626">🔁</small>' : ''}</span>
+        </div>`
+      }).join('')
+      const avisos = validarDia(ids).map(m => `<div class="aviso-dia">⚠️ ${m}</div>`).join('')
+      return `<div class="cal-dia"><h4>${DIAS[di]}<small>${fmtFecha(f)}</small></h4>${slots}${avisos}</div>`
+    }).join('')
+    return
+  }
+
+  grid.className = 'mes-grid'
+  const cab = DIAS.map(d => `<div class="mes-cab">${d}</div>`).join('')
+  const offset = (new Date(iso(fechas[0]) + 'T12:00:00').getDay() + 6) % 7
+  const vacios = Array.from({ length: offset }, () => '<div class="mes-dia vacio"></div>').join('')
+  grid.innerHTML = cab + vacios + fechas.map(f => {
+    const fi = iso(f), ids = cal[fi]
+    const slots = ids.map((id, s) => {
+      const p = id ? platoMap[id] : null
+      if(!p) return `<div class="mini-slot libre" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})">+ ${s === 0 ? 'vegetariano' : 'opción ' + (s + 1)}</div>`
+      const pd = protDef(protDe(p))
+      return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)}${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
+        <span class="dot" style="background:${pd.t}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nombre)}</span>
+      </div>`
+    }).join('')
+    const msgs = validarDia(ids)
+    const warn = msgs.length ? ` <span title="${esc(msgs.join(' · '))}" style="cursor:help">⚠️</span>` : ''
+    return `<div class="mes-dia"><h5>${f.getDate()}${warn}</h5>${slots}</div>`
+  }).join('')
+}
+
+function quitarSlot(f, s){ cal[f][s] = null; renderCal() }
+
+// ─── Drag & drop: intercambia platos entre casilleros ───────────────────────
+let dragSrc = null
+function dragStart(ev, f, s){ dragSrc = { f, s }; ev.dataTransfer.effectAllowed = 'move' }
+function soltar(ev, f, s){
+  ev.preventDefault(); ev.stopPropagation()
+  if(!dragSrc || (dragSrc.f === f && dragSrc.s === s)){ dragSrc = null; return }
+  const tmp = cal[f][s]
+  cal[f][s] = cal[dragSrc.f][dragSrc.s]
+  cal[dragSrc.f][dragSrc.s] = tmp
+  dragSrc = null
+  renderCal()
+}
+
+function abrirPicker(fecha, slot){
+  pickerCtx = { fecha, slot }
+  $('modal-pick-body').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0">Elegir plato — ${diaNombre(fecha)} ${fmtFecha(new Date(fecha + 'T12:00:00'))} (${slot === 0 ? 'vegetariano' : 'opción ' + (slot + 1)})</h2>
+      <button class="btn btn-sm" onclick="cerrarModal('modal-pick')">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+      <input id="pick-busca" placeholder="🔍 Buscar…" style="flex:1;min-width:160px" oninput="renderPickList()">
+      <select id="pick-prot" onchange="renderPickList()">
+        <option value="">Todas</option>
+        ${PROTEINAS.map(p => `<option value="${p.v}" ${slot === 0 && p.v === 'vegetariano' ? 'selected' : ''}>${p.e} ${p.l}</option>`).join('')}
+      </select>
+      <label style="display:flex;align-items:center;gap:5px;margin:0;font-size:12.5px;cursor:pointer"><input type="checkbox" id="pick-apto" checked onchange="renderPickList()"> solo en rotación</label>
+    </div>
+    <div id="pick-list" style="max-height:420px;overflow-y:auto"></div>`
+  $('modal-pick').classList.add('open')
+  renderPickList()
+}
+
+function renderPickList(){
+  const q = $('pick-busca').value.trim().toLowerCase()
+  const fp = $('pick-prot').value
+  const soloApto = $('pick-apto').checked
+  const { fecha, slot } = pickerCtx
+  const otrosIds = cal[fecha].filter((id, s) => s !== slot && id)
+  const otrasProts = otrosIds.map(id => platoMap[id] ? protDe(platoMap[id]) : null)
+  const otrasClaves = otrosIds.filter(id => platoMap[id]).map(id => claveDe(platoMap[id]))
+  const cuenta = cuentaPeriodo()
+  const base = [...platos, ...historicos].sort((a, b) => a.nombre.localeCompare(b.nombre))
+  const list = base.filter(p => (!q || p.nombre.toLowerCase().includes(q)) && (!fp || protDe(p) === fp) && (!soloApto || aptoRotacion(p)))
+  $('pick-list').innerHTML = list.length === 0 ? '<p style="color:var(--gris);font-size:13px">Sin resultados.</p>' : list.map(p => {
+    const pd = protDef(protDe(p)), c = calcPlato(p)
+    const conflicto = slot !== 0 && protDe(p) !== 'vegetariano' && otrasProts.includes(protDe(p))
+    const parecido = otrasClaves.includes(claveDe(p))
+    const veces = cuenta[p.id] || 0
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer" onclick="elegirPlato('${p.id}')">
+      ${badge(pd, pd.e)} <b style="flex:1;font-size:13.5px">${esc(p.nombre)}</b>
+      ${!aptoRotacion(p) ? '<span style="font-size:11px;color:#94a3b8">⏸ fuera de rotación</span>' : ''}
+      ${conflicto ? '<span style="font-size:11px;color:#b45309">⚠️ proteína repetida ese día</span>' : ''}
+      ${parecido ? '<span style="font-size:11px;color:#b45309">⚠️ parecido a otro plato del día</span>' : ''}
+      ${veces > 0 ? `<span style="font-size:11px;color:#64748b">ya está ${veces === 1 ? '' : veces + ' veces '}en ${vista === 'semana' ? 'la semana' : 'el mes'}</span>` : ''}
+      <span style="font-size:12.5px;color:var(--verde-osc);font-weight:600">${p.historico ? '📜' : fmt$(c.vianda)}</span>
+    </div>`
+  }).join('')
+}
+
+function elegirPlato(id){
+  cal[pickerCtx.fecha][pickerCtx.slot] = id
+  cerrarModal('modal-pick'); renderCal()
+}
+
+// ─── Generar propuesta automática ────────────────────────────────────────────
+function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango){
+  let best = null, bestS = Infinity
+  for(const p of pool){
+    const k = claveDe(p)
+    let s = Math.random() * 500
+    if(clavesDia.has(k)) s += 1e9
+    s += (usadosRango.get(p.id) || 0) * 1e6
+    if(clavesSem.has(k)) s += 3e5
+    const lu = lastUsedDe(p)
+    if(lu){ const dd = diasEntre(lu, iso(f)); if(dd >= 0 && dd < 35) s += (35 - dd) * 2e3 }
+    if(s < bestS){ bestS = s; best = p }
+  }
+  return best
+}
+
+function generarPropuesta(){
+  const fechas = visibleDates()
+  const hayAlgo = fechas.some(f => (cal[iso(f)] || []).some(x => x))
+  if(hayAlgo && !confirm('Ya hay platos cargados en este período. ¿Genero una propuesta nueva y los reemplazo?')) return
+  const rotacion = [...platos, ...historicos].filter(aptoRotacion)
+  const vegPool = rotacion.filter(p => protDe(p) === 'vegetariano')
+  const pools = {}; for(const pr of PROT_CARNES) pools[pr] = rotacion.filter(p => protDe(p) === pr)
+  const dispo = PROT_CARNES.filter(pr => pools[pr].length > 0)
+  if(vegPool.length === 0 || dispo.length < 2){ toast('Faltan platos en rotación: se necesita al menos 1 vegetariano y 2 proteínas distintas'); return }
+
+  const pares = []
+  for(let i = 0; i < dispo.length; i++) for(let j = i + 1; j < dispo.length; j++) pares.push([dispo[i], dispo[j]])
+  shuffle(pares)
+
+  const usadosRango = new Map(), clavesSemana = {}
+  fechas.forEach((f, di) => {
+    const fi = iso(f), wk = iso(mondayOf(f))
+    const clavesSem = (clavesSemana[wk] ??= new Set())
+    const clavesDia = new Set()
+    const elegir = pool => {
+      const p = elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango)
+      if(p){ usadosRango.set(p.id, (usadosRango.get(p.id) || 0) + 1); clavesDia.add(claveDe(p)); clavesSem.add(claveDe(p)) }
+      return p
+    }
+    const veg = elegir(vegPool)
+    const [pa, pb] = pares[di % pares.length]
+    const a = elegir(pools[pa])
+    const b = elegir(pools[pb])
+    cal[fi] = [veg?.id || null, a?.id || null, b?.id || null]
+  })
+  renderCal()
+  toast('Propuesta generada — revisala y guardala')
+}
+
+async function guardarSemana(){
+  if(!dbListo){ toast('Primero ejecutá el SQL en Supabase'); return }
+  const fechas = visibleDates()
+  try{
+    await sbDelete('calendario_menu', `fecha=gte.${iso(fechas[0])}&fecha=lte.${iso(fechas[fechas.length - 1])}`)
+    const rows = []
+    for(const [fecha, ids] of Object.entries(cal))
+      ids.forEach((id, slot) => { if(id) rows.push({ id: uuid(), fecha, slot, plato_id: id }) })
+    if(rows.length) await sbPost('calendario_menu', rows)
+    for(const r of rows) if(!usage[r.plato_id] || usage[r.plato_id] < r.fecha) usage[r.plato_id] = r.fecha
+    toast((vista === 'semana' ? 'Semana guardada' : 'Mes guardado') + ' ✅')
+  } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
+}
+
+// ─── Imprimir ────────────────────────────────────────────────────────────────
+function imprimirMenu(){
+  const fechas = visibleDates()
+  const semanas = {}
+  for(const f of fechas){ const wk = iso(mondayOf(f)); (semanas[wk] ??= []).push(f) }
+  const titulo = vista === 'semana'
+    ? 'Menú semana del ' + fmtFecha(fechas[0]) + ' al ' + fmtFecha(fechas[fechas.length - 1])
+    : 'Menú ' + MESES[weekStart.getMonth()] + ' ' + weekStart.getFullYear()
+  $('print-menu').innerHTML = `<h2 style="font-family:sans-serif">Easy Lunch — ${titulo}</h2>` +
+    Object.values(semanas).map(fs => `
+    <table border="1" cellpadding="8" style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:12px;margin-top:14px">
+      <tr style="background:#f1f5f9"><th></th>${fs.map(f => `<th>${diaNombre(iso(f))} ${fmtFecha(f)}</th>`).join('')}</tr>
+      ${['🌿 Vegetariano', 'Opción 2', 'Opción 3'].map((et, s) => `<tr><td><b>${et}</b></td>${fs.map(f => {
+        const id = cal[iso(f)][s]; const p = id ? platoMap[id] : null
+        return `<td>${p ? esc(p.nombre) + ' <small>(' + protDef(protDe(p)).l + ')</small>' : '—'}</td>`
+      }).join('')}</tr>`).join('')}
+    </table>`).join('')
+  window.print()
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+cargar().catch(e => { console.error(e); $('rec-grid').innerHTML = '<div class="spin">Error de conexión con la base de datos.<br><small>' + esc(e.message) + '</small></div>' })
+</script>
+</body>
+</html>
