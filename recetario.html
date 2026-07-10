@@ -95,6 +95,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
     <button id="nav-recetario" class="act" onclick="showTab('recetario')">📖 Recetario</button>
     <button id="nav-crear" onclick="showTab('crear')">➕ Nueva receta</button>
     <button id="nav-calendario" onclick="showTab('calendario')">📅 Calendario</button>
+    <button id="nav-reglas" onclick="showTab('reglas')">⚙️ Reglas</button>
   </nav>
 </header>
 <main>
@@ -168,12 +169,46 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
     <div class="avisos-cal" id="cal-avisos"></div>
     <div id="cal-grid"></div>
   </section>
+  <section id="tab-reglas" style="display:none">
+    <div class="crear-cols">
+      <div class="card">
+        <h2 style="font-size:17px;margin-bottom:6px">⚙️ Reglas fijas del sistema</h2>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:12px">El generador aplica esto automáticamente al armar la propuesta.</p>
+        <ul style="font-size:13.5px;line-height:2;padding-left:20px">
+          <li>3 platos por día, de lunes a viernes.</li>
+          <li>El plato 1 de cada día es siempre <b>vegetariano</b>.</li>
+          <li>Las otras 2 opciones llevan <b>proteínas distintas</b> entre sí (vacuna, cerdo, pollo o pescado).</li>
+          <li>No se repite un plato dentro del período visible (semana o mes).</li>
+          <li>Se evitan <b>platos parecidos</b> el mismo día y en la misma semana (por nombre o misma base).</li>
+          <li>Se prioriza lo que hace más tiempo no se sirve (usa el historial de menús desde 2024).</li>
+          <li>Fuera de rotación automática: <b>ensaladas, tartas, sándwiches, wraps y postres</b>.</li>
+          <li>Los platos proteicos y otros marcados "⏸ fuera de rotación" no entran en la propuesta (se edita en la ficha de cada plato).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2 style="font-size:17px;margin-bottom:6px">➕ Reglas personalizadas</h2>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:12px">Las de tipo "excluir" y "límite" se aplican solas al generar y al validar; las notas son recordatorios.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:end">
+          <div><label>Tipo</label><select id="rg-tipo" onchange="document.getElementById('rg-max-box').style.display = this.value === 'limite' ? '' : 'none'">
+            <option value="excluir">⛔ Excluir platos que contengan…</option>
+            <option value="limite">🚦 Límite por período para…</option>
+            <option value="nota">📝 Nota / recordatorio</option>
+          </select></div>
+          <div style="flex:1;min-width:150px"><label>Texto</label><input id="rg-texto" style="width:100%" placeholder="ej: milanesa, brócoli, mondongo…"></div>
+          <div id="rg-max-box" style="display:none"><label>Máx. veces</label><input id="rg-max" type="number" min="1" value="2" style="width:70px"></div>
+          <button class="btn btn-p" onclick="agregarRegla()">Agregar</button>
+        </div>
+        <div id="reglas-list"><p style="font-size:13px;color:var(--gris)">Sin reglas personalizadas todavía.</p></div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <div class="modal-bg" id="modal-det"><div class="modal" id="modal-det-body"></div></div>
 <div class="modal-bg" id="modal-pick"><div class="modal" id="modal-pick-body"></div></div>
 <div class="toast" id="toast"></div>
 <div id="print-menu"></div>
+<div id="hover-empl" style="position:fixed;display:none;background:#fff;border:1px solid var(--borde);border-radius:14px;padding:12px;box-shadow:0 12px 34px rgba(15,23,42,.25);z-index:85;width:290px" onmouseenter="clearTimeout(window._heT)" onmouseleave="slotHoverLeave()"></div>
 <script>
 // ─── Conexión Supabase (misma base que la plataforma de producción) ─────────
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
@@ -225,6 +260,9 @@ let usage = {}                // plato_id -> última fecha usada (histórico)
 let pickerCtx = null
 let historicos = []           // platos importados del Google Sheet
 let usageNorm = {}            // nombre_norm -> ultima fecha en menus historicos
+let reglas = { excluir: [], limites: [], notas: [] }
+let emplatados = {}           // nombre_norm -> url de foto de emplatado
+const API_EMPLATADO = 'https://easylunch-panel.vercel.app/api/emplatado'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id)
@@ -259,7 +297,9 @@ const RE_FUERA_NOMBRE = /(ensalada|tarta|wrap|sandwich|omelet|pechuga de pollo c
 const normNombre = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 function aptoRotacion(p){
   if(p.en_rotacion === false) return false
-  if(p.historico) return !RE_FUERA_NOMBRE.test(normNombre(p.nombre))
+  const nn = normNombre(p.nombre)
+  if(reglas.excluir.some(w => nn.includes(normNombre(w)))) return false
+  if(p.historico) return !RE_FUERA_NOMBRE.test(nn)
   return !TIPOS_FUERA_ROTACION.has(p.tipo)
 }
 function lastUsedDe(p){
@@ -373,6 +413,16 @@ async function cargar(){
   }
 
   try{
+    const rg = await sbGet('app_data?key=eq.recetario_reglas&select=value')
+    if(rg[0] && rg[0].value) reglas = { excluir: [], limites: [], notas: [], ...rg[0].value }
+  } catch(e){ console.warn('[Reglas]', e) }
+  try{
+    const em = await sbGet('emplatados?select=nombre_norm,url')
+    for(const r of em) emplatados[r.nombre_norm] = r.url
+  } catch(e){ console.warn('[Emplatados] tabla no disponible', e) }
+  renderReglas()
+
+  try{
     const desde = iso(addDays(weekStart, -35))
     const hist = dbListo ? await sbGet(`calendario_menu?select=fecha,plato_id&fecha=gte.${desde}&order=fecha`) : []
     for(const r of hist) if(!usage[r.plato_id] || usage[r.plato_id] < r.fecha) usage[r.plato_id] = r.fecha
@@ -394,7 +444,7 @@ function llenarSelects(){
 
 // ─── Tabs ────────────────────────────────────────────────────────────────────
 function showTab(t){
-  for(const x of ['recetario','crear','calendario']){
+  for(const x of ['recetario','crear','calendario','reglas']){
     $('tab-' + x).style.display = x === t ? '' : 'none'
     $('nav-' + x).classList.toggle('act', x === t)
   }
@@ -766,7 +816,15 @@ function avisosPeriodo(){
     }
   }
   for(const s of similares) avisos.push(`👀 Platos parecidos en la misma semana: ${s}`)
-  return avisos
+  for(const l of (reglas.limites || [])){
+    const pal = normNombre(l.palabra); let n = 0
+    for(const f of fechas) for(const id of cal[iso(f)]) if(id && platoMap[id] && normNombre(platoMap[id].nombre).includes(pal)) n++
+    if(n > (parseInt(l.max) || 1)) avisos.push(`🚦 "${l.palabra}" aparece ${n} veces (máximo ${l.max} por regla)`)
+  }
+  for(const f of fechas) for(const id of cal[iso(f)])
+    if(id && platoMap[id] && reglas.excluir.some(w => normNombre(platoMap[id].nombre).includes(normNombre(w))))
+      avisos.push(`⛔ "${platoMap[id].nombre}" está excluido por regla`)
+  return [...new Set(avisos)]
 }
 
 function renderCal(){
@@ -787,7 +845,7 @@ function renderCal(){
         const p = id ? platoMap[id] : null
         if(!p) return `<div class="slot" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})"><span class="slot-tag">${etiquetas[s]}</span><span style="color:#94a3b8">+ Elegir plato</span></div>`
         const pd = protDef(protDe(p)), c = calcPlato(p)
-        return `<div class="slot lleno" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onclick="abrirPicker('${fi}',${s})">
+        return `<div class="slot lleno" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})">
           <button class="quitar" onclick="event.stopPropagation();quitarSlot('${fi}',${s})">✕</button>
           <span class="slot-tag">${etiquetas[s]}</span>
           <b style="font-size:12.5px;line-height:1.25">${esc(p.nombre)}</b>
@@ -810,7 +868,7 @@ function renderCal(){
       const p = id ? platoMap[id] : null
       if(!p) return `<div class="mini-slot libre" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})">+ ${s === 0 ? 'vegetariano' : 'opción ' + (s + 1)}</div>`
       const pd = protDef(protDe(p))
-      return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)}${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
+      return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)}${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
         <span class="dot" style="background:${pd.t}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nombre)}</span>
       </div>`
     }).join('')
@@ -888,7 +946,7 @@ function elegirPlato(id){
 }
 
 // ─── Generar propuesta automática ────────────────────────────────────────────
-function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango){
+function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims){
   let best = null, bestS = Infinity
   for(const p of pool){
     const k = claveDe(p)
@@ -896,6 +954,7 @@ function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango){
     if(clavesDia.has(k)) s += 1e9
     s += (usadosRango.get(p.id) || 0) * 1e6
     if(clavesSem.has(k)) s += 3e5
+    if(lims && lims.some(l => normNombre(p.nombre).includes(l.palabra) && l.n >= l.max)) s += 8e8
     const lu = lastUsedDe(p)
     if(lu){ const dd = diasEntre(lu, iso(f)); if(dd >= 0 && dd < 35) s += (35 - dd) * 2e3 }
     if(s < bestS){ bestS = s; best = p }
@@ -918,13 +977,17 @@ function generarPropuesta(){
   shuffle(pares)
 
   const usadosRango = new Map(), clavesSemana = {}
+  const lims = (reglas.limites || []).map(l => ({ palabra: normNombre(l.palabra), max: Math.max(1, parseInt(l.max) || 1), n: 0 }))
   fechas.forEach((f, di) => {
     const fi = iso(f), wk = iso(mondayOf(f))
     const clavesSem = (clavesSemana[wk] ??= new Set())
     const clavesDia = new Set()
     const elegir = pool => {
-      const p = elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango)
-      if(p){ usadosRango.set(p.id, (usadosRango.get(p.id) || 0) + 1); clavesDia.add(claveDe(p)); clavesSem.add(claveDe(p)) }
+      const p = elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims)
+      if(p){
+        usadosRango.set(p.id, (usadosRango.get(p.id) || 0) + 1); clavesDia.add(claveDe(p)); clavesSem.add(claveDe(p))
+        for(const l of lims) if(normNombre(p.nombre).includes(l.palabra)) l.n++
+      }
       return p
     }
     const veg = elegir(vegPool)
@@ -969,6 +1032,74 @@ function imprimirMenu(){
       }).join('')}</tr>`).join('')}
     </table>`).join('')
   window.print()
+}
+
+// ─── Reglas personalizadas ───────────────────────────────────────────────────
+async function persistirReglas(){
+  try{ await sbPost('app_data', [{ key: 'recetario_reglas', value: reglas }]) }
+  catch(e){ console.error(e); toast('Error al guardar las reglas') }
+}
+function agregarRegla(){
+  const tipo = $('rg-tipo').value, txt = $('rg-texto').value.trim()
+  if(!txt){ toast('Escribí el texto de la regla'); return }
+  if(tipo === 'excluir') reglas.excluir.push(txt)
+  else if(tipo === 'limite') reglas.limites.push({ palabra: txt, max: Math.max(1, parseInt($('rg-max').value) || 1) })
+  else reglas.notas.push(txt)
+  $('rg-texto').value = ''
+  persistirReglas(); renderReglas(); renderRecetario(); if(Object.keys(cal).length) renderCal()
+  toast('Regla agregada ✅')
+}
+function quitarRegla(tipo, i){
+  reglas[tipo].splice(i, 1)
+  persistirReglas(); renderReglas(); renderRecetario(); if(Object.keys(cal).length) renderCal()
+}
+function renderReglas(){
+  const box = $('reglas-list'); if(!box) return
+  const fila = (icono, texto, tipo, i) => `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13.5px">
+    <span>${icono}</span><span style="flex:1">${esc(texto)}</span>
+    <button class="btn btn-sm" onclick="quitarRegla('${tipo}',${i})">✕</button></div>`
+  let html = ''
+  reglas.excluir.forEach((w, i) => html += fila('⛔', `Excluir platos que contengan "${w}"`, 'excluir', i))
+  reglas.limites.forEach((l, i) => html += fila('🚦', `"${l.palabra}" máximo ${l.max} veces por período`, 'limites', i))
+  reglas.notas.forEach((n, i) => html += fila('📝', n, 'notas', i))
+  box.innerHTML = html || '<p style="font-size:13px;color:var(--gris)">Sin reglas personalizadas todavía.</p>'
+}
+
+// ─── Hover: foto de emplatado (bandeja 105) ──────────────────────────────────
+function slotHover(ev, id){
+  clearTimeout(window._heT); clearTimeout(window._heShow)
+  const x = Math.min(ev.clientX + 14, window.innerWidth - 310)
+  const y = Math.min(ev.clientY + 10, window.innerHeight - 330)
+  window._heShow = setTimeout(() => mostrarEmplatado(x, y, id), 400)
+}
+function slotHoverLeave(){
+  clearTimeout(window._heShow)
+  window._heT = setTimeout(() => { $('hover-empl').style.display = 'none' }, 350)
+}
+function mostrarEmplatado(x, y, id){
+  const p = platoMap[id]; if(!p) return
+  const el = $('hover-empl')
+  const url = emplatados[normNombre(p.nombre)]
+  el.innerHTML = `<b style="font-size:13px;line-height:1.3;display:block">${esc(p.nombre)}</b>` + (url
+    ? `<img src="${url}" style="width:100%;border-radius:10px;margin-top:8px" alt="emplatado">
+       <div style="font-size:11px;color:var(--gris);margin-top:4px">Propuesta de emplatado — bandeja 105 <button class="btn btn-sm" style="float:right" onclick="generarEmplatado('${id}')">🔄</button></div>`
+    : `<button class="btn btn-sm btn-p" style="margin-top:8px" onclick="generarEmplatado('${id}')">✨ Generar foto de emplatado</button>
+       <div style="font-size:11px;color:var(--gris);margin-top:5px">Imagen IA: propuesta en bandeja 105 rectangular sin división</div>`)
+  el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.display = 'block'
+}
+async function generarEmplatado(id){
+  const p = platoMap[id]; if(!p) return
+  const el = $('hover-empl')
+  el.innerHTML = `<b style="font-size:13px">${esc(p.nombre)}</b><div style="margin-top:8px;font-size:12.5px;color:var(--gris)">⏳ Generando imagen… (10-25 seg)</div>`
+  try{
+    const r = await fetch(API_EMPLATADO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: p.nombre }) })
+    const j = await r.json()
+    if(!r.ok || !j.url) throw new Error(j.error || 'No se recibió la imagen')
+    emplatados[normNombre(p.nombre)] = j.url
+    el.innerHTML = `<b style="font-size:13px;line-height:1.3;display:block">${esc(p.nombre)}</b><img src="${j.url}" style="width:100%;border-radius:10px;margin-top:8px">`
+  } catch(e){
+    el.innerHTML = `<b style="font-size:13px">${esc(p.nombre)}</b><div style="margin-top:8px;font-size:12px;color:#b91c1c">⚠️ ${esc(String(e.message)).slice(0, 160)}</div>`
+  }
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
