@@ -161,6 +161,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
         <button id="vt-mes" onclick="setVista('mes')">Mes</button>
       </div>
       <div style="flex:1"></div>
+      <button class="btn" id="btn-fotos" onclick="generarFotosFaltantes()">📸 Fotos faltantes</button>
       <button class="btn" onclick="imprimirMenu()">🖨 Imprimir</button>
       <button class="btn" onclick="generarPropuesta()">✨ Generar propuesta</button>
       <button class="btn btn-p" id="btn-guardar-sem" onclick="guardarSemana()">💾 Guardar</button>
@@ -1219,6 +1220,35 @@ async function generarEmplatado(id){
   } catch(e){
     el.innerHTML = `<b style="font-size:13px">${esc(p.nombre)}</b><div style="margin-top:8px;font-size:12px;color:#b91c1c">⚠️ ${esc(String(e.message)).slice(0, 160)}</div>`
   }
+}
+
+// ─── Generar fotos de emplatado para todo el período ────────────────────────
+async function generarFotosFaltantes(){
+  const btn = $('btn-fotos')
+  const ids = new Set()
+  for(const f of visibleDates()) for(const id of (cal[iso(f)] || [])) if(id && platoMap[id]) ids.add(id)
+  if(ids.size === 0){ toast('No hay platos cargados en este período'); return }
+  const pendientes = [...ids].map(id => platoMap[id]).filter(p => !emplatados[normNombre(p.nombre)])
+  if(pendientes.length === 0){ toast('Todos los platos del período ya tienen foto 🎉'); return }
+  const min = Math.max(1, Math.ceil(pendientes.length * 20 / 60))
+  if(!confirm(`Faltan fotos para ${pendientes.length} platos del período.\n\nSe generan una por una (~USD ${(pendientes.length * 0.04).toFixed(2)} en total, unos ${min} min).\nDejá esta pestaña abierta mientras trabaja. ¿Empezamos?`)) return
+  btn.disabled = true
+  let ok = 0, fallas = []
+  for(let i = 0; i < pendientes.length; i++){
+    const p = pendientes[i]
+    btn.textContent = `📸 Generando ${i + 1}/${pendientes.length}…`
+    try{
+      const r = await fetch(API_EMPLATADO, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre: p.nombre }) })
+      const j = await r.json()
+      if(!r.ok || !j.url) throw new Error(j.error || 'sin imagen')
+      emplatados[normNombre(p.nombre)] = j.url
+      ok++
+    } catch(e){ console.error('[Fotos]', p.nombre, e); fallas.push(p.nombre) }
+  }
+  btn.disabled = false
+  btn.textContent = '📸 Fotos faltantes'
+  if(fallas.length) toast(`${ok} fotos listas · ${fallas.length} fallaron — tocá el botón de nuevo para reintentar`)
+  else toast(`Listo: ${ok} fotos generadas ✅ Pasá el mouse por los platos para verlas`)
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
