@@ -173,17 +173,9 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
     <div class="crear-cols">
       <div class="card">
         <h2 style="font-size:17px;margin-bottom:6px">⚙️ Reglas fijas del sistema</h2>
-        <p style="font-size:13px;color:var(--gris);margin-bottom:12px">El generador aplica esto automáticamente al armar la propuesta.</p>
-        <ul style="font-size:13.5px;line-height:2;padding-left:20px">
-          <li>3 platos por día, de lunes a viernes.</li>
-          <li>El plato 1 de cada día es siempre <b>vegetariano</b>.</li>
-          <li>Las otras 2 opciones llevan <b>proteínas distintas</b> entre sí (vacuna, cerdo, pollo o pescado).</li>
-          <li>No se repite un plato dentro del período visible (semana o mes).</li>
-          <li>Se evitan <b>platos parecidos</b> el mismo día y en la misma semana (por nombre o misma base).</li>
-          <li>Se prioriza lo que hace más tiempo no se sirve (usa el historial de menús desde 2024).</li>
-          <li>Fuera de rotación automática: <b>ensaladas, tartas, sándwiches, wraps y postres</b>.</li>
-          <li>Los platos proteicos y otros marcados "⏸ fuera de rotación" no entran en la propuesta (se edita en la ficha de cada plato).</li>
-        </ul>
+        <p style="font-size:13px;color:var(--gris);margin-bottom:12px">El generador aplica las que están activadas. Podés apagar cualquiera con su interruptor.</p>
+        <div style="font-size:13px;color:var(--gris);padding:6px 4px;border-bottom:1px solid #f1f5f9">📐 3 platos por día, de lunes a viernes <small>(estructura del calendario, no se desactiva)</small></div>
+        <div id="reglas-sistema"></div>
       </div>
       <div class="card">
         <h2 style="font-size:17px;margin-bottom:6px">➕ Reglas personalizadas</h2>
@@ -266,7 +258,16 @@ let usage = {}                // plato_id -> última fecha usada (histórico)
 let pickerCtx = null
 let historicos = []           // platos importados del Google Sheet
 let usageNorm = {}            // nombre_norm -> ultima fecha en menus historicos
-let reglas = { excluir: [], limites: [], notas: [], grupos: [] }
+let reglas = { excluir: [], limites: [], notas: [], grupos: [], sistema: {} }
+const REGLAS_SISTEMA = [
+  { k: 'veg',        t: 'El plato 1 de cada día es siempre vegetariano' },
+  { k: 'prot',       t: 'Las otras 2 opciones llevan proteínas distintas entre sí' },
+  { k: 'repetir',    t: 'No se repite un plato dentro del período visible (semana o mes)' },
+  { k: 'parecidos',  t: 'Se evitan platos parecidos el mismo día y en la misma semana' },
+  { k: 'recencia',   t: 'Se prioriza lo que hace más tiempo no se sirve (historial desde 2024)' },
+  { k: 'tiposFuera', t: 'Fuera de rotación automática: ensaladas, tartas, sándwiches, wraps y postres' },
+]
+const sisOn = k => !reglas.sistema || reglas.sistema[k] !== false
 let emplatados = {}           // nombre_norm -> url de foto de emplatado
 const API_EMPLATADO = 'https://easylunch-panel.vercel.app/api/emplatado'
 
@@ -305,6 +306,7 @@ function aptoRotacion(p){
   if(p.en_rotacion === false) return false
   const nn = normNombre(p.nombre)
   if(reglas.excluir.some(w => nn.includes(normNombre(w)))) return false
+  if(!sisOn('tiposFuera')) return true
   if(p.historico) return !RE_FUERA_NOMBRE.test(nn)
   return !TIPOS_FUERA_ROTACION.has(p.tipo)
 }
@@ -420,7 +422,7 @@ async function cargar(){
 
   try{
     const rg = await sbGet('app_data?key=eq.recetario_reglas&select=value')
-    if(rg[0] && rg[0].value) reglas = { excluir: [], limites: [], notas: [], grupos: [], ...rg[0].value }
+    if(rg[0] && rg[0].value) reglas = { excluir: [], limites: [], notas: [], grupos: [], sistema: {}, ...rg[0].value }
   } catch(e){ console.warn('[Reglas]', e) }
   try{
     const em = await sbGet('emplatados?select=nombre_norm,url')
@@ -791,10 +793,10 @@ function setVista(v){
 function validarDia(ids){
   const msgs = []
   const ps = ids.map(id => id ? platoMap[id] : null)
-  if(ps[0] && protDe(ps[0]) !== 'vegetariano') msgs.push('El plato 1 debería ser vegetariano')
-  for(const k of [1, 2]) if(ps[k] && protDe(ps[k]) === 'vegetariano') msgs.push(`La opción ${k + 1} es vegetariana (va proteína)`)
-  if(ps[1] && ps[2] && protDe(ps[1]) === protDe(ps[2])) msgs.push('Proteína repetida: ' + protDef(protDe(ps[1])).l)
-  for(let i = 0; i < 3; i++) for(let j = i + 1; j < 3; j++)
+  if(sisOn('veg') && ps[0] && protDe(ps[0]) !== 'vegetariano') msgs.push('El plato 1 debería ser vegetariano')
+  if(sisOn('veg')) for(const k of [1, 2]) if(ps[k] && protDe(ps[k]) === 'vegetariano') msgs.push(`La opción ${k + 1} es vegetariana (va proteína)`)
+  if(sisOn('prot') && ps[1] && ps[2] && protDe(ps[1]) === protDe(ps[2])) msgs.push('Proteína repetida: ' + protDef(protDe(ps[1])).l)
+  if(sisOn('parecidos')) for(let i = 0; i < 3; i++) for(let j = i + 1; j < 3; j++)
     if(ps[i] && ps[j] && (ps[i].id === ps[j].id || claveDe(ps[i]) === claveDe(ps[j]))) msgs.push('Platos parecidos el mismo día')
   return [...new Set(msgs)]
 }
@@ -808,7 +810,7 @@ function cuentaPeriodo(){
 function avisosPeriodo(){
   const fechas = visibleDates(), avisos = []
   const cuenta = cuentaPeriodo()
-  for(const [id, n] of Object.entries(cuenta))
+  if(sisOn('repetir')) for(const [id, n] of Object.entries(cuenta))
     if(n > 1 && platoMap[id]) avisos.push(`🔁 "${platoMap[id].nombre}" aparece ${n} veces en ${vista === 'semana' ? 'la semana' : 'el mes'}`)
   const porSemana = {}
   for(const f of fechas){ const wk = iso(mondayOf(f)); porSemana[wk] ??= []; for(const id of cal[iso(f)]) if(id && platoMap[id]) porSemana[wk].push(id) }
@@ -821,7 +823,7 @@ function avisosPeriodo(){
       if(unicos.length > 1) similares.add(unicos.map(id => platoMap[id].nombre).join(' / '))
     }
   }
-  for(const s of similares) avisos.push(`👀 Platos parecidos en la misma semana: ${s}`)
+  if(sisOn('parecidos')) for(const s of similares) avisos.push(`👀 Platos parecidos en la misma semana: ${s}`)
   for(const l of (reglas.limites || [])){
     const pal = normNombre(l.palabra); let n = 0
     for(const f of fechas) for(const id of cal[iso(f)]) if(id && platoMap[id] && normNombre(platoMap[id].nombre).includes(pal)) n++
@@ -971,9 +973,9 @@ function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx)
   for(const p of pool){
     const k = claveDe(p)
     let s = Math.random() * 500
-    if(clavesDia.has(k)) s += 1e9
-    s += (usadosRango.get(p.id) || 0) * 1e6
-    if(clavesSem.has(k)) s += 3e5
+    if(sisOn('parecidos') && clavesDia.has(k)) s += 1e9
+    s += (usadosRango.get(p.id) || 0) * (sisOn('repetir') ? 1e6 : 0)
+    if(sisOn('parecidos') && clavesSem.has(k)) s += 3e5
     const nn = normNombre(p.nombre)
     if(lims && lims.some(l => nn.includes(l.palabra) && l.n >= l.max)) s += 8e8
     if(gctx) for(const g of gctx.grupos){
@@ -983,7 +985,7 @@ function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx)
       if(g.alcance === 'consec' && gctx.ayer.some(x => matchGrupo(x, g))) s += 7e8
       if(g.alcance === 'semana' && gctx.semana.filter(x => matchGrupo(x, g)).length >= max) s += 7e8
     }
-    const lu = lastUsedDe(p)
+    const lu = sisOn('recencia') ? lastUsedDe(p) : null
     if(lu){ const dd = diasEntre(lu, iso(f)); if(dd >= 0 && dd < 35) s += (35 - dd) * 2e3 }
     if(s < bestS){ bestS = s; best = p }
   }
@@ -995,10 +997,13 @@ function generarPropuesta(){
   const hayAlgo = fechas.some(f => (cal[iso(f)] || []).some(x => x))
   if(hayAlgo && !confirm('Ya hay platos cargados en este período. ¿Genero una propuesta nueva y los reemplazo?')) return
   const rotacion = [...platos, ...historicos].filter(aptoRotacion)
-  const vegPool = rotacion.filter(p => protDe(p) === 'vegetariano')
+  const vegPool = sisOn('veg') ? rotacion.filter(p => protDe(p) === 'vegetariano') : rotacion
   const pools = {}; for(const pr of PROT_CARNES) pools[pr] = rotacion.filter(p => protDe(p) === pr)
+  const carnesTodas = rotacion.filter(p => PROT_CARNES.includes(protDe(p)))
   const dispo = PROT_CARNES.filter(pr => pools[pr].length > 0)
-  if(vegPool.length === 0 || dispo.length < 2){ toast('Faltan platos en rotación: se necesita al menos 1 vegetariano y 2 proteínas distintas'); return }
+  if(sisOn('veg') && vegPool.length === 0){ toast('No hay platos vegetarianos en rotación'); return }
+  if(sisOn('prot') && dispo.length < 2){ toast('Se necesitan platos de al menos 2 proteínas distintas'); return }
+  if(carnesTodas.length === 0){ toast('No hay platos con proteína en rotación'); return }
 
   const pares = []
   for(let i = 0; i < dispo.length; i++) for(let j = i + 1; j < dispo.length; j++) pares.push([dispo[i], dispo[j]])
@@ -1024,9 +1029,13 @@ function generarPropuesta(){
       return p
     }
     const veg = elegir(vegPool)
-    const [pa, pb] = pares[di % pares.length]
-    const a = elegir(pools[pa])
-    const b = elegir(pools[pb])
+    let a, b
+    if(sisOn('prot') && pares.length){
+      const [pa, pb] = pares[di % pares.length]
+      a = elegir(pools[pa]); b = elegir(pools[pb])
+    } else {
+      a = elegir(carnesTodas); b = elegir(carnesTodas)
+    }
     cal[fi] = [veg?.id || null, a?.id || null, b?.id || null]
     nombresAyer = nombresHoy
   })
@@ -1101,7 +1110,21 @@ function quitarRegla(tipo, i){
   reglas[tipo].splice(i, 1)
   persistirReglas(); renderReglas(); renderRecetario(); if(Object.keys(cal).length) renderCal()
 }
+function toggleSistema(k, v){
+  reglas.sistema = reglas.sistema || {}
+  reglas.sistema[k] = v
+  persistirReglas(); renderRecetario(); if(Object.keys(cal).length) renderCal()
+  toast(v ? 'Regla activada ✅' : 'Regla desactivada — el generador ya no la aplica')
+}
 function renderReglas(){
+  const sisBox = $('reglas-sistema')
+  if(sisBox) sisBox.innerHTML = REGLAS_SISTEMA.map(r => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13.5px;${sisOn(r.k) ? '' : 'opacity:.45'}">
+      <span style="flex:1">${r.t}</span>
+      <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris)">
+        <input type="checkbox" ${sisOn(r.k) ? 'checked' : ''} onchange="toggleSistema('${r.k}', this.checked)"> activa
+      </label>
+    </div>`).join('')
   const box = $('reglas-list'); if(!box) return
   const fila = (icono, texto, tipo, i) => `<div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13.5px">
     <span>${icono}</span><span style="flex:1">${esc(texto)}</span>
