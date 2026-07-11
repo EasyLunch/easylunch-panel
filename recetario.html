@@ -90,7 +90,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
 </head>
 <body>
 <header>
-  <h1>🍱 Easy Lunch — <span>Recetario & Menú</span></h1>
+  <h1 style="display:flex;align-items:center;gap:10px"><img src="https://easy-lunch-eight.vercel.app/logo.png" alt="Easy Lunch" style="height:36px"> <span>Recetario & Menú</span></h1>
   <nav>
     <button id="nav-recetario" class="act" onclick="showTab('recetario')">📖 Recetario</button>
     <button id="nav-crear" onclick="showTab('crear')">➕ Nueva receta</button>
@@ -825,9 +825,15 @@ function avisosPeriodo(){
   }
   if(sisOn('parecidos')) for(const s of similares) avisos.push(`👀 Platos parecidos en la misma semana: ${s}`)
   for(const l of (reglas.limites || [])){
-    const pal = normNombre(l.palabra); let n = 0
-    for(const f of fechas) for(const id of cal[iso(f)]) if(id && platoMap[id] && normNombre(platoMap[id].nombre).includes(pal)) n++
-    if(n > (parseInt(l.max) || 1)) avisos.push(`🚦 "${l.palabra}" aparece ${n} veces (máximo ${l.max} por regla)`)
+    const max = parseInt(l.max) || 1
+    const porKey = {}
+    for(const f of fechas) for(const id of cal[iso(f)]){
+      if(!(id && platoMap[id] && matchPalabra(platoMap[id], l.palabra))) continue
+      const k = l.alcance === 'mes' ? iso(f).slice(0, 7) : iso(mondayOf(f))
+      porKey[k] = (porKey[k] || 0) + 1
+    }
+    for(const n of Object.values(porKey)) if(n > max)
+      avisos.push(`🚦 "${l.palabra}": ${n} veces (máximo ${max} por ${l.alcance === 'mes' ? 'mes' : 'semana'})`)
   }
   for(const f of fechas) for(const id of cal[iso(f)])
     if(id && platoMap[id] && reglas.excluir.some(w => normNombre(platoMap[id].nombre).includes(normNombre(w))))
@@ -977,7 +983,7 @@ function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx)
     s += (usadosRango.get(p.id) || 0) * (sisOn('repetir') ? 1e6 : 0)
     if(sisOn('parecidos') && clavesSem.has(k)) s += 3e5
     const nn = normNombre(p.nombre)
-    if(lims && lims.some(l => nn.includes(l.palabra) && l.n >= l.max)) s += 8e8
+    if(lims && lims.some(l => matchPalabra(p, l.palabra) && (l.counts[l.key] || 0) >= l.max)) s += 8e8
     if(gctx) for(const g of gctx.grupos){
       if(!matchGrupo(nn, g)) continue
       const max = g.max || 1
@@ -992,7 +998,7 @@ function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx)
   return best
 }
 
-function generarPropuesta(){
+async function generarPropuesta(){
   const fechas = visibleDates()
   const hayAlgo = fechas.some(f => (cal[iso(f)] || []).some(x => x))
   if(hayAlgo && !confirm('Ya hay platos cargados en este período. ¿Genero una propuesta nueva y los reemplazo?')) return
@@ -1005,15 +1011,32 @@ function generarPropuesta(){
   if(sisOn('prot') && dispo.length < 2){ toast('Se necesitan platos de al menos 2 proteínas distintas'); return }
   if(carnesTodas.length === 0){ toast('No hay platos con proteína en rotación'); return }
 
-  const pares = []
-  for(let i = 0; i < dispo.length; i++) for(let j = i + 1; j < dispo.length; j++) pares.push([dispo[i], dispo[j]])
-  shuffle(pares)
+  const lims = (reglas.limites || []).map(l => ({
+    palabra: l.palabra, max: Math.max(1, parseInt(l.max) || 1),
+    alcance: l.alcance === 'mes' ? 'mes' : 'semana', counts: {}, key: ''
+  }))
+
+  // límites mensuales generando solo una semana: contar lo ya guardado en el resto del mes
+  if(lims.some(l => l.alcance === 'mes') && vista === 'semana' && dbListo){
+    try{
+      const mesK = iso(fechas[0]).slice(0, 7)
+      const rows = await sbGet(`calendario_menu?select=fecha,plato_id&fecha=gte.${mesK}-01&fecha=lte.${mesK}-31`)
+      const visibles = new Set(fechas.map(f => iso(f)))
+      for(const r of rows){
+        if(visibles.has(r.fecha)) continue
+        const p = platoMap[r.plato_id]; if(!p) continue
+        for(const l of lims) if(l.alcance === 'mes' && matchPalabra(p, l.palabra))
+          l.counts[mesK] = (l.counts[mesK] || 0) + 1
+      }
+    } catch(e){ console.warn(e) }
+  }
 
   const usadosRango = new Map(), clavesSemana = {}, nombresSemana = {}
-  const lims = (reglas.limites || []).map(l => ({ palabra: normNombre(l.palabra), max: Math.max(1, parseInt(l.max) || 1), n: 0 }))
+  const protCount = {}
   let nombresAyer = []
   fechas.forEach((f, di) => {
-    const fi = iso(f), wk = iso(mondayOf(f))
+    const fi = iso(f), wk = iso(mondayOf(f)), mesK = fi.slice(0, 7)
+    for(const l of lims) l.key = l.alcance === 'mes' ? mesK : wk
     const clavesSem = (clavesSemana[wk] ??= new Set())
     const clavesDia = new Set()
     const nombresHoy = []
@@ -1024,15 +1047,20 @@ function generarPropuesta(){
         usadosRango.set(p.id, (usadosRango.get(p.id) || 0) + 1); clavesDia.add(claveDe(p)); clavesSem.add(claveDe(p))
         const nn = normNombre(p.nombre)
         nombresHoy.push(nn); nombresSemana[wk].push(nn)
-        for(const l of lims) if(nn.includes(l.palabra)) l.n++
+        for(const l of lims) if(matchPalabra(p, l.palabra)) l.counts[l.key] = (l.counts[l.key] || 0) + 1
       }
       return p
     }
     const veg = elegir(vegPool)
-    let a, b
-    if(sisOn('prot') && pares.length){
-      const [pa, pb] = pares[di % pares.length]
-      a = elegir(pools[pa]); b = elegir(pools[pb])
+    let a = null, b = null
+    if(sisOn('prot') && dispo.length >= 2){
+      const protLibre = pr => !lims.some(l => protDePalabra(l.palabra) === pr && (l.counts[l.key] || 0) >= l.max)
+      const orden = shuffle([...dispo]).sort((x, y) => (protCount[wk + x] || 0) - (protCount[wk + y] || 0))
+      const elegibles = orden.filter(protLibre)
+      const usar = elegibles.length >= 2 ? elegibles : orden
+      const pa = usar[0], pb = usar[1]
+      a = elegir(pools[pa]); if(a) protCount[wk + pa] = (protCount[wk + pa] || 0) + 1
+      b = elegir(pools[pb]); if(b) protCount[wk + pb] = (protCount[wk + pb] || 0) + 1
     } else {
       a = elegir(carnesTodas); b = elegir(carnesTodas)
     }
@@ -1079,13 +1107,32 @@ function imprimirMenu(){
 
 // ─── Reglas personalizadas ───────────────────────────────────────────────────
 function matchGrupo(nombreNorm, g){ return (g.palabras || []).some(w => nombreNorm.includes(normNombre(w))) }
+function protDePalabra(w){
+  w = normNombre(w)
+  if(/^cerdo/.test(w)) return 'cerdo'
+  if(/^(pollo|ave)$/.test(w)) return 'pollo'
+  if(/^(vacuna|vacuno|ternera|res)$/.test(w)) return 'vacuna'
+  if(/^pescado/.test(w)) return 'pescado'
+  if(/^(vegetariano|veggie)$/.test(w)) return 'vegetariano'
+  return null
+}
+function matchPalabra(p, palabra){
+  const pal = normNombre(palabra)
+  if(normNombre(p.nombre).includes(pal)) return true
+  const pr = protDePalabra(pal)
+  return pr ? protDe(p) === pr : false
+}
 const ALCANCE_LBL = { dia: 'mismo día', consec: 'día y consecutivos', semana: 'misma semana' }
 function formReglaUI(){
   const t = $('rg-tipo').value
   $('rg-max-box').style.display = (t === 'limite' || t === 'grupo') ? '' : 'none'
-  $('rg-alcance-box').style.display = t === 'grupo' ? '' : 'none'
+  $('rg-alcance-box').style.display = (t === 'grupo' || t === 'limite') ? '' : 'none'
+  const alc = $('rg-alcance')
+  if(t === 'grupo') alc.innerHTML = '<option value="dia">Mismo día</option><option value="consec">Día y consecutivos</option><option value="semana">Misma semana</option>'
+  else if(t === 'limite') alc.innerHTML = '<option value="semana">Por semana</option><option value="mes">Por mes</option>'
   $('rg-max').value = t === 'grupo' ? 1 : 2
-  $('rg-texto').placeholder = t === 'grupo' ? 'palabras separadas por coma: arroz, risotto, chaufa' : 'ej: milanesa, brócoli, mondongo…'
+  $('rg-texto').placeholder = t === 'grupo' ? 'palabras separadas por coma: arroz, risotto, chaufa'
+    : (t === 'limite' ? 'palabra o proteína: cerdo, pollo, milanesa, guiso…' : 'ej: milanesa, brócoli, mondongo…')
 }
 async function persistirReglas(){
   try{ await sbPost('app_data', [{ key: 'recetario_reglas', value: reglas }]) }
@@ -1095,7 +1142,7 @@ function agregarRegla(){
   const tipo = $('rg-tipo').value, txt = $('rg-texto').value.trim()
   if(!txt){ toast('Escribí el texto de la regla'); return }
   if(tipo === 'excluir') reglas.excluir.push(txt)
-  else if(tipo === 'limite') reglas.limites.push({ palabra: txt, max: Math.max(1, parseInt($('rg-max').value) || 1) })
+  else if(tipo === 'limite') reglas.limites.push({ palabra: txt, max: Math.max(1, parseInt($('rg-max').value) || 1), alcance: $('rg-alcance').value === 'mes' ? 'mes' : 'semana' })
   else if(tipo === 'grupo') reglas.grupos.push({
     palabras: txt.split(',').map(x => x.trim()).filter(Boolean),
     alcance: $('rg-alcance').value,
@@ -1131,7 +1178,7 @@ function renderReglas(){
     <button class="btn btn-sm" onclick="quitarRegla('${tipo}',${i})">✕</button></div>`
   let html = ''
   reglas.excluir.forEach((w, i) => html += fila('⛔', `Excluir platos que contengan "${w}"`, 'excluir', i))
-  reglas.limites.forEach((l, i) => html += fila('🚦', `"${l.palabra}" máximo ${l.max} veces por período`, 'limites', i))
+  reglas.limites.forEach((l, i) => html += fila('🚦', `"${l.palabra}" máximo ${l.max} veces por ${l.alcance === 'mes' ? 'mes' : 'semana'} (por nombre o proteína)`, 'limites', i))
   ;(reglas.grupos || []).forEach((g, i) => html += fila('🧩', `Máximo ${g.max || 1} plato${(g.max || 1) > 1 ? 's' : ''} con "${(g.palabras || []).join(', ')}" — ${ALCANCE_LBL[g.alcance] || g.alcance}`, 'grupos', i))
   reglas.notas.forEach((n, i) => html += fila('📝', n, 'notas', i))
   box.innerHTML = html || '<p style="font-size:13px;color:var(--gris)">Sin reglas personalizadas todavía.</p>'
