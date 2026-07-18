@@ -78,7 +78,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
 .mini-slot span:not(.dot){min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini-slot:hover{border-color:var(--verde)}
 .mini-slot.libre{color:#94a3b8;border-style:dashed;background:transparent}
-.mini-slot.rep{border-color:#fca5a5;background:#fef2f2}
+.mini-slot.rep{border:1.5px solid #dc2626 !important}
 .mini-slot .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .drag-over{outline:2px dashed var(--verde);outline-offset:1px}
 [draggable="true"]{cursor:grab}
@@ -234,8 +234,8 @@ const PROTEINAS = [
   { v:'vegetariano', l:'Vegetariano', e:'🌿', c:'#dcfce7', t:'#15803d' },
   { v:'vacuna',      l:'Vacuna',      e:'🥩', c:'#fee2e2', t:'#b91c1c' },
   { v:'cerdo',       l:'Cerdo',       e:'🐷', c:'#fce7f3', t:'#be185d' },
-  { v:'pollo',       l:'Pollo',       e:'🍗', c:'#ffedd5', t:'#c2410c' },
-  { v:'pescado',     l:'Pescado',     e:'🐟', c:'#cffafe', t:'#0e7490' },
+  { v:'pollo',       l:'Pollo',       e:'🍗', c:'#fef9c3', t:'#a16207' },
+  { v:'pescado',     l:'Pescado',     e:'🐟', c:'#dbeafe', t:'#1d4ed8' },
   { v:'cordero',     l:'Cordero',     e:'🐑', c:'#ffe4e6', t:'#be123c' },
   { v:'otra',        l:'Otra',        e:'📋', c:'#f1f5f9', t:'#475569' },
 ]
@@ -359,6 +359,30 @@ function costoIngrediente(ing){
 function calcPlato(p){
   const total = (p.ingredientes || []).reduce((s, ing) => s + costoIngrediente(ing), 0)
   return { total, vianda: p.porciones > 0 ? total / p.porciones : total }
+}
+
+// ─── Escala de costo $ a $$$$ (cuartiles sobre platos con receta) ───────────
+let costoNiveles = null
+function calcularNivelesCosto(){
+  const vals = platos.map(p => calcPlato(p).vianda).filter(v => v > 0).sort((a, b) => a - b)
+  if(vals.length < 8){ costoNiveles = null; return }
+  const q = f => vals[Math.min(vals.length - 1, Math.floor(f * vals.length))]
+  const med = q(0.5)
+  costoNiveles = { q1: q(0.25), q2: med, q3: q(0.75), min: med / 6, max: med * 4 }
+}
+function nivelCosto(p){
+  if(!p || p.historico || !costoNiveles) return 0
+  const v = calcPlato(p).vianda
+  if(!(v > 0) || v < costoNiveles.min || v > costoNiveles.max) return 0
+  if(v <= costoNiveles.q1) return 1
+  if(v <= costoNiveles.q2) return 2
+  if(v <= costoNiveles.q3) return 3
+  return 4
+}
+function simboloCosto(p){
+  const n = nivelCosto(p)
+  if(!n) return ''
+  return `<span title="Costo ${n}/4 — ${fmt$(calcPlato(p).vianda)}/vianda" style="font-weight:800;letter-spacing:-.5px;white-space:nowrap">${'$'.repeat(n)}<span style="opacity:.25">${'$'.repeat(4 - n)}</span></span>`
 }
 
 // ─── Proteína: valor guardado o inferido de los ingredientes ────────────────
@@ -857,6 +881,7 @@ function avisosPeriodo(){
 }
 
 function renderCal(){
+  if(!costoNiveles) calcularNivelesCosto()
   const fechas = visibleDates()
   $('cal-titulo').textContent = vista === 'semana'
     ? 'Semana del ' + fmtFecha(fechas[0]) + ' al ' + fmtFecha(fechas[4])
@@ -874,11 +899,11 @@ function renderCal(){
         const p = id ? platoMap[id] : null
         if(!p) return `<div class="slot" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})"><span class="slot-tag">${etiquetas[s]}</span><span style="color:#94a3b8">+ Elegir plato</span></div>`
         const pd = protDef(protDe(p)), c = calcPlato(p)
-        return `<div class="slot lleno" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})">
+        return `<div class="slot lleno" style="background:${pd.c}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})">
           <button class="quitar" onclick="event.stopPropagation();quitarSlot('${fi}',${s})">✕</button>
           <span class="slot-tag">${etiquetas[s]}</span>
           <b style="font-size:12.5px;line-height:1.25">${esc(p.nombre)}</b>
-          <span>${badge(pd)} <small style="color:var(--gris)">${p.historico ? '📜 histórico' : fmt$(c.vianda)}</small>${cuenta[id] > 1 ? ' <small style="color:#dc2626">🔁</small>' : ''}</span>
+          <span>${badge(pd)} <small style="color:var(--gris)">${p.historico ? '📜 histórico' : fmt$(c.vianda)}</small> <small>${simboloCosto(p)}</small>${cuenta[id] > 1 ? ' <small style="color:#dc2626">🔁</small>' : ''}</span>
         </div>`
       }).join('')
       const avisos = validarDia(ids).map(m => `<div class="aviso-dia">⚠️ ${m}</div>`).join('')
@@ -897,8 +922,8 @@ function renderCal(){
       const p = id ? platoMap[id] : null
       if(!p) return `<div class="mini-slot libre" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})">+ ${s === 0 ? 'vegetariano' : 'opción ' + (s + 1)}</div>`
       const pd = protDef(protDe(p))
-      return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)}${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
-        <span class="dot" style="background:${pd.t}"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nombre)}</span>
+      return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" style="background:${pd.c};color:${pd.t};font-weight:600" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)} (${pd.l})${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(p.nombre)}</span>${simboloCosto(p) ? `<span style="font-size:10px">${simboloCosto(p)}</span>` : ''}
       </div>`
     }).join('')
     const msgs = validarDia(ids)
