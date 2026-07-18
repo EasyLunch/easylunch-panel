@@ -1157,8 +1157,8 @@ function formReglaUI(){
   if(t === 'grupo') alc.innerHTML = '<option value="dia">Mismo día</option><option value="consec">Día y consecutivos</option><option value="semana">Misma semana</option>'
   else if(t === 'limite') alc.innerHTML = '<option value="semana">Por semana</option><option value="mes">Por mes</option>'
   $('rg-max').value = t === 'grupo' ? 1 : 2
-  $('rg-texto').placeholder = t === 'grupo' ? 'palabras separadas por coma: arroz, risotto, chaufa'
-    : (t === 'limite' ? 'palabra o proteína: cerdo, pollo, milanesa, guiso…' : 'ej: milanesa, brócoli, mondongo…')
+  $('rg-texto').placeholder = t === 'grupo' ? 'palabras cortas separadas por coma: arroz, risotto, chaufa'
+    : (t === 'limite' ? 'UNA palabra o proteína: pescado, cerdo, milanesa…' : (t === 'nota' ? 'texto libre de recordatorio' : 'UNA palabra: wrap, mondongo, sin tacc…'))
 }
 async function persistirReglas(){
   try{ await sbPost('app_data', [{ key: 'recetario_reglas', value: reglas }]) }
@@ -1167,6 +1167,16 @@ async function persistirReglas(){
 function agregarRegla(){
   const tipo = $('rg-tipo').value, txt = $('rg-texto').value.trim()
   if(!txt){ toast('Escribí el texto de la regla'); return }
+  if(tipo !== 'nota'){
+    const palabras = tipo === 'grupo' ? txt.split(',').map(x => x.trim()).filter(Boolean) : [txt]
+    const todosP = [...platos, ...historicos]
+    const sinMatch = palabras.filter(w => !protDePalabra(w) && !todosP.some(p => normNombre(p.nombre).includes(normNombre(w))))
+    if(sinMatch.length === palabras.length){
+      if(!confirm(`⚠️ "${txt}" no coincide con ningún plato ni proteína del sistema, así que la regla no tendría efecto.\n\nTip: usá palabras cortas y sueltas — ej: "pescado", "milanesa", "arroz" — no frases largas.\n\n¿Guardar igual?`)) return
+    } else if(sinMatch.length){
+      toast(`Ojo: "${sinMatch.join('", "')}" no coincide con ningún plato`)
+    }
+  }
   if(tipo === 'excluir') reglas.excluir.push(txt)
   else if(tipo === 'limite') reglas.limites.push({ palabra: txt, max: Math.max(1, parseInt($('rg-max').value) || 1), alcance: $('rg-alcance').value === 'mes' ? 'mes' : 'semana' })
   else if(tipo === 'grupo') reglas.grupos.push({
