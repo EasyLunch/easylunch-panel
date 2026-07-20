@@ -162,6 +162,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
       </div>
       <div style="flex:1"></div>
       <button class="btn" id="btn-fotos" onclick="generarFotosFaltantes()">📸 Fotos faltantes</button>
+      <button class="btn" onclick="exportarExcel()">📊 Excel</button>
       <button class="btn" onclick="imprimirMenu()">🖨 Imprimir</button>
       <button class="btn" onclick="generarPropuesta()">✨ Generar propuesta</button>
       <button class="btn btn-p" id="btn-guardar-sem" onclick="guardarSemana()">💾 Guardar</button>
@@ -1158,6 +1159,40 @@ async function guardarSemana(){
     for(const r of rows) if(!usage[r.plato_id] || usage[r.plato_id] < r.fecha) usage[r.plato_id] = r.fecha
     toast((vista === 'semana' ? 'Semana guardada' : 'Mes guardado') + ' ✅')
   } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
+}
+
+// ─── Exportar a Excel (mismo formato que la planilla) ───────────────────────
+async function exportarExcel(){
+  if(!window.XLSX){
+    try{
+      await new Promise((res, rej) => {
+        const sc = document.createElement('script')
+        sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+        sc.onload = res; sc.onerror = rej
+        document.head.appendChild(sc)
+      })
+    } catch(e){ toast('No se pudo cargar el módulo de Excel'); return }
+  }
+  const fechas = visibleDates()
+  const semanas = {}
+  for(const f of fechas){ const wk = iso(mondayOf(f)); (semanas[wk] ??= []).push(f) }
+  const CATS = [['Tradicional', 1], ['Veggie', 0], ['Sabores del Mundo', 2]]
+  const aoa = []
+  for(const fs of Object.values(semanas)){
+    aoa.push(['', ...fs.map(f => diaNombre(iso(f)) + ' ' + f.getDate())])
+    for(const [cat, slot] of CATS)
+      aoa.push([cat, ...fs.map(f => { const id = (cal[iso(f)] || [])[slot]; return id && platoMap[id] ? platoMap[id].nombre : '' })])
+    aoa.push([])
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [{ wch: 18 }, { wch: 45 }, { wch: 45 }, { wch: 45 }, { wch: 45 }, { wch: 45 }]
+  const wb = XLSX.utils.book_new()
+  const titulo = vista === 'semana'
+    ? 'Semana del ' + fmtFecha(fechas[0]).replace('/', '-')
+    : MESES[weekStart.getMonth()] + ' ' + weekStart.getFullYear()
+  XLSX.utils.book_append_sheet(wb, ws, titulo.slice(0, 30))
+  XLSX.writeFile(wb, `Menu Easy Lunch - ${titulo}.xlsx`)
+  toast('Excel descargado 📊')
 }
 
 // ─── Imprimir ────────────────────────────────────────────────────────────────
