@@ -186,6 +186,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
             <option value="excluir">⛔ Excluir platos que contengan…</option>
             <option value="limite">🚦 Límite por período para…</option>
             <option value="grupo">🧩 No combinar (día / consecutivos / semana)…</option>
+            <option value="dias">🗓️ No ofrecer ciertos días…</option>
             <option value="nota">📝 Nota / recordatorio</option>
           </select></div>
           <div style="flex:1;min-width:150px"><label>Texto</label><input id="rg-texto" style="width:100%" placeholder="ej: milanesa, brócoli, mondongo…"></div>
@@ -195,6 +196,13 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
             <option value="consec">Día y consecutivos</option>
             <option value="semana">Misma semana</option>
           </select></div>
+          <div id="rg-dias-box" style="display:none"><label>Días</label><div style="display:flex;gap:8px;padding-top:8px;font-size:13px">
+            <label style="margin:0;cursor:pointer"><input type="checkbox" id="rg-d0"> L</label>
+            <label style="margin:0;cursor:pointer"><input type="checkbox" id="rg-d1"> M</label>
+            <label style="margin:0;cursor:pointer"><input type="checkbox" id="rg-d2"> X</label>
+            <label style="margin:0;cursor:pointer"><input type="checkbox" id="rg-d3"> J</label>
+            <label style="margin:0;cursor:pointer"><input type="checkbox" id="rg-d4"> V</label>
+          </div></div>
           <button class="btn btn-p" onclick="agregarRegla()">Agregar</button>
         </div>
         <div id="reglas-list"><p style="font-size:13px;color:var(--gris)">Sin reglas personalizadas todavía.</p></div>
@@ -259,7 +267,7 @@ let usage = {}                // plato_id -> última fecha usada (histórico)
 let pickerCtx = null
 let historicos = []           // platos importados del Google Sheet
 let usageNorm = {}            // nombre_norm -> ultima fecha en menus historicos
-let reglas = { excluir: [], limites: [], notas: [], grupos: [], sistema: {} }
+let reglas = { excluir: [], limites: [], notas: [], grupos: [], diasProhibidos: [], sistema: {} }
 const REGLAS_SISTEMA = [
   { k: 'veg',        t: 'El plato 1 de cada día es siempre vegetariano' },
   { k: 'prot',       t: 'Las otras 2 opciones llevan proteínas distintas entre sí' },
@@ -447,7 +455,7 @@ async function cargar(){
 
   try{
     const rg = await sbGet('app_data?key=eq.recetario_reglas&select=value')
-    if(rg[0] && rg[0].value) reglas = { excluir: [], limites: [], notas: [], grupos: [], sistema: {}, ...rg[0].value }
+    if(rg[0] && rg[0].value) reglas = { excluir: [], limites: [], notas: [], grupos: [], diasProhibidos: [], sistema: {}, ...rg[0].value }
   } catch(e){ console.warn('[Reglas]', e) }
   try{
     const em = await sbGet('emplatados?select=nombre_norm,url')
@@ -877,6 +885,13 @@ function avisosPeriodo(){
       for(const [wk, n] of Object.entries(porSem)) if(n > max) avisos.push(`🧩 Semana del ${fmtFecha(new Date(wk + 'T12:00:00'))}: ${n} platos con "${et}" (máx. ${max} por semana)`)
     }
   }
+  for(const r of (reglas.diasProhibidos || []))
+    for(const f of fechas){
+      if(!(r.dias || []).includes((f.getDay() + 6) % 7)) continue
+      for(const id of cal[iso(f)])
+        if(id && platoMap[id] && matchPalabra(platoMap[id], r.palabra))
+          avisos.push(`🗓️ ${diaNombre(iso(f))} ${fmtFecha(f)}: "${platoMap[id].nombre}" no se ofrece ese día por regla`)
+    }
   return [...new Set(avisos)]
 }
 
@@ -962,7 +977,11 @@ function abrirPicker(fecha, slot){
       </select>
       <label style="display:flex;align-items:center;gap:5px;margin:0;font-size:12.5px;cursor:pointer"><input type="checkbox" id="pick-apto" checked onchange="renderPickList()"> solo en rotación</label>
     </div>
-    <div id="pick-list" style="max-height:420px;overflow-y:auto"></div>`
+    <div id="pick-list" style="max-height:380px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center;border-top:1px solid var(--borde);padding-top:12px">
+      <input id="pick-nuevo" placeholder="¿No está? Escribí el plato nuevo (ej: cambio de guarnición)…" style="flex:1">
+      <button class="btn btn-sm btn-p" onclick="crearRapidoYAsignar()">➕ Crear y usar</button>
+    </div>`
   $('modal-pick').classList.add('open')
   renderPickList()
 }
@@ -988,6 +1007,7 @@ function renderPickList(){
       ${!aptoRotacion(p) ? '<span style="font-size:11px;color:#94a3b8">⏸ fuera de rotación</span>' : ''}
       ${conflicto ? '<span style="font-size:11px;color:#b45309">⚠️ proteína repetida ese día</span>' : ''}
       ${parecido ? '<span style="font-size:11px;color:#b45309">⚠️ parecido a otro plato del día</span>' : ''}
+      ${(reglas.diasProhibidos || []).some(r => (r.dias || []).includes((new Date(fecha + 'T12:00:00').getDay() + 6) % 7) && matchPalabra(p, r.palabra)) ? '<span style="font-size:11px;color:#b45309">🗓️ no se ofrece ese día</span>' : ''}
       ${veces > 0 ? `<span style="font-size:11px;color:#64748b">ya está ${veces === 1 ? '' : veces + ' veces '}en ${vista === 'semana' ? 'la semana' : 'el mes'}</span>` : ''}
       <span style="font-size:12.5px;color:var(--verde-osc);font-weight:600">${p.historico ? '📜' : fmt$(c.vianda)}</span>
     </div>`
@@ -997,6 +1017,31 @@ function renderPickList(){
 function elegirPlato(id){
   cal[pickerCtx.fecha][pickerCtx.slot] = id
   cerrarModal('modal-pick'); renderCal()
+}
+
+function protPorNombre(n){
+  n = normNombre(n)
+  if(/cordero/.test(n)) return 'cordero'
+  if(/(cerdo|bondiola|matambre|solomillo|ribs|pastron)/.test(n)) return 'cerdo'
+  if(/(merluza|brotola|pescad|atun|salmon|tilapia|marisco|abadejo)/.test(n)) return 'pescado'
+  if(/(pollo|suprema|pechuga|pata muslo)/.test(n)) return 'pollo'
+  if(/(ternera|vacun|carne|bife|lomo|peceto|goulash|burger|mondongo|osobuco|bolognesa|hamburguesa|albondiga|musakka)/.test(n)) return 'vacuna'
+  return 'vegetariano'
+}
+async function crearRapidoYAsignar(){
+  const nombre = $('pick-nuevo').value.trim()
+  if(!nombre){ toast('Escribí el nombre del plato'); return }
+  const nn = normNombre(nombre)
+  const existente = [...platos, ...historicos].find(p => normNombre(p.nombre) === nn)
+  if(existente){ elegirPlato(existente.id); toast('Ya existía — lo asigné'); return }
+  const prot = protPorNombre(nombre)
+  const row = { id: uuid(), nombre, proteina: prot, vegetariano: prot === 'vegetariano', en_rotacion: true, fuente: 'manual' }
+  try{ await sbPost('platos_historicos', [row]) }
+  catch(e){ toast('Error al crear: ' + String(e.message).slice(0, 60)); return }
+  const h = { ...row, historico: true, tipo: prot === 'vegetariano' ? 'vegetariano' : 'clasico', porciones: 1, ingredientes: [] }
+  historicos.push(h); platoMap[h.id] = h
+  toast(`Plato creado — proteína ${protDef(prot).l} (editable en su ficha) ✅`)
+  elegirPlato(h.id)
 }
 
 // ─── Generar propuesta automática ────────────────────────────────────────────
@@ -1010,6 +1055,8 @@ function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx)
     if(sisOn('parecidos') && clavesSem.has(k)) s += 3e5
     const nn = normNombre(p.nombre)
     if(lims && lims.some(l => matchPalabra(p, l.palabra) && (l.counts[l.key] || 0) >= l.max)) s += 8e8
+    const dowF = (f.getDay() + 6) % 7
+    if((reglas.diasProhibidos || []).some(r => (r.dias || []).includes(dowF) && matchPalabra(p, r.palabra))) s += 9e8
     if(gctx) for(const g of gctx.grupos){
       if(!matchGrupo(nn, g)) continue
       const max = g.max || 1
@@ -1080,7 +1127,9 @@ async function generarPropuesta(){
     const veg = elegir(vegPool)
     let a = null, b = null
     if(sisOn('prot') && dispo.length >= 2){
+      const dowHoy = (f.getDay() + 6) % 7
       const protLibre = pr => !lims.some(l => protDePalabra(l.palabra) === pr && (l.counts[l.key] || 0) >= l.max)
+        && !(reglas.diasProhibidos || []).some(rr => (rr.dias || []).includes(dowHoy) && protDePalabra(rr.palabra) === pr)
       const orden = shuffle([...dispo]).sort((x, y) => (protCount[wk + x] || 0) - (protCount[wk + y] || 0))
       const elegibles = orden.filter(protLibre)
       const usar = elegibles.length >= 2 ? elegibles : orden
@@ -1153,12 +1202,15 @@ function formReglaUI(){
   const t = $('rg-tipo').value
   $('rg-max-box').style.display = (t === 'limite' || t === 'grupo') ? '' : 'none'
   $('rg-alcance-box').style.display = (t === 'grupo' || t === 'limite') ? '' : 'none'
+  $('rg-dias-box').style.display = t === 'dias' ? '' : 'none'
   const alc = $('rg-alcance')
   if(t === 'grupo') alc.innerHTML = '<option value="dia">Mismo día</option><option value="consec">Día y consecutivos</option><option value="semana">Misma semana</option>'
   else if(t === 'limite') alc.innerHTML = '<option value="semana">Por semana</option><option value="mes">Por mes</option>'
   $('rg-max').value = t === 'grupo' ? 1 : 2
   $('rg-texto').placeholder = t === 'grupo' ? 'palabras cortas separadas por coma: arroz, risotto, chaufa'
-    : (t === 'limite' ? 'UNA palabra o proteína: pescado, cerdo, milanesa…' : (t === 'nota' ? 'texto libre de recordatorio' : 'UNA palabra: wrap, mondongo, sin tacc…'))
+    : (t === 'limite' ? 'UNA palabra o proteína: pescado, cerdo, milanesa…'
+    : (t === 'dias' ? 'palabra o proteína: pescado, guiso, milanesa…'
+    : (t === 'nota' ? 'texto libre de recordatorio' : 'UNA palabra: wrap, mondongo, sin tacc…')))
 }
 async function persistirReglas(){
   try{ await sbPost('app_data', [{ key: 'recetario_reglas', value: reglas }]) }
@@ -1184,6 +1236,11 @@ function agregarRegla(){
     alcance: $('rg-alcance').value,
     max: Math.max(1, parseInt($('rg-max').value) || 1),
   })
+  else if(tipo === 'dias'){
+    const dias = [0, 1, 2, 3, 4].filter(i => $('rg-d' + i).checked)
+    if(!dias.length){ toast('Marcá al menos un día'); return }
+    reglas.diasProhibidos.push({ palabra: txt, dias })
+  }
   else reglas.notas.push(txt)
   $('rg-texto').value = ''
   persistirReglas(); renderReglas(); renderRecetario(); if(Object.keys(cal).length) renderCal()
@@ -1216,6 +1273,7 @@ function renderReglas(){
   reglas.excluir.forEach((w, i) => html += fila('⛔', `Excluir platos que contengan "${w}"`, 'excluir', i))
   reglas.limites.forEach((l, i) => html += fila('🚦', `"${l.palabra}" máximo ${l.max} veces por ${l.alcance === 'mes' ? 'mes' : 'semana'} (por nombre o proteína)`, 'limites', i))
   ;(reglas.grupos || []).forEach((g, i) => html += fila('🧩', `Máximo ${g.max || 1} plato${(g.max || 1) > 1 ? 's' : ''} con "${(g.palabras || []).join(', ')}" — ${ALCANCE_LBL[g.alcance] || g.alcance}`, 'grupos', i))
+  ;(reglas.diasProhibidos || []).forEach((r, i) => html += fila('🗓️', `No ofrecer "${r.palabra}" los ${(r.dias || []).map(d => DIAS[d]).join(', ')}`, 'diasProhibidos', i))
   reglas.notas.forEach((n, i) => html += fila('📝', n, 'notas', i))
   box.innerHTML = html || '<p style="font-size:13px;color:var(--gris)">Sin reglas personalizadas todavía.</p>'
 }
