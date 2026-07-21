@@ -939,7 +939,7 @@ function renderCal(){
       if(!p) return `<div class="mini-slot libre" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})">+ ${s === 0 ? 'vegetariano' : 'opción ' + (s + 1)}</div>`
       const pd = protDef(protDe(p))
       return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" style="background:${pd.c};color:${pd.t};font-weight:600" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)} (${pd.l})${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(p.nombre)}</span>${simboloCosto(p) ? `<span style="font-size:10px">${simboloCosto(p)}</span>` : ''}
+        <span style="overflow:visible;white-space:normal;overflow-wrap:anywhere;line-height:1.25;flex:1">${esc(p.nombre)}</span>${simboloCosto(p) ? `<span style="font-size:10px">${simboloCosto(p)}</span>` : ''}
       </div>`
     }).join('')
     const msgs = validarDia(ids)
