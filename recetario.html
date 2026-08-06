@@ -35,6 +35,10 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
 .rec-card h3{font-size:15px;margin:8px 0 8px}
 .rec-meta{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:13px;color:var(--gris)}
 .rec-meta b{color:var(--verde-osc);font-size:15px}
+.rec-foot{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;flex-wrap:wrap}
+.rec-foot label{margin:0}
+.rec-foot .rec-prot{padding:4px 8px;font-size:12.5px;border-radius:8px;flex:1;min-width:110px}
+.rec-foot .btn{white-space:nowrap}
 .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;z-index:60;padding:30px 14px;overflow-y:auto}
 .modal-bg.open{display:flex}
 .modal{background:#fff;border-radius:16px;padding:22px;width:100%;max-width:620px}
@@ -63,6 +67,9 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
 .slot.lleno{border-style:solid;border-color:var(--borde);background:#fafcff}
 .slot .quitar{position:absolute;top:4px;right:6px;border:none;background:none;color:#94a3b8;cursor:pointer;font-size:13px}
 .slot .quitar:hover{color:#dc2626}
+.slot .crearrec{position:absolute;top:3px;right:24px;border:none;background:none;cursor:pointer;font-size:13px;line-height:1;opacity:.75}
+.slot .crearrec:hover{opacity:1}
+.mini-slot .crearrec{border:none;background:none;cursor:pointer;font-size:11px;line-height:1;flex:none;padding:0}
 .slot-tag{font-size:10.5px;font-weight:700;letter-spacing:.4px;color:#94a3b8;text-transform:uppercase}
 .aviso-dia{font-size:11.5px;color:#b45309;background:#fef3c7;border-radius:8px;padding:5px 8px}
 .avisos-cal{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
@@ -492,30 +499,85 @@ function showTab(t){
   }
 }
 
+// ─── Duplicados: priorizar los platos de producción (con receta y precio) ────
+function tokensNombre(nombre){
+  return new Set(String(nombre || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)))
+}
+function jaccard(a, b){
+  if(!a.size || !b.size) return 0
+  let inter = 0; for(const w of a) if(b.has(w)) inter++
+  return inter / (a.size + b.size - inter)
+}
+// Para un histórico, decide si ya tiene equivalente con receta/precio en producción.
+// { ocultar: mismo nombre exacto → se oculta } | { similar: nombre del plato parecido → se marca }
+function estadoDuplicado(p, realNorms, realTokens){
+  if(!p.historico) return { ocultar: false, similar: null }
+  if(realNorms.has(normNombre(p.nombre))) return { ocultar: true, similar: null }
+  const tk = tokensNombre(p.nombre)
+  let best = null, bestScore = 0
+  for(const r of realTokens){ const s = jaccard(tk, r.tokens); if(s > bestScore){ bestScore = s; best = r.nombre } }
+  return { ocultar: false, similar: bestScore >= 0.6 ? best : null }
+}
+
 // ─── Recetario ───────────────────────────────────────────────────────────────
 function renderRecetario(){
   const q = $('f-busca').value.trim().toLowerCase()
   const ft = $('f-tipo').value, fp = $('f-prot').value
-  const base = ($('f-hist') && $('f-hist').checked) ? [...platos, ...historicos].sort((a, b) => a.nombre.localeCompare(b.nombre)) : platos
+  const conHist = !!($('f-hist') && $('f-hist').checked)
+  const realNorms = new Set(platos.map(p => normNombre(p.nombre)))
+  const realTokens = platos.map(p => ({ nombre: p.nombre, tokens: tokensNombre(p.nombre) }))
+  const base0 = conHist ? [...platos, ...historicos].sort((a, b) => a.nombre.localeCompare(b.nombre)) : platos
+  // Ocultar los históricos que ya tienen su versión con receta y precio en producción
+  const base = base0.filter(p => !estadoDuplicado(p, realNorms, realTokens).ocultar)
+  const ocultos = base0.length - base.length
   const list = base.filter(p =>
     (!q || p.nombre.toLowerCase().includes(q)) &&
     (!ft || p.tipo === ft) &&
     (!fp || protDe(p) === fp)
   )
-  $('f-count').textContent = list.length + ' de ' + base.length + ' platos'
+  $('f-count').textContent = list.length + ' de ' + base.length + ' platos' +
+    (ocultos ? ` · ${ocultos} duplicado${ocultos > 1 ? 's' : ''} sin receta oculto${ocultos > 1 ? 's' : ''}` : '')
+  const protOpts = p => PROTEINAS.map(x => `<option value="${x.v}" ${x.v === protDe(p) ? 'selected' : ''}>${x.e} ${x.l}</option>`).join('')
   $('rec-grid').innerHTML = list.length === 0
     ? '<div class="spin">No hay platos que coincidan.</div>'
     : list.map(p => {
         const c = calcPlato(p), td = tipoDef(p.tipo), pd = protDef(protDe(p))
+        const dup = conHist ? estadoDuplicado(p, realNorms, realTokens) : { similar: null }
         const histBadge = p.historico ? '<span class="badge" style="background:#ede9fe;color:#6d28d9">📜 histórico</span>' : badge(td)
+        const simBadge = dup.similar ? `<span class="badge" style="background:#fef3c7;color:#b45309" title="Parecido a «${esc(dup.similar)}», que ya tiene receta con precio">⚠️ posible duplicado</span>` : ''
         const metaIzq = p.historico ? (p.fuente === 'catalogo' ? 'del catálogo' : 'de menús anteriores') : `${p.porciones} porc. · ${(p.ingredientes || []).length} ingr.`
         const metaDer = p.historico ? '' : `<b>${fmt$(c.vianda)}/vianda</b>`
+        const accion = p.historico
+          ? `<button class="btn btn-p btn-sm" onclick="event.stopPropagation();crearDesdeHistorico('${p.id}')">🍳 Crear receta</button>`
+          : ''
         return `<div class="rec-card" onclick="abrirDetalle('${p.id}')">
-          <div style="display:flex;gap:6px;flex-wrap:wrap">${histBadge}${badge(pd, (protInferida(p) && !p.historico ? '~' : '') + pd.l)}${aptoRotacion(p) ? '' : '<span class="badge" style="background:#f1f5f9;color:#64748b">⏸ fuera de rotación</span>'}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${histBadge}${badge(pd, (protInferida(p) && !p.historico ? '~' : '') + pd.l)}${simBadge}${aptoRotacion(p) ? '' : '<span class="badge" style="background:#f1f5f9;color:#64748b">⏸ fuera de rotación</span>'}</div>
           <h3>${esc(p.nombre)}</h3>
           <div class="rec-meta"><span>${metaIzq}</span>${metaDer}</div>
+          <div class="rec-foot" onclick="event.stopPropagation()">
+            <label>Proteína</label>
+            <select class="rec-prot" onchange="cambiarProtInline('${p.id}', this.value)">${protOpts(p)}</select>
+            ${accion}
+          </div>
         </div>`
       }).join('')
+}
+
+// Corregir la proteína/etiqueta directamente desde la tarjeta, sin abrir el detalle
+async function cambiarProtInline(id, v){
+  const p = platoMap[id]; if(!p) return
+  try{
+    if(p.historico){
+      await sbPatch('platos_historicos', 'id=eq.' + encodeURIComponent(id), { proteina: v, vegetariano: v === 'vegetariano' })
+      Object.assign(p, { proteina: v, vegetariano: v === 'vegetariano' })
+    } else {
+      if(!dbListo){ toast('Primero ejecutá el SQL en Supabase'); renderRecetario(); return }
+      await sbPatch('platos', 'id=eq.' + encodeURIComponent(id), { proteina: v })
+      Object.assign(p, { proteina: v })
+    }
+    toast('Proteína actualizada ✅'); renderRecetario()
+  } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
 }
 
 function abrirDetalle(id){
@@ -627,6 +689,7 @@ async function eliminarPlato(id){
 // ─── Form de receta ──────────────────────────────────────────────────────────
 function editarPlato(id){
   const p = platoMap[id]; if(!p) return
+  window._calPendiente = null
   cerrarModal('modal-det')
   editingId = id
   $('form-titulo').textContent = '✏️ Editando: ' + p.nombre
@@ -640,6 +703,7 @@ function editarPlato(id){
 }
 
 function limpiarForm(){
+  window._calPendiente = null
   editingId = null; formIngs = []
   $('form-titulo').textContent = '➕ Nueva receta'
   $('p-nombre').value = ''; $('p-desc').value = ''; $('p-porciones').value = 1
@@ -714,6 +778,19 @@ async function guardarPlato(){
     platoMap[id] = nuevo
     const dup = historicos.find(h => normNombre(h.nombre) === normNombre(nombre))
     if(dup){ sbDelete('platos_historicos', 'id=eq.' + encodeURIComponent(dup.id)).catch(() => {}); historicos = historicos.filter(h => h.id !== dup.id); delete platoMap[dup.id] }
+    // Si la receta se creó desde el calendario, reconectar el/los casilleros al plato nuevo con receta
+    const pend = window._calPendiente
+    if(pend){
+      window._calPendiente = null
+      let reconectados = 0
+      for(const f in cal) for(let s = 0; s < cal[f].length; s++){
+        if(cal[f][s] === pend.oldId || cal[f][s] === dup?.id){ cal[f][s] = id; reconectados++ }
+      }
+      limpiarForm()
+      toast('Receta guardada en producción ✅ — acordate de tocar 💾 Guardar el menú')
+      showTab('calendario'); renderCal()
+      return
+    }
     toast(editingId ? 'Receta actualizada ✅' : 'Receta guardada en el recetario ✅')
     limpiarForm(); renderRecetario(); showTab('recetario')
   } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
@@ -917,6 +994,7 @@ function renderCal(){
         const pd = protDef(protDe(p)), c = calcPlato(p)
         return `<div class="slot lleno" style="background:${pd.c}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})">
           <button class="quitar" onclick="event.stopPropagation();quitarSlot('${fi}',${s})">✕</button>
+          ${sinReceta(p) ? `<button class="crearrec" title="Cargar receta — queda guardada en producción" onclick="event.stopPropagation();crearRecetaDesdeCal('${fi}',${s})">🍳</button>` : ''}
           <span class="slot-tag">${etiquetas[s]}</span>
           <b style="font-size:12.5px;line-height:1.25">${esc(p.nombre)}</b>
           <span>${badge(pd)} <small style="color:var(--gris)">${p.historico ? '📜 histórico' : fmt$(c.vianda)}</small> <small>${simboloCosto(p)}</small>${cuenta[id] > 1 ? ' <small style="color:#dc2626">🔁</small>' : ''}</span>
@@ -939,7 +1017,7 @@ function renderCal(){
       if(!p) return `<div class="mini-slot libre" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})">+ ${s === 0 ? 'vegetariano' : 'opción ' + (s + 1)}</div>`
       const pd = protDef(protDe(p))
       return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" style="background:${pd.c};color:${pd.t};font-weight:600" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)} (${pd.l})${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
-        <span style="overflow:visible;white-space:normal;overflow-wrap:anywhere;line-height:1.25;flex:1">${esc(p.nombre)}</span>${simboloCosto(p) ? `<span style="font-size:10px">${simboloCosto(p)}</span>` : ''}
+        <span style="overflow:visible;white-space:normal;overflow-wrap:anywhere;line-height:1.25;flex:1">${esc(p.nombre)}</span>${simboloCosto(p) ? `<span style="font-size:10px">${simboloCosto(p)}</span>` : ''}${sinReceta(p) ? `<button class="crearrec" title="Cargar receta — queda guardada en producción" onclick="event.stopPropagation();crearRecetaDesdeCal('${fi}',${s})">🍳</button>` : ''}
       </div>`
     }).join('')
     const msgs = validarDia(ids)
@@ -949,6 +1027,22 @@ function renderCal(){
 }
 
 function quitarSlot(f, s){ cal[f][s] = null; renderCal() }
+
+// ¿El plato de este slot todavía no tiene receta cargada? (histórico o sin ingredientes)
+function sinReceta(p){ return !!p && (p.historico || (p.ingredientes || []).length === 0) }
+
+// Cargar la receta de un plato directamente desde el calendario.
+// Abre el form Crear (con todos los insumos y subrecetas de producción) precargado,
+// y al guardar reconecta el slot al nuevo plato con receta (queda en la plataforma de producción).
+function crearRecetaDesdeCal(fecha, slot){
+  const id = cal[fecha] && cal[fecha][slot]
+  const p = id ? platoMap[id] : null
+  if(!p){ toast('Ese casillero está vacío'); return }
+  if(p.historico) crearDesdeHistorico(id)   // precarga nombre + proteína y va a la pestaña Crear
+  else editarPlato(id)                        // plato real sin ingredientes: se completa manteniendo su id
+  window._calPendiente = { fecha, slot, oldId: id }   // se setea al final: las llamadas de arriba limpian el form
+  toast('Cargá los ingredientes y guardá — se sumará a producción')
+}
 
 // ─── Drag & drop: intercambia platos entre casilleros ───────────────────────
 let dragSrc = null
