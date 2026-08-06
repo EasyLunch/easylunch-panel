@@ -56,6 +56,33 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
 .idea{border:1px solid var(--borde);border-radius:12px;padding:12px 14px;margin-bottom:10px}
 .idea h4{font-size:14px;margin-bottom:4px}
 .idea .comp{font-size:12.5px;color:var(--gris)}
+.ing-row{border-radius:10px;padding:8px;margin-bottom:8px}
+.ing-row.insumo{background:#eff6ff}
+.ing-row.subreceta{background:#faf5ff}
+.ing-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ing-badge{font-size:11px;font-weight:700;padding:2px 6px;border-radius:6px;flex:none}
+.ing-badge.insumo{background:#dbeafe;color:#1d4ed8}
+.ing-badge.subreceta{background:#f3e8ff;color:#7e22ce}
+.ing-ref{flex:1;min-width:150px}
+.ing-cant{width:90px}
+.ing-uni{width:82px}
+.ing-costo{width:72px;text-align:right;font-weight:700;font-size:12.5px;color:var(--verde-osc)}
+.crudo-tog{font-size:11px;font-weight:700;padding:5px 9px;border-radius:99px;border:1px solid;cursor:pointer;flex:none}
+.crudo-tog.crudo{background:#ffedd5;color:#c2410c;border-color:#fed7aa}
+.crudo-tog.cocido{background:#dcfce7;color:#15803d;border-color:#bbf7d0}
+.ing-rinde{font-size:11.5px;color:#c2410c;margin:6px 0 0 34px}
+.cotiz-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cotiz-card{border-radius:12px;padding:12px;text-align:center;display:flex;flex-direction:column;gap:3px}
+.cotiz-card span{font-size:11.5px;opacity:.85}
+.cotiz-card b{font-size:15px}
+.cotiz-card.c-verde{background:#ecfccb;color:#3f6212}
+.cotiz-card.c-verde2{background:#dcfce7;color:#15803d}
+.cotiz-card.c-naranja{background:#ffedd5;color:#c2410c}
+.foto-drop{width:96px;height:76px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #cbd5e1;border-radius:10px;cursor:pointer;color:#94a3b8;font-size:12px;gap:2px;flex:none}
+.foto-drop:hover{border-color:var(--verde);background:#f0fdf4}
+.foto-thumb{position:relative;width:96px;height:76px;flex:none}
+.foto-thumb img{width:96px;height:76px;object-fit:cover;border-radius:10px;border:1px solid var(--borde)}
+.foto-thumb button{position:absolute;top:-6px;right:-6px;background:#fff;border:1px solid var(--borde);border-radius:50%;width:22px;height:22px;cursor:pointer;color:#dc2626;line-height:1;font-size:12px}
 .cal-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .cal-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
 @media(max-width:960px){.cal-grid{grid-template-columns:1fr}}
@@ -124,23 +151,32 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
       <div class="card">
         <h2 id="form-titulo" style="font-size:17px;margin-bottom:16px">➕ Nueva receta</h2>
         <div class="form-grid" style="margin-bottom:14px">
-          <div style="grid-column:span 2"><label>Nombre del plato</label><input id="p-nombre" style="width:100%"></div>
+          <div style="grid-column:span 2"><label>Nombre del plato *</label><input id="p-nombre" placeholder="Ej: Milanesa napolitana con papas" style="width:100%"></div>
           <div><label>Tipo</label><select id="p-tipo" style="width:100%"></select></div>
           <div><label>Proteína</label><select id="p-prot" style="width:100%"></select></div>
-          <div><label>Porciones que rinde</label><input id="p-porciones" type="number" min="1" value="1" style="width:100%"></div>
+          <div><label>Porciones que rinde *</label><input id="p-porciones" type="number" min="1" value="1" style="width:100%"></div>
         </div>
-        <label>Ingredientes (insumos o subrecetas)</label>
-        <div style="position:relative;margin-bottom:10px">
-          <input id="ing-search" placeholder="Escribí para buscar e ir agregando…" style="width:100%" oninput="sugerirIngs()" onfocus="sugerirIngs()">
-          <div class="sugs" id="ing-sugs"></div>
+        <label>Foto del plato</label>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div id="foto-prev"></div>
+          <p style="font-size:12px;color:var(--gris);margin:0;flex:1">Foto opcional para identificar el plato. Se muestra en el detalle y al imprimir la receta.</p>
+          <input type="file" id="p-foto-file" accept="image/*" style="display:none" onchange="onFotoChange(event)">
         </div>
-        <table class="tbl" id="ing-tbl" style="margin-bottom:12px">
-          <thead><tr><th>Ingrediente</th><th style="width:90px">Cantidad</th><th style="width:90px">Unidad</th><th style="width:60px">Crudo</th><th style="width:80px">Costo</th><th></th></tr></thead>
-          <tbody id="ing-body"></tbody>
-        </table>
-        <div style="margin-bottom:14px"><label>Descripción / paso a paso (opcional)</label><textarea id="p-desc" rows="3" style="width:100%"></textarea></div>
-        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-          <div style="font-size:14px">Costo total: <b id="c-total" style="color:var(--verde-osc)">$0</b> &nbsp;·&nbsp; Por vianda: <b id="c-vianda" style="color:var(--verde-osc)">$0</b></div>
+        <div style="margin-bottom:14px"><label>Paso a paso / Descripción (opcional)</label><textarea id="p-desc" rows="3" placeholder="Ej: 1. Preparar la salsa… 2. Cocinar la carne a fuego fuerte…" style="width:100%"></textarea></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label style="margin:0">Ingredientes</label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" onclick="addIng('insumo')">＋ Insumo</button>
+            <button class="btn btn-sm" onclick="addIng('subreceta')">＋ Sub-receta</button>
+          </div>
+        </div>
+        <div id="ing-body" style="margin-bottom:12px"></div>
+        <div id="cotiz-cards" class="cotiz-cards" style="display:none">
+          <div class="cotiz-card c-verde"><span>💲 Costo total</span><b id="c-total">$0</b></div>
+          <div class="cotiz-card c-verde2"><span>💲 Costo/vianda</span><b id="c-vianda">$0</b></div>
+          <div class="cotiz-card c-naranja"><span>⚖️ Peso/vianda (cocido)</span><b id="c-peso">0 g</b></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px">
           <div style="flex:1"></div>
           <button class="btn" onclick="limpiarForm()">Limpiar</button>
           <button class="btn btn-p" onclick="guardarPlato()">💾 Guardar receta</button>
@@ -267,6 +303,7 @@ let insMap = {}, srMap = {}, platoMap = {}
 let dbListo = true            // proteina + calendario_menu disponibles
 let editingId = null          // id del plato que se está editando en el form
 let formIngs = []             // ingredientes del form
+let formFoto = null           // foto (base64) del form de receta
 let weekStart = mondayOf(new Date())
 let vista = 'semana'          // 'semana' | 'mes'
 let dbRot = true              // columna en_rotacion disponible
@@ -594,6 +631,7 @@ function abrirDetalle(id){
       <button class="btn btn-sm" onclick="cerrarModal('modal-det')">✕</button>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${badge(tipoDef(p.tipo))}${badge(pd, (protInferida(p) ? '~' : '') + pd.l)}</div>
+    ${p.foto ? `<img src="${p.foto}" alt="Foto" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:12px">` : ''}
     ${p.descripcion ? `<p style="font-size:13.5px;color:var(--gris);margin-bottom:12px;white-space:pre-wrap">${esc(p.descripcion)}</p>` : ''}
     <table class="tbl"><thead><tr><th>Ingrediente</th><th>Cantidad</th><th style="text-align:right">Costo</th></tr></thead><tbody>${filas}</tbody></table>
     <div style="margin:14px 0;font-size:14px">Costo total: <b style="color:var(--verde-osc)">${fmt$(c.total)}</b> &nbsp;·&nbsp; Por vianda (${p.porciones}): <b style="color:var(--verde-osc)">${fmt$(c.vianda)}</b></div>
@@ -699,61 +737,96 @@ function editarPlato(id){
   $('p-porciones').value = p.porciones
   $('p-desc').value = p.descripcion || ''
   formIngs = (p.ingredientes || []).map(i => ({ ...i }))
+  formFoto = p.foto || null
   renderForm(); showTab('crear'); window.scrollTo(0, 0)
 }
 
 function limpiarForm(){
   window._calPendiente = null
-  editingId = null; formIngs = []
+  editingId = null; formIngs = []; formFoto = null
   $('form-titulo').textContent = '➕ Nueva receta'
   $('p-nombre').value = ''; $('p-desc').value = ''; $('p-porciones').value = 1
   $('p-tipo').value = 'clasico'; $('p-prot').value = 'vegetariano'
   renderForm()
 }
 
-function sugerirIngs(){
-  const q = $('ing-search').value.trim().toLowerCase()
-  const box = $('ing-sugs')
-  if(q.length < 2){ box.style.display = 'none'; return }
-  const res = [
-    ...subrecetas.filter(s => s.nombre.toLowerCase().includes(q)).map(s => ({ tipo:'subreceta', id:s.id, n:'🧩 ' + s.nombre })),
-    ...insumos.filter(i => i.nombre.toLowerCase().includes(q)).map(i => ({ tipo:'insumo', id:i.id, n:i.nombre })),
-  ].slice(0, 12)
-  box.innerHTML = res.length ? res.map(r => `<div onclick="agregarIng('${r.tipo}','${r.id}')">${esc(r.n)}</div>`).join('') : '<div style="color:var(--gris)">Sin resultados</div>'
-  box.style.display = 'block'
+// Peso neto (cocido) que aporta cada ingrediente — misma lógica que producción
+function pesoIngrediente(ing){
+  if(ing.tipo === 'insumo'){
+    const ins = insMap[ing.ref_id]; if(!ins) return 0
+    if(PESO_UNITS.has(ing.unidad)){
+      const cantG = toGramos(ing.cantidad, ing.unidad)
+      return ing.crudo ? cantG * yieldFactor(ins.merma_crudo, ins.variacion_coccion) : cantG
+    }
+    return ing.cantidad * (ins.gramaje || 0)
+  }
+  const sr = srMap[ing.ref_id]; if(!sr) return 0
+  if(PESO_UNITS.has(ing.unidad)) return toGramos(ing.cantidad, ing.unidad)
+  return ing.cantidad * (sr.gramaje_unidad || 0)
 }
-document.addEventListener('click', e => { if(!e.target.closest('#ing-search') && !e.target.closest('#ing-sugs')) $('ing-sugs').style.display = 'none' })
 
-function agregarIng(tipo, refId){
-  formIngs.push({ id: uuid(), tipo, ref_id: refId, cantidad: 100, unidad: 'g', crudo: false })
-  $('ing-search').value = ''; $('ing-sugs').style.display = 'none'
+function addIng(tipo){
+  const first = tipo === 'insumo' ? (insumos[0] && insumos[0].id) : (subrecetas[0] && subrecetas[0].id)
+  if(!first){ toast(tipo === 'insumo' ? 'No hay insumos cargados' : 'No hay subrecetas cargadas'); return }
+  formIngs.push({ id: uuid(), tipo, ref_id: first, cantidad: 100, unidad: 'g', crudo: false })
   renderForm()
 }
 function quitarIng(idx){ formIngs.splice(idx, 1); renderForm() }
 function updIng(idx, campo, val){
   if(campo === 'cantidad') formIngs[idx].cantidad = parseFloat(val) || 0
-  else if(campo === 'crudo') formIngs[idx].crudo = val
+  else if(campo === 'crudo') formIngs[idx].crudo = !!val
   else formIngs[idx][campo] = val
   renderForm()
 }
 
 function renderForm(){
-  $('ing-body').innerHTML = formIngs.map((ing, i) => {
-    const n = ing.tipo === 'insumo' ? (insMap[ing.ref_id]?.nombre || '¿?') : '🧩 ' + (srMap[ing.ref_id]?.nombre || '¿?')
-    return `<tr>
-      <td>${esc(n)}</td>
-      <td><input type="number" min="0" step="any" value="${ing.cantidad}" style="width:80px" onchange="updIng(${i},'cantidad',this.value)"></td>
-      <td><select style="width:85px" onchange="updIng(${i},'unidad',this.value)">${UNIDADES.map(u => `<option ${u === ing.unidad ? 'selected' : ''}>${u}</option>`).join('')}</select></td>
-      <td style="text-align:center">${ing.tipo === 'insumo' ? `<input type="checkbox" ${ing.crudo ? 'checked' : ''} onchange="updIng(${i},'crudo',this.checked)">` : ''}</td>
-      <td style="font-size:12.5px;color:var(--verde-osc);font-weight:600">${fmt$(costoIngrediente(ing))}</td>
-      <td><button class="btn btn-sm" onclick="quitarIng(${i})">✕</button></td>
-    </tr>`
-  }).join('') || '<tr><td colspan="6" style="color:var(--gris);font-size:13px">Todavía no agregaste ingredientes.</td></tr>'
+  const insOpts = ref => insumos.map(i => `<option value="${i.id}" ${i.id === ref ? 'selected' : ''}>${esc(i.nombre)} (${esc(i.unidad)})</option>`).join('')
+  const srOpts  = ref => subrecetas.map(s => `<option value="${s.id}" ${s.id === ref ? 'selected' : ''}>🧩 ${esc(s.nombre)}</option>`).join('')
+  $('ing-body').innerHTML = formIngs.length === 0
+    ? '<p style="color:var(--gris);font-size:13px;text-align:center;padding:14px;border:1px dashed var(--borde);border-radius:10px">Agregá insumos o sub-recetas</p>'
+    : formIngs.map((ing, i) => {
+        const esPeso = PESO_UNITS.has(ing.unidad)
+        const costo = costoIngrediente(ing)
+        const ins = ing.tipo === 'insumo' ? insMap[ing.ref_id] : null
+        const rinde = (ing.tipo === 'insumo' && ing.crudo && esPeso && ins && ing.cantidad > 0)
+          ? toGramos(ing.cantidad, ing.unidad) * yieldFactor(ins.merma_crudo, ins.variacion_coccion) : null
+        return `<div class="ing-row ${ing.tipo}">
+          <div class="ing-line">
+            <span class="ing-badge ${ing.tipo}">${ing.tipo === 'insumo' ? 'Ins' : 'Sub'}</span>
+            <select class="ing-ref" onchange="updIng(${i},'ref_id',this.value)">${ing.tipo === 'insumo' ? insOpts(ing.ref_id) : srOpts(ing.ref_id)}</select>
+            <input class="ing-cant" type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="updIng(${i},'cantidad',this.value)">
+            <select class="ing-uni" onchange="updIng(${i},'unidad',this.value)">${UNIDADES.map(u => `<option ${u === ing.unidad ? 'selected' : ''}>${u}</option>`).join('')}</select>
+            ${(ing.tipo === 'insumo' && esPeso) ? `<button class="crudo-tog ${ing.crudo ? 'crudo' : 'cocido'}" onclick="updIng(${i},'crudo',${!ing.crudo})" title="${ing.crudo ? 'Cantidad en crudo — clic para cocido' : 'Cantidad en cocido — clic para crudo'}">${ing.crudo ? '🥩 Crudo' : '✅ Cocido'}</button>` : ''}
+            <span class="ing-costo">${costo > 0 ? fmt$(costo) : '—'}</span>
+            <button class="btn btn-sm" onclick="quitarIng(${i})">✕</button>
+          </div>
+          ${rinde !== null ? `<div class="ing-rinde">→ rinde aprox. <b>${rinde >= 1000 ? (rinde / 1000).toFixed(3) + ' kg' : rinde.toFixed(0) + ' g'}</b> cocido</div>` : ''}
+        </div>`
+      }).join('')
   const total = formIngs.reduce((s, i) => s + costoIngrediente(i), 0)
+  const pesoT = formIngs.reduce((s, i) => s + pesoIngrediente(i), 0)
   const porc = parseInt($('p-porciones').value) || 1
+  $('cotiz-cards').style.display = formIngs.length ? 'grid' : 'none'
   $('c-total').textContent = fmt$(total)
   $('c-vianda').textContent = fmt$(total / porc)
+  $('c-peso').textContent = (pesoT / porc).toFixed(0) + ' g'
+  renderFoto()
 }
+
+function renderFoto(){
+  const box = $('foto-prev'); if(!box) return
+  box.innerHTML = formFoto
+    ? `<div class="foto-thumb"><img src="${formFoto}" alt="Foto"><button type="button" onclick="quitarFoto()" title="Quitar foto">✕</button></div>`
+    : `<div class="foto-drop" onclick="document.getElementById('p-foto-file').click()"><span style="font-size:18px">📷</span>Subir foto</div>`
+}
+function onFotoChange(e){
+  const f = e.target.files && e.target.files[0]; if(!f) return
+  const r = new FileReader()
+  r.onload = ev => { formFoto = ev.target.result; renderFoto() }
+  r.readAsDataURL(f)
+  e.target.value = ''
+}
+function quitarFoto(){ formFoto = null; renderFoto() }
 document.addEventListener('DOMContentLoaded', () => { $('p-porciones').addEventListener('input', renderForm) })
 
 async function guardarPlato(){
@@ -766,6 +839,7 @@ async function guardarPlato(){
     tipo: $('p-tipo').value,
     porciones: parseInt($('p-porciones').value) || 1,
     descripcion: $('p-desc').value.trim() || null,
+    foto: formFoto || null,
   }
   if(dbListo) row.proteina = $('p-prot').value
   if(dbRot) row.en_rotacion = editingId ? (platoMap[editingId]?.en_rotacion ?? true) : true
