@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Easy Lunch — Recetario & Menú</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--verde:#059669;--verde-osc:#047857;--tinta:#1e293b;--gris:#64748b;--borde:#e2e8f0;--fondo:#f4f6f8}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -130,6 +131,8 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
     <button id="nav-crear" onclick="showTab('crear')">➕ Nueva receta</button>
     <button id="nav-calendario" onclick="showTab('calendario')">📅 Calendario</button>
     <button id="nav-reglas" onclick="showTab('reglas')">⚙️ Reglas</button>
+    <button id="nav-refresh" onclick="refrescarTodo()" title="Actualizar datos desde la base">🔄 Actualizar</button>
+    <span id="sync-ind" title="Estado de la sincronización en vivo" style="font-size:12px;color:#94a3b8;align-self:center">○ sin conexión en vivo</span>
   </nav>
 </header>
 <main>
@@ -304,6 +307,7 @@ let dbListo = true            // proteina + calendario_menu disponibles
 let editingId = null          // id del plato que se está editando en el form
 let formIngs = []             // ingredientes del form
 let formFoto = null           // foto (base64) del form de receta
+let calDirty = false          // hay cambios en el calendario sin guardar (para no pisarlos al sincronizar)
 let weekStart = mondayOf(new Date())
 let vista = 'semana'          // 'semana' | 'mes'
 let dbRot = true              // columna en_rotacion disponible
@@ -860,6 +864,7 @@ async function guardarPlato(){
       for(const f in cal) for(let s = 0; s < cal[f].length; s++){
         if(cal[f][s] === pend.oldId || cal[f][s] === dup?.id){ cal[f][s] = id; reconectados++ }
       }
+      if(reconectados) calDirty = true
       limpiarForm()
       toast('Receta guardada en producción ✅ — acordate de tocar 💾 Guardar el menú')
       showTab('calendario'); renderCal()
@@ -957,6 +962,7 @@ async function cargarPeriodo(){
       for(const r of rows) if(cal[r.fecha] && r.slot >= 0 && r.slot < 3) cal[r.fecha][r.slot] = r.plato_id
     } catch(e){ console.warn(e) }
   }
+  calDirty = false
   renderCal()
 }
 const cargarSemana = cargarPeriodo
@@ -1100,7 +1106,7 @@ function renderCal(){
   }).join('')
 }
 
-function quitarSlot(f, s){ cal[f][s] = null; renderCal() }
+function quitarSlot(f, s){ cal[f][s] = null; calDirty = true; renderCal() }
 
 // ¿El plato de este slot todavía no tiene receta cargada? (histórico o sin ingredientes)
 function sinReceta(p){ return !!p && (p.historico || (p.ingredientes || []).length === 0) }
@@ -1128,6 +1134,7 @@ function soltar(ev, f, s){
   cal[f][s] = cal[dragSrc.f][dragSrc.s]
   cal[dragSrc.f][dragSrc.s] = tmp
   dragSrc = null
+  calDirty = true
   renderCal()
 }
 
@@ -1185,6 +1192,7 @@ function renderPickList(){
 
 function elegirPlato(id){
   cal[pickerCtx.fecha][pickerCtx.slot] = id
+  calDirty = true
   cerrarModal('modal-pick'); renderCal()
 }
 
@@ -1311,6 +1319,7 @@ async function generarPropuesta(){
     cal[fi] = [veg?.id || null, a?.id || null, b?.id || null]
     nombresAyer = nombresHoy
   })
+  calDirty = true
   renderCal()
   toast('Propuesta generada — revisala y guardala')
 }
@@ -1325,9 +1334,80 @@ async function guardarSemana(){
       ids.forEach((id, slot) => { if(id) rows.push({ id: uuid(), fecha, slot, plato_id: id }) })
     if(rows.length) await sbPost('calendario_menu', rows)
     for(const r of rows) if(!usage[r.plato_id] || usage[r.plato_id] < r.fecha) usage[r.plato_id] = r.fecha
+    calDirty = false
     toast((vista === 'semana' ? 'Semana guardada' : 'Mes guardado') + ' ✅')
   } catch(e){ console.error(e); toast('Error al guardar: ' + e.message.slice(0, 80)) }
 }
+
+// ─── Sincronización entre computadoras (Realtime + botón + al volver a la pestaña) ──
+const SBBASE = SB.replace(/\/rest\/v1$/, '')
+let rtClient = null, _catT = null, _calT = null
+
+async function refrescarCatalogo(){
+  try{
+    const [ins, srs, srIngs, pls, plIngs] = await Promise.all([
+      sbGet('insumos?select=*&order=nombre'),
+      sbGet('subrecetas?select=*&order=nombre'),
+      sbGet('subreceta_ingredientes?select=*'),
+      sbGet('platos?select=*&order=nombre'),
+      sbGet('plato_ingredientes?select=*'),
+    ])
+    insumos = ins
+    subrecetas = srs.map(s => ({ ...s, ingredientes: srIngs.filter(i => i.subreceta_id === s.id) }))
+    platos = pls.map(p => ({ ...p, ingredientes: plIngs.filter(i => i.plato_id === p.id) }))
+    insMap = Object.fromEntries(insumos.map(i => [i.id, i]))
+    srMap = Object.fromEntries(subrecetas.map(s => [s.id, s]))
+    platoMap = Object.fromEntries(platos.map(p => [p.id, p]))
+    if(dbListo){
+      try{
+        const hs = await sbGet('platos_historicos?select=*&order=nombre')
+        historicos = hs.map(h => ({ ...h, historico: true, tipo: h.vegetariano ? 'vegetariano' : 'clasico', porciones: 1, ingredientes: [] }))
+        for(const h of historicos) platoMap[h.id] = h
+      } catch(e){}
+    }
+    costoNiveles = null; calcularNivelesCosto()
+    renderRecetario()
+    if($('tab-calendario') && $('tab-calendario').style.display !== 'none') renderCal()
+  } catch(e){ console.warn('[sync] catálogo', e) }
+}
+
+async function refrescarTodo(){
+  await refrescarCatalogo()
+  if(calDirty){ toast('Datos actualizados — el calendario tiene cambios sin guardar, no lo toqué'); return }
+  await cargarPeriodo()
+  toast('Datos actualizados ✅')
+}
+
+function scheduleCatalogRefresh(){ clearTimeout(_catT); _catT = setTimeout(refrescarCatalogo, 1200) }
+function onCalRemoteChange(){
+  clearTimeout(_calT)
+  _calT = setTimeout(() => {
+    if(calDirty){ toast('🔄 El calendario cambió en otra compu. Guardá o tocá 🔄 Actualizar para traer lo último.'); return }
+    cargarPeriodo()
+  }, 1200)
+}
+function setSyncInd(txt, color){ const e = $('sync-ind'); if(e){ e.textContent = txt; e.style.color = color } }
+
+function initRealtime(){
+  if(!(window.supabase && window.supabase.createClient)){ setSyncInd('○ sin conexión en vivo', '#94a3b8'); return }
+  try{
+    rtClient = window.supabase.createClient(SBBASE, KEY)
+    const cat = ['platos','plato_ingredientes','insumos','subrecetas','subreceta_ingredientes','platos_historicos']
+    let ch = rtClient.channel('recetario-sync')
+    for(const t of cat) ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, scheduleCatalogRefresh)
+    ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: 'calendario_menu' }, onCalRemoteChange)
+    ch.subscribe(st => {
+      if(st === 'SUBSCRIBED') setSyncInd('● en vivo', '#059669')
+      else if(st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') setSyncInd('○ sin conexión en vivo (usá 🔄)', '#dc2626')
+      else setSyncInd('○ conectando…', '#94a3b8')
+    })
+  } catch(e){ console.warn('[sync] realtime', e); setSyncInd('○ sin conexión en vivo', '#94a3b8') }
+}
+
+// Al volver a la pestaña, refrescar (respetando cambios sin guardar del calendario)
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible'){ refrescarCatalogo(); if(!calDirty) cargarPeriodo() }
+})
 
 // ─── Exportar a Excel (mismo formato que la planilla) ───────────────────────
 async function exportarExcel(){
@@ -1548,7 +1628,9 @@ async function generarFotosFaltantes(){
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────
-cargar().catch(e => { console.error(e); $('rec-grid').innerHTML = '<div class="spin">Error de conexión con la base de datos.<br><small>' + esc(e.message) + '</small></div>' })
+cargar()
+  .then(() => { try{ initRealtime() } catch(e){ console.warn(e) } })
+  .catch(e => { console.error(e); $('rec-grid').innerHTML = '<div class="spin">Error de conexión con la base de datos.<br><small>' + esc(e.message) + '</small></div>' })
 </script>
 </body>
 </html>
