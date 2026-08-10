@@ -1053,8 +1053,22 @@ function avisosPeriodo(){
   return [...new Set(avisos)]
 }
 
+// Si un casillero apunta a un histórico (sin receta) pero existe la receta real con
+// el mismo nombre, mostrar la receta real (con su precio). Prioriza lo cargado en producción.
+let realNombreMap = {}
+function rebuildRealNombreMap(){
+  realNombreMap = {}
+  for(const p of platos) if((p.ingredientes || []).length) realNombreMap[normNombre(p.nombre)] = p
+}
+function platoEfectivo(id){
+  const p = platoMap[id]; if(!p) return p
+  if(p.historico){ const r = realNombreMap[normNombre(p.nombre)]; if(r) return r }
+  return p
+}
+
 function renderCal(){
   if(!costoNiveles) calcularNivelesCosto()
+  rebuildRealNombreMap()
   const fechas = visibleDates()
   $('cal-titulo').textContent = vista === 'semana'
     ? 'Semana del ' + fmtFecha(fechas[0]) + ' al ' + fmtFecha(fechas[4])
@@ -1069,7 +1083,7 @@ function renderCal(){
     grid.innerHTML = fechas.map((f, di) => {
       const fi = iso(f), ids = cal[fi]
       const slots = ids.map((id, s) => {
-        const p = id ? platoMap[id] : null
+        const p = id ? platoEfectivo(id) : null
         if(!p) return `<div class="slot" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})"><span class="slot-tag">${etiquetas[s]}</span><span style="color:#94a3b8">+ Elegir plato</span></div>`
         const pd = protDef(protDe(p)), c = calcPlato(p)
         return `<div class="slot lleno" style="background:${pd.c}" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})">
@@ -1093,7 +1107,7 @@ function renderCal(){
   grid.innerHTML = cab + vacios + fechas.map(f => {
     const fi = iso(f), ids = cal[fi]
     const slots = ids.map((id, s) => {
-      const p = id ? platoMap[id] : null
+      const p = id ? platoEfectivo(id) : null
       if(!p) return `<div class="mini-slot libre" onclick="abrirPicker('${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})">+ ${s === 0 ? 'vegetariano' : 'opción ' + (s + 1)}</div>`
       const pd = protDef(protDe(p))
       return `<div class="mini-slot${cuenta[id] > 1 ? ' rep' : ''}" style="background:${pd.c};color:${pd.t};font-weight:600" draggable="true" ondragstart="dragStart(event,'${fi}',${s})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="soltar(event,'${fi}',${s})" onmouseenter="slotHover(event,'${id}')" onmouseleave="slotHoverLeave()" onclick="abrirPicker('${fi}',${s})" title="${esc(p.nombre)} (${pd.l})${cuenta[id] > 1 ? ' — repetido en el mes' : ''}">
@@ -1456,7 +1470,7 @@ function imprimirMenu(){
     <table border="1" cellpadding="8" style="border-collapse:collapse;width:100%;font-family:sans-serif;font-size:12px;margin-top:14px">
       <tr style="background:#f1f5f9"><th></th>${fs.map(f => `<th>${diaNombre(iso(f))} ${fmtFecha(f)}</th>`).join('')}</tr>
       ${['🌿 Vegetariano', 'Opción 2', 'Opción 3'].map((et, s) => `<tr><td><b>${et}</b></td>${fs.map(f => {
-        const id = cal[iso(f)][s]; const p = id ? platoMap[id] : null
+        const id = cal[iso(f)][s]; const p = id ? platoEfectivo(id) : null
         return `<td>${p ? esc(p.nombre) + ' <small>(' + protDef(protDe(p)).l + ')</small>' : '—'}</td>`
       }).join('')}</tr>`).join('')}
     </table>`).join('')
