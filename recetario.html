@@ -1425,36 +1425,76 @@ document.addEventListener('visibilitychange', () => {
 
 // ─── Exportar a Excel (mismo formato que la planilla) ───────────────────────
 async function exportarExcel(){
-  if(!window.XLSX){
+  // xlsx-js-style: mismo API que SheetJS pero soporta colores/bordes en las celdas
+  if(!(window.XLSX && window.XLSX.__styled)){
     try{
       await new Promise((res, rej) => {
         const sc = document.createElement('script')
-        sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+        sc.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js'
         sc.onload = res; sc.onerror = rej
         document.head.appendChild(sc)
       })
+      if(window.XLSX) window.XLSX.__styled = true
     } catch(e){ toast('No se pudo cargar el módulo de Excel'); return }
   }
+  const XL = window.XLSX
   const fechas = visibleDates()
   const semanas = {}
   for(const f of fechas){ const wk = iso(mondayOf(f)); (semanas[wk] ??= []).push(f) }
-  const CATS = [['Tradicional', 1], ['Veggie', 0], ['Sabores del Mundo', 2]]
-  const aoa = []
-  for(const fs of Object.values(semanas)){
-    aoa.push(['', ...fs.map(f => diaNombre(iso(f)) + ' ' + f.getDate())])
-    for(const [cat, slot] of CATS)
-      aoa.push([cat, ...fs.map(f => { const id = (cal[iso(f)] || [])[slot]; return id && platoMap[id] ? platoMap[id].nombre : '' })])
-    aoa.push([])
-  }
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
-  ws['!cols'] = [{ wch: 18 }, { wch: 45 }, { wch: 45 }, { wch: 45 }, { wch: 45 }, { wch: 45 }]
-  const wb = XLSX.utils.book_new()
+  const CATS = [
+    { name: '🍽  Tradicional',        slot: 1, cell: 'EFF6FF', lblBg: 'DBEAFE', lblFg: '1E40AF' },
+    { name: '🌿  Veggie',             slot: 0, cell: 'F0FDF4', lblBg: 'DCFCE7', lblFg: '166534' },
+    { name: '🌎  Sabores del Mundo',  slot: 2, cell: 'FFF7ED', lblBg: 'FFEDD5', lblFg: '9A3412' },
+  ]
+  const NC = 6 // etiqueta + 5 días
+  const aoa = [], st = {}, rh = {}, dishRows = []
+  const setS = (r, c, s) => { st[r + ',' + c] = s }
+  const bd = { style: 'thin', color: { rgb: 'E2E8F0' } }
+  const border = { top: bd, bottom: bd, left: bd, right: bd }
+
   const titulo = vista === 'semana'
     ? 'Semana del ' + fmtFecha(fechas[0]).replace('/', '-')
     : MESES[weekStart.getMonth()] + ' ' + weekStart.getFullYear()
-  XLSX.utils.book_append_sheet(wb, ws, titulo.slice(0, 30))
-  XLSX.writeFile(wb, `Menu Easy Lunch - ${titulo}.xlsx`)
-  toast('Excel descargado 📊')
+
+  // Título
+  aoa.push(['🍱  Menú Easy Lunch — ' + titulo]); const tr = aoa.length - 1; rh[tr] = 30
+  for(let c = 0; c < NC; c++) setS(tr, c, { fill: { patternType: 'solid', fgColor: { rgb: '047857' } }, font: { bold: true, sz: 15, color: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'center', vertical: 'center' } })
+  aoa.push([])
+
+  for(const fs of Object.values(semanas)){
+    // Encabezado de días
+    const hdr = ['', ...fs.map(f => diaNombre(iso(f)) + ' ' + f.getDate())]
+    while(hdr.length < NC) hdr.push('')
+    aoa.push(hdr); const hr = aoa.length - 1; rh[hr] = 22
+    setS(hr, 0, { fill: { patternType: 'solid', fgColor: { rgb: '065F46' } }, font: { bold: true, color: { rgb: 'FFFFFF' } }, border })
+    for(let c = 1; c < NC; c++) setS(hr, c, { fill: { patternType: 'solid', fgColor: { rgb: '059669' } }, font: { bold: true, color: { rgb: 'FFFFFF' } }, alignment: { horizontal: 'center', vertical: 'center' }, border })
+    // Filas por categoría
+    for(const cat of CATS){
+      const row = [cat.name, ...fs.map(f => {
+        const id = (cal[iso(f)] || [])[cat.slot]
+        const p = id ? platoEfectivo(id) : null
+        if(!p) return ''
+        const conReceta = !p.historico && (p.ingredientes || []).length
+        return p.nombre + (conReceta ? '\n$' + Math.round(calcPlato(p).vianda).toLocaleString('es-AR') + ' /vianda' : '')
+      })]
+      while(row.length < NC) row.push('')
+      aoa.push(row); const rr = aoa.length - 1; rh[rr] = 40; dishRows.push(rr)
+      setS(rr, 0, { fill: { patternType: 'solid', fgColor: { rgb: cat.lblBg } }, font: { bold: true, sz: 11, color: { rgb: cat.lblFg } }, alignment: { horizontal: 'left', vertical: 'center' }, border })
+      for(let c = 1; c < NC; c++) setS(rr, c, { fill: { patternType: 'solid', fgColor: { rgb: cat.cell } }, font: { sz: 10, color: { rgb: '1E293B' } }, alignment: { vertical: 'center', horizontal: 'left', wrapText: true }, border })
+    }
+    aoa.push([])
+  }
+
+  const ws = XL.utils.aoa_to_sheet(aoa)
+  for(const k in st){ const [r, c] = k.split(',').map(Number); const ref = XL.utils.encode_cell({ r, c }); if(!ws[ref]) ws[ref] = { t: 's', v: '' }; ws[ref].s = st[k] }
+  ws['!cols'] = [{ wch: 22 }, ...Array(NC - 1).fill({ wch: 34 })]
+  ws['!rows'] = aoa.map((_, i) => rh[i] ? { hpt: rh[i] } : {})
+  ws['!merges'] = [{ s: { r: tr, c: 0 }, e: { r: tr, c: NC - 1 } }]
+
+  const wb = XL.utils.book_new()
+  XL.utils.book_append_sheet(wb, ws, titulo.slice(0, 30))
+  XL.writeFile(wb, `Menu Easy Lunch - ${titulo}.xlsx`)
+  toast('Excel con diseño descargado 📊')
 }
 
 // ─── Imprimir ────────────────────────────────────────────────────────────────
