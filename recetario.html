@@ -1473,12 +1473,10 @@ async function exportarExcel(){
       const row = [cat.name, ...fs.map(f => {
         const id = (cal[iso(f)] || [])[cat.slot]
         const p = id ? platoEfectivo(id) : null
-        if(!p) return ''
-        const conReceta = !p.historico && (p.ingredientes || []).length
-        return p.nombre + (conReceta ? '\n$' + Math.round(calcPlato(p).vianda).toLocaleString('es-AR') + ' /vianda' : '')
+        return p ? p.nombre : ''
       })]
       while(row.length < NC) row.push('')
-      aoa.push(row); const rr = aoa.length - 1; rh[rr] = 40; dishRows.push(rr)
+      aoa.push(row); const rr = aoa.length - 1; rh[rr] = 34; dishRows.push(rr)
       setS(rr, 0, { fill: { patternType: 'solid', fgColor: { rgb: cat.lblBg } }, font: { bold: true, sz: 11, color: { rgb: cat.lblFg } }, alignment: { horizontal: 'left', vertical: 'center' }, border })
       for(let c = 1; c < NC; c++) setS(rr, c, { fill: { patternType: 'solid', fgColor: { rgb: cat.cell } }, font: { sz: 10, color: { rgb: '1E293B' } }, alignment: { vertical: 'center', horizontal: 'left', wrapText: true }, border })
     }
