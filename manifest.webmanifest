@@ -1,0 +1,14 @@
+{
+  "name": "Easy Lunch — Carga de Costos",
+  "short_name": "Carga Costos",
+  "description": "Carga de facturas y tickets por foto: costos de insumos y cash flow.",
+  "start_url": "/carga.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#16a34a",
+  "icons": [
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
