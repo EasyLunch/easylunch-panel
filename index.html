@@ -1,98 +1,168 @@
--- ============================================================================
--- Easy Lunch — Carga de Costos y Gastos por Fotos
--- Migración: correr una sola vez en Supabase → SQL Editor
--- Crea: conversiones de unidades de compra, compras, ítems e historial de precios.
--- Idempotente: usa IF NOT EXISTS. No toca ninguna tabla existente.
--- ============================================================================
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Easy Lunch — Panel Central</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;min-height:100vh;}
+        #login-overlay{position:fixed;inset:0;background:#f3f4f6;display:flex;align-items:center;justify-content:center;z-index:9999;}
+        .login-box{background:white;border-radius:16px;padding:40px 36px;box-shadow:0 4px 24px rgba(0,0,0,.10);width:100%;max-width:380px;}
+        .login-box h2{font-size:22px;font-weight:800;color:#0f172a;margin-bottom:6px;}
+        .login-box .sub{font-size:13px;color:#6b7280;margin-bottom:28px;}
+        .login-box label{font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;}
+        .login-box input{width:100%;padding:10px 13px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;outline:none;margin-bottom:16px;transition:border .15s;}
+        .login-box input:focus{border-color:#16a34a;}
+        .login-box button{width:100%;padding:11px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s;}
+        .login-box button:hover{background:#15803d;}
+        .login-error{color:#dc2626;font-size:12px;margin-top:-10px;margin-bottom:12px;display:none;}
+        #app{display:none;}
+        header{background:white;border-bottom:1px solid #e5e7eb;padding:14px 40px;display:flex;align-items:center;}
+        .logo-text{font-size:20px;font-weight:800;color:#0f172a;letter-spacing:-0.5px;}
+        .btn-salir{margin-left:auto;background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+        .btn-salir:hover{background:#fee2e2;color:#dc2626;border-color:#fecaca;}
+        main{max-width:1100px;margin:0 auto;padding:52px 40px;}
+        .badge{display:inline-flex;align-items:center;gap:7px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:18px;}
+        .badge::before{content:'';width:7px;height:7px;background:#16a34a;border-radius:50%;}
+        h1{font-size:38px;font-weight:800;color:#0f172a;line-height:1.15;margin-bottom:10px;}
+        .subtitle{color:#6b7280;font-size:15px;margin-bottom:44px;line-height:1.5;}
+        .section-label{font-size:11px;font-weight:700;letter-spacing:1px;color:#9ca3af;text-transform:uppercase;margin-bottom:22px;}
+        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+        @media(max-width:960px){.grid{grid-template-columns:repeat(2,1fr);}}
+        @media(max-width:580px){.grid{grid-template-columns:1fr;}}
+        .card{background:white;border-radius:14px;padding:26px;box-shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);border:1px solid #f1f5f9;display:flex;flex-direction:column;gap:14px;}
+        .card-number{font-size:12px;font-weight:600;color:#d1d5db;}
+        .card-icon{width:46px;height:46px;background:#f0fdf4;border-radius:11px;display:flex;align-items:center;justify-content:center;}
+        .card-icon svg{stroke:#16a34a;}
+        .card h3{font-size:17px;font-weight:700;color:#0f172a;margin-bottom:6px;}
+        .card p{font-size:13px;color:#6b7280;line-height:1.6;flex:1;}
+        .btn-abrir{display:inline-flex;align-items:center;gap:4px;background:#16a34a;color:white;text-decoration:none;font-size:13px;font-weight:600;padding:8px 18px;border-radius:8px;width:fit-content;transition:background .15s;margin-top:4px;}
+        .btn-abrir:hover{background:#15803d;}
+    </style>
+</head>
+<body>
+<div id="login-overlay">
+    <div class="login-box">
+        <img src="https://easy-lunch-eight.vercel.app/logo.png" alt="Easy Lunch" style="width:210px;display:block;margin-bottom:10px;">
+        <p class="sub">Ingresa tus credenciales para acceder al panel.</p>
+        <label>Usuario</label>
+        <input type="text" id="login-user" placeholder="usuario@easylunch.com.ar" autocomplete="username">
+        <label>Contrasena</label>
+        <input type="password" id="login-pass" placeholder="*****" autocomplete="current-password">
+        <p class="login-error" id="login-error">Usuario o contrasena incorrectos.</p>
+        <button onclick="doLogin()">Ingresar</button>
+    </div>
+</div>
+<div id="app">
+<header><img src="https://easy-lunch-eight.vercel.app/logo.png" alt="Easy Lunch" style="height:42px;"><button class="btn-salir" onclick="doLogout()">Cerrar sesion</button></header>
+<main>
+    <div class="badge">Herramientas Internas</div>
+    <h1>La operacion en un solo lugar.</h1>
+    <p class="subtitle">Accede a todas las plataformas de Easy Lunch desde este panel centralizado.</p>
+    <div class="section-label">Plataformas disponibles</div>
+    <div class="grid">
 
--- Necesario para gen_random_uuid()
-create extension if not exists pgcrypto;
+        <div class="card" data-app="reclamos">
+            <span class="card-number">01</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <div><h3>Control de Reclamos</h3><p>Gestiona y hace seguimiento de los reclamos de clientes. Registra incidencias y monitored resoluciones.</p></div>
+            <a href="https://script.google.com/macros/s/AKfycbwdOlzyIXpT2Caw_-23Br4askOibT8WeNeEIxODIKd2qH8uPqvpuME4Y1E5Q-od6C6e/exec" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
 
--- ── 1) Conversiones: cómo pasar de la unidad de COMPRA a la unidad BASE del insumo
---     Ej.: papa se guarda por 'kg' (insumos.unidad='kg'); se compra por 'bolsa'.
---     factor = cuántas unidades base entran en 1 unidad de compra (1 bolsa = 20 kg → factor 20).
-create table if not exists insumo_unidades_compra (
-  id            uuid primary key default gen_random_uuid(),
-  insumo_id     text not null,               -- id del insumo (mismo valor que insumos.id)
-  nombre_compra text not null,               -- 'bolsa', 'cajón', 'atado', 'caja x12', 'unidad'...
-  factor        numeric not null check (factor > 0), -- unidades base por 1 unidad de compra
-  nota          text,
-  activo        boolean not null default true,
-  created_at    timestamptz not null default now(),
-  unique (insumo_id, nombre_compra)
-);
-comment on table insumo_unidades_compra is 'Conversión unidad de compra -> unidad base del insumo (para costear por kg/lt/unidad).';
+        <div class="card" data-app="crm">
+            <span class="card-number">02</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div><h3>CRM Comercial</h3><p>Administra clientes, oportunidades y el pipeline comercial. Seguimiento de contactos y ventas.</p></div>
+            <a href="https://script.google.com/macros/s/AKfycbx9N2SN7dQaYSX6xSlLGPsXi_MJgiIw9_KoleTRyYZ4sDoTekSaAKt6f3IFWryUdk_d/exec" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
 
--- ── 2) Compras (cabecera de cada comprobante cargado)
-create table if not exists compras (
-  id              uuid primary key default gen_random_uuid(),
-  proveedor       text,
-  cuit            text,
-  tipo            text,                        -- 'Factura A', 'Factura B', 'Ticket', 'Remito'...
-  punto_venta     text,
-  nro_comprobante text,
-  fecha           date,
-  cond_iva        text,                        -- 'Responsable Inscripto', 'No fiscal'...
-  neto            numeric default 0,
-  iva             numeric default 0,
-  total           numeric default 0,
-  cae             text,
-  origen          text default 'foto',         -- 'foto' | 'manual'
-  foto_url        text,
-  notas           text,
-  creado_por      text,
-  created_at      timestamptz not null default now()
-);
-create index if not exists idx_compras_fecha on compras (fecha);
+        <div class="card" data-app="produccion">
+            <span class="card-number">03</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>
+            <div><h3>Produccion</h3><p>Control del area de produccion. Gestiona pedidos, inventario y el flujo operativo del dia a dia.</p></div>
+            <a href="https://easy-lunch-eight.vercel.app/" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
 
--- ── 3) Ítems de cada compra (renglones)
-create table if not exists compra_items (
-  id                uuid primary key default gen_random_uuid(),
-  compra_id         uuid not null references compras(id) on delete cascade,
-  descripcion       text,                      -- texto tal cual del comprobante
-  insumo_id         text,                      -- insumo vinculado (puede quedar null)
-  cantidad          numeric,
-  unidad            text,                      -- unidad de compra ('kg','unidad','bolsa'...)
-  precio_unit       numeric,                   -- precio unitario s/IVA por unidad de compra
-  iva_pct           numeric default 0,
-  subtotal_neto     numeric,
-  iva               numeric default 0,
-  subtotal_total    numeric,
-  factor_conversion numeric,                   -- factor usado a unidad base (null si no aplica)
-  costo_base_aplicado numeric,                 -- costo s/IVA por unidad base que se aplicó al insumo
-  actualizo_costo   boolean not null default false,
-  created_at        timestamptz not null default now()
-);
-create index if not exists idx_compra_items_compra on compra_items (compra_id);
-create index if not exists idx_compra_items_insumo on compra_items (insumo_id);
+        <div class="card" data-app="financiero">
+            <span class="card-number">04</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            <div><h3>Financiero</h3><p>Analiza la rentabilidad del negocio, cotiza clientes nuevos y modela la sensibilidad de tus costos e ingresos.</p></div>
+            <a href="https://sprightly-croquembouche-6bd4aa.netlify.app/easylunch_cotizador" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
 
--- ── 4) Historial de precios de insumos (para trazabilidad y alertas)
-create table if not exists insumo_precio_historial (
-  id              uuid primary key default gen_random_uuid(),
-  insumo_id       text not null,
-  nombre_insumo   text,
-  precio_anterior numeric,
-  precio_nuevo    numeric,
-  pct_cambio      numeric,
-  compra_id       uuid references compras(id) on delete set null,
-  origen          text default 'factura',
-  usuario         text,
-  fecha           timestamptz not null default now()
-);
-create index if not exists idx_hist_insumo on insumo_precio_historial (insumo_id);
-create index if not exists idx_hist_fecha on insumo_precio_historial (fecha);
+        <div class="card" data-app="facturacion">
+            <span class="card-number">05</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div><h3>Facturacion</h3><p>Gestiona la facturacion semanal. Sube las comandas, calcula los totales por cliente y descarga los detalles en Excel.</p></div>
+            <a href="https://easylunch-panel.vercel.app/facturacion.html" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+            <div class="card" data-app="recetario">
+            <span class="card-number">06</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg></div>
+            <div><h3>Recetario &amp; Menú</h3><p>Recetario completo, creador de recetas nuevas y calendario semanal/mensual de platos con generación automática.</p></div>
+            <a href="https://easylunch-panel.vercel.app/recetario.html" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
 
--- ── 5) Permisos (mismo modelo que el resto de la app: acceso vía anon key)
-do $$
-declare t text;
-begin
-  foreach t in array array['insumo_unidades_compra','compras','compra_items','insumo_precio_historial']
-  loop
-    execute format('alter table %I enable row level security;', t);
-    execute format('drop policy if exists "el_public_all" on %I;', t);
-    execute format('create policy "el_public_all" on %I for all to anon, authenticated using (true) with check (true);', t);
-    execute format('grant all on %I to anon, authenticated;', t);
-  end loop;
-end $$;
+        <div class="card" data-app="costos">
+            <span class="card-number">07</span>
+            <div class="card-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></div>
+            <div><h3>Carga de Costos &amp; Gastos</h3><p>Subí la foto de una factura o ticket: identifica proveedor e ítems, actualiza costos de insumos y arma el cash flow. Ideal desde el celular.</p></div>
+            <a href="https://easylunch-panel.vercel.app/carga.html" class="btn-abrir" target="_blank" rel="noopener">Abrir</a>
+        </div>
 
--- Listo. Si no hubo errores, las 4 tablas quedaron creadas y accesibles.
+    </div>
+
+    </div>
+</main>
+</div>
+<script>
+var USERS={
+    'pbronstein@easylunch.com.ar':{pass:'Viel912',access:'all'},
+    'easylunch':{pass:'Viel912',access:'all'},
+    'info@easylunch.com.ar':{pass:'Viel912',access:['produccion','recetario']}
+};
+function applyAccess(access){
+    document.querySelectorAll('.card').forEach(function(card){
+        var app=card.getAttribute('data-app');
+        var visible=(access==='all')||(Array.isArray(access)&&access.indexOf(app)!==-1);
+        card.style.display=visible?'':'none';
+    });
+}
+function showApp(access){
+    applyAccess(access);
+    document.getElementById('login-overlay').style.display='none';
+    document.getElementById('app').style.display='block';
+}
+(function(){
+    if(sessionStorage.getItem('el_auth')==='ok'){
+        var saved=sessionStorage.getItem('el_access');
+        showApp(saved==='all'?'all':(saved?JSON.parse(saved):'all'));
+    }
+    ['login-user','login-pass'].forEach(function(id){
+        document.getElementById(id).addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
+    });
+})();
+function doLogout(){
+    sessionStorage.removeItem('el_auth');
+    sessionStorage.removeItem('el_access');
+    location.reload();
+}
+function doLogin(){
+    var u=document.getElementById('login-user').value.trim().toLowerCase();
+    var p=document.getElementById('login-pass').value;
+    var err=document.getElementById('login-error');
+    var user=USERS[u];
+    if(user&&p===user.pass){
+        sessionStorage.setItem('el_auth','ok');
+        sessionStorage.setItem('el_access',user.access==='all'?'all':JSON.stringify(user.access));
+        err.style.display='none';
+        showApp(user.access);
+    } else {
+        err.style.display='block';
+        document.getElementById('login-pass').value='';
+        document.getElementById('login-pass').focus();
+    }
+}
+</script>
+</body>
+</html>
