@@ -1,14 +1,423 @@
-{
-  "name": "Easy Lunch — Carga de Costos",
-  "short_name": "Carga Costos",
-  "description": "Carga de facturas y tickets por foto: costos de insumos y cash flow.",
-  "start_url": "/carga.html",
-  "scope": "/",
-  "display": "standalone",
-  "background_color": "#f3f4f6",
-  "theme_color": "#16a34a",
-  "icons": [
-    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" }
-  ]
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#16a34a">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Easy Lunch — Carga de Costos</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{--verde:#16a34a;--verde-d:#15803d;--gris:#6b7280;--borde:#e5e7eb;--bg:#f3f4f6;--rojo:#dc2626;--amber:#b45309}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:#111827;min-height:100vh;padding-bottom:90px}
+  header{background:#fff;border-bottom:1px solid var(--borde);padding:12px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
+  header .logo{font-size:16px;font-weight:800;color:#0f172a}
+  header .sp{margin-left:auto}
+  .btn{background:var(--verde);color:#fff;border:none;border-radius:10px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s;width:100%}
+  .btn:active{background:var(--verde-d)}
+  .btn:disabled{opacity:.5}
+  .btn.sec{background:#fff;color:#374151;border:1px solid var(--borde)}
+  .btn.sm{width:auto;padding:8px 12px;font-size:13px}
+  main{max-width:720px;margin:0 auto;padding:16px}
+  .card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.07);border:1px solid #f1f5f9;margin-bottom:14px}
+  .card h2{font-size:15px;font-weight:700;margin-bottom:12px;color:#0f172a}
+  label{font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px}
+  input,select{width:100%;padding:10px 11px;border:1px solid var(--borde);border-radius:9px;font-size:14px;outline:none;background:#fff}
+  input:focus,select:focus{border-color:var(--verde)}
+  .row{display:flex;gap:8px}.row>*{flex:1}
+  .muted{color:var(--gris);font-size:13px}
+  .cap-box{border:2px dashed var(--borde);border-radius:14px;padding:26px 16px;text-align:center;background:#fafafa}
+  .cap-box svg{stroke:var(--verde);margin-bottom:8px}
+  #preview{width:100%;border-radius:10px;margin-top:12px;display:none}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+  .b-ok{background:#dcfce7;color:#15803d}.b-alert{background:#fef2f2;color:var(--rojo)}.b-new{background:#eff6ff;color:#1d4ed8}.b-warn{background:#fef3c7;color:var(--amber)}
+  .it{border:1px solid var(--borde);border-radius:12px;padding:12px;margin-bottom:10px}
+  .it.alert{border-color:#fecaca;background:#fff7f7}
+  .it .top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .it .desc{font-weight:700;font-size:14px;flex:1}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .costline{display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-radius:9px;padding:8px 10px;margin-top:8px;font-size:13px}
+  .costline b{font-size:14px}
+  .pct-up{color:var(--rojo);font-weight:700}.pct-dn{color:#15803d;font-weight:700}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px}
+  .chk input{width:auto}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;z-index:60;opacity:0;transition:.2s;pointer-events:none;max-width:90%}
+  .toast.show{opacity:1}
+  .footbar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--borde);padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));z-index:30}
+  .footbar .inner{max-width:720px;margin:0 auto;display:flex;gap:10px;align-items:center}
+  .spin{width:20px;height:20px;border:3px solid #d1fae5;border-top-color:var(--verde);border-radius:50%;animation:sp 1s linear infinite;display:inline-block;vertical-align:middle}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .hide{display:none!important}
+  #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .lbox{background:#fff;border-radius:16px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+  .lbox h2{font-size:20px;font-weight:800;margin-bottom:18px}
+  .err{color:var(--rojo);font-size:12px;margin:-6px 0 10px;display:none}
+  .stat{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+  .stat .s{background:#f8fafc;border:1px solid var(--borde);border-radius:10px;padding:10px 14px;flex:1;min-width:120px}
+  .stat .s b{display:block;font-size:20px;color:#0f172a}
+  .stat .s span{font-size:11px;color:var(--gris)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="lbox">
+    <div class="logo" style="font-size:20px;font-weight:800;margin-bottom:4px">Easy Lunch</div>
+    <p class="muted" style="margin-bottom:18px">Carga de Costos & Gastos</p>
+    <label>Usuario</label>
+    <input id="lu" type="text" autocomplete="username" placeholder="usuario@easylunch.com.ar">
+    <div style="height:10px"></div>
+    <label>Contraseña</label>
+    <input id="lp" type="password" autocomplete="current-password" placeholder="•••••">
+    <div style="height:14px"></div>
+    <p class="err" id="lerr">Usuario o contraseña incorrectos.</p>
+    <button class="btn" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+<header>
+  <span class="logo">🧾 Carga de Costos</span>
+  <span class="sp"></span>
+  <span id="sync" class="muted" style="font-size:12px">cargando…</span>
+</header>
+
+<main>
+  <!-- CONFIG + CAPTURA -->
+  <div class="card" id="card-capture">
+    <h2>1 · Sacá la foto del comprobante</h2>
+    <div class="cap-box" onclick="document.getElementById('file').click()">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <div style="font-weight:600">Tocá para sacar o elegir una foto</div>
+      <div class="muted" style="margin-top:3px">Factura o ticket · se procesa al instante</div>
+    </div>
+    <input id="file" type="file" accept="image/*" capture="environment" class="hide" onchange="onFile(event)">
+    <img id="preview" alt="preview">
+    <div class="row" style="margin-top:12px">
+      <div style="flex:2">
+        <label>Umbral de alerta (%)</label>
+        <input id="umbral" type="number" value="8" min="0" step="1">
+      </div>
+      <div style="flex:3;display:flex;align-items:flex-end">
+        <button class="btn hide" id="btn-proc" onclick="procesar()">Procesar comprobante</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="card-result" class="hide">
+    <div class="card">
+      <h2>2 · Datos del comprobante</h2>
+      <div class="grid2">
+        <div><label>Proveedor</label><input id="c-prov"></div>
+        <div><label>Fecha</label><input id="c-fecha" type="date"></div>
+      </div>
+      <div class="grid3">
+        <div><label>Tipo</label><input id="c-tipo"></div>
+        <div><label>CUIT</label><input id="c-cuit"></div>
+        <div><label>Nº</label><input id="c-nro"></div>
+      </div>
+      <div class="chk"><input type="checkbox" id="c-fiscal"><label for="c-fiscal" style="margin:0">Comprobante fiscal (discrimina IVA — el costo se guarda SIN IVA)</label></div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Ítems y actualización de costos</h2>
+      <p class="muted" style="margin-bottom:12px">Revisá el insumo vinculado y la conversión. Nada se guarda hasta que confirmes.</p>
+      <div id="items"></div>
+    </div>
+
+    <div class="card">
+      <h2>Resumen</h2>
+      <div class="stat" id="resumen"></div>
+    </div>
+  </div>
+
+  <!-- LISTO -->
+  <div id="card-done" class="card hide" style="text-align:center">
+    <div style="font-size:40px">✅</div>
+    <h2 style="justify-content:center">Compra registrada</h2>
+    <div class="stat" id="done-stat" style="margin:14px 0"></div>
+    <button class="btn" onclick="reset()">Cargar otro comprobante</button>
+  </div>
+</main>
+
+<div class="footbar hide" id="footbar">
+  <div class="inner">
+    <button class="btn sec sm" onclick="reset()">Cancelar</button>
+    <button class="btn" id="btn-confirm" onclick="confirmar()">Confirmar y guardar</button>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Config Supabase (misma base que Producción / Recetario) ───────────────
+const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
+const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }
+async function sbGet(q){ const r = await fetch(`${SB}/${q}`, { headers:H }); if(!r.ok) throw new Error(await r.text()); return r.json() }
+async function sbInsert(t, rows, ret){ const r = await fetch(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer: ret?'return=representation':'return=minimal' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()); return ret? r.json():null }
+async function sbPatch(t, filtro, body){ const r = await fetch(`${SB}/${t}?${filtro}`, { method:'PATCH', headers:H, body:JSON.stringify(body) }); if(!r.ok) throw new Error(await r.text()) }
+async function sbUpsert(t, rows){ const r = await fetch(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()) }
+
+// ─── Auth (mismo esquema que el panel) ─────────────────────────────────────
+const USERS = {
+  'pbronstein@easylunch.com.ar': 'Viel912',
+  'easylunch': 'Viel912',
+  'info@easylunch.com.ar': 'Viel912'
 }
+function doLogin(){
+  const u=document.getElementById('lu').value.trim().toLowerCase(), p=document.getElementById('lp').value
+  if(USERS[u] && USERS[u]===p){ sessionStorage.setItem('el_auth','ok'); sessionStorage.setItem('el_user',u); start() }
+  else { document.getElementById('lerr').style.display='block' }
+}
+
+// ─── Estado ────────────────────────────────────────────────────────────────
+let insumos=[], insMap={}, conversiones={}, comprobante=null, rows=[], imgDataUrl=null
+// factor = cuántas unidades BASE hay en 1 unidad de COMPRA: CONV_STD[compra][base]
+const CONV_STD={
+  kg:{kg:1,g:1000}, g:{g:1,kg:0.001},
+  lt:{lt:1,ml:1000}, ml:{ml:1,lt:0.001},
+  unidad:{unidad:1,docena:1/12,atado:1,sobre:1},
+  docena:{docena:1,unidad:12},
+  atado:{atado:1,unidad:1},
+  sobre:{sobre:1,unidad:1}
+}
+const UNIT_SYN={un:'unidad',u:'unidad',uni:'unidad',unid:'unidad',unidad:'unidad',unidades:'unidad',
+  kg:'kg',kgs:'kg',kilo:'kg',kilos:'kg',kilogramo:'kg',k:'kg',
+  g:'g',gr:'g',grs:'g',gramo:'g',gramos:'g',
+  lt:'lt',l:'lt',lts:'lt',litro:'lt',litros:'lt',
+  ml:'ml',cc:'ml',
+  doc:'docena',docena:'docena',docenas:'docena',
+  at:'atado',atado:'atado',atados:'atado',
+  sobre:'sobre',sobres:'sobre',
+  bolsa:'bolsa',bolsas:'bolsa',cajon:'cajon','cajón':'cajon',cajones:'cajon',caja:'caja',cajas:'caja'}
+const normU = u => { const x=String(u||'').toLowerCase().trim(); return UNIT_SYN[x]||x }
+const fmt$ = n => (n==null||isNaN(n))?'—':new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:2}).format(n)
+const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(()=>t.classList.remove('show'),2600) }
+
+// ─── Matcheo difuso ─────────────────────────────────────────────────────────
+function bigrams(s){ const g=[]; for(let i=0;i<s.length-1;i++) g.push(s.slice(i,i+2)); return g }
+function dice(a,b){ if(!a||!b)return 0; if(a===b)return 1; const A=bigrams(a),B=bigrams(b); if(!A.length||!B.length)return 0; const m={}; A.forEach(g=>m[g]=(m[g]||0)+1); let hit=0; B.forEach(g=>{ if(m[g]>0){hit++;m[g]--} }); return 2*hit/(A.length+B.length) }
+function tokenScore(a,b){ const A=new Set(a.split(' ')),B=new Set(b.split(' ')); let inter=0; A.forEach(x=>{ if(B.has(x))inter++ }); return inter/Math.max(A.size,B.size,1) }
+function bestMatch(desc){
+  const q=norm(desc); if(!q) return {id:null,score:0}
+  let best={id:null,score:0}
+  for(const i of insumos){ const n=norm(i.nombre); let sc=Math.max(dice(q,n),0.6*tokenScore(q,n)); if(n.includes(q)||q.includes(n)) sc=Math.max(sc,0.82); if(sc>best.score) best={id:i.id,score:sc} }
+  return best
+}
+
+// ─── Conversión a unidad base ───────────────────────────────────────────────
+function baseUnit(insumo){ return insumo? (insumo.unidad||'unidad') : 'unidad' }
+function getFactor(insumoId, unidadCompra){
+  const ins=insMap[insumoId]; if(!ins) return null
+  const base=normU(baseUnit(ins)), u=normU(unidadCompra)
+  if(u===base) return 1
+  if(CONV_STD[u] && CONV_STD[u][base]!=null) return CONV_STD[u][base]
+  // conversión guardada por el usuario (bolsa/cajón/atado...)
+  const saved=(conversiones[insumoId]||{})[u]
+  if(saved!=null) return saved
+  return null // desconocida → requiere que el usuario la ingrese
+}
+
+// ─── Carga inicial ──────────────────────────────────────────────────────────
+async function start(){
+  document.getElementById('login').classList.add('hide')
+  document.getElementById('app').classList.remove('hide')
+  try{
+    insumos = await sbGet('insumos?select=id,nombre,unidad,precio,categoria&order=nombre')
+    insMap = Object.fromEntries(insumos.map(i=>[String(i.id),i]))
+    try{
+      const cv = await sbGet('insumo_unidades_compra?select=insumo_id,nombre_compra,factor&activo=eq.true')
+      cv.forEach(c=>{ const k=String(c.insumo_id); (conversiones[k]=conversiones[k]||{})[String(c.nombre_compra).toLowerCase()]=Number(c.factor) })
+    }catch(e){ /* tabla nueva puede no existir aún */ }
+    document.getElementById('sync').textContent = insumos.length+' insumos'
+  }catch(e){ document.getElementById('sync').textContent='⚠️ sin conexión'; toast('No pude leer insumos: '+e.message) }
+}
+
+// ─── Captura + resize ───────────────────────────────────────────────────────
+function onFile(ev){
+  const f=ev.target.files[0]; if(!f) return
+  const img=new Image(), url=URL.createObjectURL(f)
+  img.onload=()=>{ const max=1600, sc=Math.min(1,max/Math.max(img.width,img.height)); const w=Math.round(img.width*sc),h=Math.round(img.height*sc); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); imgDataUrl=c.toDataURL('image/jpeg',0.82); URL.revokeObjectURL(url); const p=document.getElementById('preview'); p.src=imgDataUrl; p.style.display='block'; document.getElementById('btn-proc').classList.remove('hide') }
+  img.src=url
+}
+
+// ─── Procesar (OCR) ─────────────────────────────────────────────────────────
+async function procesar(){
+  if(!imgDataUrl) return
+  const b=document.getElementById('btn-proc'); b.disabled=true; b.innerHTML='<span class="spin"></span> Leyendo…'
+  try{
+    const r=await fetch('/api/factura-ocr',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ image:imgDataUrl }) })
+    const j=await r.json()
+    if(!r.ok||!j.ok) throw new Error(j.error||'Error de OCR')
+    comprobante=j.comprobante
+    buildReview()
+  }catch(e){ toast('Error: '+e.message) }
+  finally{ b.disabled=false; b.textContent='Procesar comprobante' }
+}
+
+// ─── Armar revisión ─────────────────────────────────────────────────────────
+function buildReview(){
+  const c=comprobante
+  document.getElementById('c-prov').value=c.proveedor||''
+  document.getElementById('c-fecha').value=c.fecha||''
+  document.getElementById('c-tipo').value=c.tipo||''
+  document.getElementById('c-cuit').value=c.cuit||''
+  document.getElementById('c-nro').value=(c.punto_venta?c.punto_venta+'-':'')+(c.nro_comprobante||'')
+  document.getElementById('c-fiscal').checked=!!c.es_fiscal
+  rows=(c.items||[]).map(it=>{
+    const bm=bestMatch(it.descripcion)
+    return { it, insumoId: bm.score>=0.62?String(bm.id):'', factorManual:null, actualizar:true, score:bm.score }
+  })
+  document.getElementById('card-capture').classList.add('hide')
+  document.getElementById('card-result').classList.remove('hide')
+  document.getElementById('footbar').classList.remove('hide')
+  renderItems()
+}
+
+function insumoOptions(sel){
+  let o='<option value="">— sin vincular —</option>'
+  for(const i of insumos) o+=`<option value="${i.id}" ${String(i.id)===sel?'selected':''}>${i.nombre} (${i.unidad})</option>`
+  return o
+}
+
+function calcRow(r){
+  const ins=insMap[r.insumoId]
+  const precioUnit=Number(r.it.precio_unit)||0          // por unidad de compra, s/IVA si fiscal
+  const unidad=(r.it.unidad||'').toLowerCase()
+  let factor = r.factorManual!=null ? Number(r.factorManual) : getFactor(r.insumoId, unidad)
+  let costoBase=null
+  if(ins && factor && factor>0) costoBase = precioUnit/factor   // costo s/IVA por unidad base
+  const actual = ins? Number(ins.precio)||0 : null
+  let pct=null; if(costoBase!=null && actual) pct=(costoBase-actual)/actual*100
+  return { ins, precioUnit, unidad, factor, costoBase, actual, pct }
+}
+
+function renderItems(){
+  const umbral=Number(document.getElementById('umbral').value)||0
+  const cont=document.getElementById('items'); cont.innerHTML=''
+  rows.forEach((r,idx)=>{
+    const k=calcRow(r)
+    const base = k.ins? baseUnit(k.ins):''
+    const needFactor = k.ins && (k.factor==null)
+    const isNew = !k.ins
+    const alert = k.pct!=null && Math.abs(k.pct)>=umbral
+    const el=document.createElement('div'); el.className='it'+(alert?' alert':'')
+    let badge = isNew?'<span class="badge b-new">nuevo / sin vincular</span>'
+      : needFactor?'<span class="badge b-warn">falta conversión</span>'
+      : alert?`<span class="badge b-alert">⚠ ${k.pct>0?'+':''}${k.pct.toFixed(1)}%</span>`
+      : '<span class="badge b-ok">ok</span>'
+    let conf = r.score>0 && r.score<0.62 && !isNew?'':''
+    el.innerHTML=`
+      <div class="top"><div class="desc">${r.it.descripcion||'(sin nombre)'}</div>${badge}</div>
+      <div class="grid3">
+        <div><label>Cantidad</label><input type="number" step="any" value="${r.it.cantidad??''}" oninput="upd(${idx},'cantidad',this.value)"></div>
+        <div><label>Unidad compra</label><input value="${r.it.unidad||''}" oninput="upd(${idx},'unidad',this.value)"></div>
+        <div><label>Precio unit. ${document.getElementById('c-fiscal')&&document.getElementById('c-fiscal').checked?'s/IVA':''}</label><input type="number" step="any" value="${r.it.precio_unit??''}" oninput="upd(${idx},'precio_unit',this.value)"></div>
+      </div>
+      <div><label>Insumo vinculado</label><select onchange="upd(${idx},'insumoId',this.value)">${insumoOptions(r.insumoId)}</select></div>
+      ${k.ins?`<div class="grid2" style="margin-top:8px">
+        <div><label>Conversión: 1 ${r.it.unidad||'u'} = ? ${base}</label><input type="number" step="any" value="${k.factor??''}" placeholder="ej. 20" oninput="upd(${idx},'factor',this.value)"></div>
+        <div style="display:flex;align-items:flex-end"><span class="muted">${k.factor?('→ costo/'+base+' '+fmt$(k.costoBase)):'ingresá cuántos '+base+' trae'}</span></div>
+      </div>`:''}
+      ${k.ins?`<div class="costline"><span>Costo actual: <b>${fmt$(k.actual)}</b>/${base}</span><span>Nuevo: <b>${k.costoBase!=null?fmt$(k.costoBase):'—'}</b> ${k.pct!=null?`<span class="${k.pct>0?'pct-up':'pct-dn'}">(${k.pct>0?'+':''}${k.pct.toFixed(1)}%)</span>`:''}</span></div>
+      <div class="chk"><input type="checkbox" ${r.actualizar&&k.costoBase!=null?'checked':''} ${k.costoBase==null?'disabled':''} onchange="upd(${idx},'actualizar',this.checked)"><label style="margin:0">Actualizar el costo de este insumo</label></div>`:'<p class="muted" style="margin-top:8px">Se registra como gasto en el cash flow, sin actualizar costo.</p>'}
+    `
+    cont.appendChild(el)
+  })
+  renderResumen()
+}
+
+function upd(idx,campo,val){
+  const r=rows[idx]
+  if(campo==='insumoId'){ r.insumoId=val; r.factorManual=null }
+  else if(campo==='factor'){ r.factorManual=val===''?null:Number(val) }
+  else if(campo==='actualizar'){ r.actualizar=val }
+  else { r.it[campo]= (campo==='cantidad'||campo==='precio_unit')? (val===''?null:Number(val)) : val; if(campo==='unidad') r.factorManual=null }
+  renderItems()
+}
+
+function renderResumen(){
+  const umbral=Number(document.getElementById('umbral').value)||0
+  let upd=0,alerts=0,nuevos=0,totalGasto=0
+  rows.forEach(r=>{ const k=calcRow(r); if(!k.ins) nuevos++; if(r.actualizar&&k.costoBase!=null) upd++; if(k.pct!=null&&Math.abs(k.pct)>=umbral) alerts++; totalGasto+=Number(r.it.total)||0 })
+  document.getElementById('resumen').innerHTML=`
+    <div class="s"><b>${upd}</b><span>costos a actualizar</span></div>
+    <div class="s"><b style="color:${alerts?'#dc2626':'#0f172a'}">${alerts}</b><span>alertas de precio</span></div>
+    <div class="s"><b>${nuevos}</b><span>sin vincular</span></div>
+    <div class="s"><b>${fmt$(totalGasto)}</b><span>total comprobante</span></div>`
+}
+
+// ─── Confirmar y guardar ────────────────────────────────────────────────────
+async function confirmar(){
+  const btn=document.getElementById('btn-confirm'); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Guardando…'
+  try{
+    const fiscal=document.getElementById('c-fiscal').checked
+    const umbral=Number(document.getElementById('umbral').value)||0
+    const usuario=sessionStorage.getItem('el_user')||''
+    let sNeto=0,sTot=0
+    rows.forEach(r=>{ const sn=Number(r.it.subtotal_neto)||0, tt=Number(r.it.total)||0; sNeto+=sn; sTot+=tt })
+    const neto = Number(comprobante.total_neto) || (fiscal? sNeto : sTot)
+    const total = Number(comprobante.total) || sTot
+    const iva = Number(comprobante.total_iva) || (fiscal? Math.max(0,total-neto) : 0)
+    // 1) cabecera
+    const cab=await sbInsert('compras',[{ proveedor:document.getElementById('c-prov').value, cuit:document.getElementById('c-cuit').value, tipo:document.getElementById('c-tipo').value, nro_comprobante:document.getElementById('c-nro').value, fecha:document.getElementById('c-fecha').value||null, cond_iva:fiscal?'Responsable Inscripto':'No fiscal', neto, iva, total, origen:'foto', creado_por:usuario }],true)
+    const compraId=cab[0].id
+    // 2) ítems + actualizaciones
+    const items=[], hist=[], convNuevas=[]
+    let actualizados=0, alertas=0
+    for(const r of rows){
+      const k=calcRow(r)
+      const aplicar = r.actualizar && k.ins && k.costoBase!=null
+      const snRow=Number(r.it.subtotal_neto)|| (fiscal?null:Number(r.it.total))||null
+      const ivaRow=fiscal? Math.max(0,(Number(r.it.total)||0)-(Number(r.it.subtotal_neto)||0)) : 0
+      items.push({ compra_id:compraId, descripcion:r.it.descripcion, insumo_id:r.insumoId||null, cantidad:Number(r.it.cantidad)||null, unidad:r.it.unidad, precio_unit:Number(r.it.precio_unit)||null, iva_pct:Number(r.it.iva_pct)||0, subtotal_neto:snRow, iva:ivaRow, subtotal_total:Number(r.it.total)||null, factor_conversion:k.factor, costo_base_aplicado:aplicar?k.costoBase:null, actualizo_costo:aplicar })
+      if(k.pct!=null && Math.abs(k.pct)>=umbral) alertas++
+      if(aplicar){
+        await sbPatch('insumos','id=eq.'+encodeURIComponent(r.insumoId),{ precio:k.costoBase })
+        hist.push({ insumo_id:r.insumoId, nombre_insumo:k.ins.nombre, precio_anterior:k.actual, precio_nuevo:k.costoBase, pct_cambio:k.pct, compra_id:compraId, origen:'factura', usuario })
+        insMap[r.insumoId].precio=k.costoBase
+        actualizados++
+        // guardar conversión no estándar para la próxima
+        const u=normU(r.it.unidad), base=normU(baseUnit(k.ins))
+        if(u && u!==base && !(CONV_STD[u]&&CONV_STD[u][base]!=null) && k.factor) convNuevas.push({ insumo_id:r.insumoId, nombre_compra:u, factor:k.factor })
+      }
+    }
+    if(items.length) await sbInsert('compra_items',items)
+    if(hist.length) await sbInsert('insumo_precio_historial',hist)
+    if(convNuevas.length){ try{ await sbUpsert('insumo_unidades_compra',convNuevas) }catch(e){} }
+    // listo
+    document.getElementById('card-result').classList.add('hide')
+    document.getElementById('footbar').classList.add('hide')
+    document.getElementById('done-stat').innerHTML=`
+      <div class="s"><b>${actualizados}</b><span>costos actualizados</span></div>
+      <div class="s"><b style="color:${alertas?'#dc2626':'#0f172a'}">${alertas}</b><span>alertas</span></div>
+      <div class="s"><b>${fmt$(total)}</b><span>registrado</span></div>`
+    document.getElementById('card-done').classList.remove('hide')
+  }catch(e){ toast('Error al guardar: '+e.message); btn.disabled=false; btn.textContent='Confirmar y guardar' }
+}
+
+function reset(){
+  comprobante=null; rows=[]; imgDataUrl=null
+  document.getElementById('file').value=''
+  document.getElementById('preview').style.display='none'
+  document.getElementById('btn-proc').classList.add('hide')
+  document.getElementById('card-result').classList.add('hide')
+  document.getElementById('card-done').classList.add('hide')
+  document.getElementById('footbar').classList.add('hide')
+  document.getElementById('card-capture').classList.remove('hide')
+  window.scrollTo(0,0)
+}
+
+// init
+if(sessionStorage.getItem('el_auth')==='ok') start()
+document.getElementById('lp')&&document.getElementById('lp').addEventListener('keydown',e=>{ if(e.key==='Enter')doLogin() })
+</script>
+</body>
+</html>
