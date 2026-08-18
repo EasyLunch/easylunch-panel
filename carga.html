@@ -179,7 +179,7 @@
 
 <script>
 // ─── Versión visible (para saber qué build corre el celu) ──────────────────
-const BUILD = 'v4 · 18-08'
+const BUILD = 'v5 · 18-08'
 // ─── Config Supabase (misma base que Producción / Recetario) ───────────────
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
@@ -214,6 +214,7 @@ let insumos=[], insMap={}, conversiones={}, categorias=[], comprobante=null, row
 let aliasMap={}            // memoria global: norm(descripcion) -> insumo_id (aprendido de cargas previas)
 let saveState={}           // guardado en curso: {compraId, itemsDone, histDone, convDone, aliasDone} para reintentar sin duplicar
 let dupHit=null            // si la factura parece ya cargada, acá va la compra existente
+let dupAck=false           // el usuario ya confirmó que quiere guardarla igual (2do toque)
 const UNIDADES=['kg','g','lt','ml','unidad','docena','atado','sobre']
 // factor = cuántas unidades BASE hay en 1 unidad de COMPRA: CONV_STD[compra][base]
 const CONV_STD={
@@ -366,7 +367,7 @@ function buildReview(){
 
 // ─── Detección de facturas ya cargadas ──────────────────────────────────────
 async function checkDuplicado(){
-  const el=document.getElementById('dup-warn'); el.classList.add('hide'); el.innerHTML=''; dupHit=null
+  const el=document.getElementById('dup-warn'); el.classList.add('hide'); el.innerHTML=''; dupHit=null; dupAck=false
   try{
     const nro=(document.getElementById('c-nro').value||'').trim()
     const fecha=document.getElementById('c-fecha').value||''
@@ -545,9 +546,17 @@ function renderResumen(){
 
 // ─── Confirmar y guardar ────────────────────────────────────────────────────
 async function confirmar(){
-  // Si parece duplicada, pedir confirmación explícita antes de guardar.
-  if(dupHit && !confirm('Esta factura parece YA cargada'+(dupHit.nro_comprobante?(' (Nº '+dupHit.nro_comprobante+')'):'')+'. ¿Guardarla igual?')) return
-  const btn=document.getElementById('btn-confirm'); btn.disabled=true; btn.innerHTML='<span class="spin"></span> Guardando…'
+  const btn=document.getElementById('btn-confirm')
+  // Si parece duplicada, NO usamos confirm() del navegador (en el celu/PWA suele venir bloqueado
+  // y devuelve "cancelar" solo → no dejaba guardar). En su lugar: pedir un 2º toque de Guardar.
+  if(dupHit && !dupAck){
+    dupAck=true
+    toast('⚠ Parece duplicada. Tocá "Guardar" de nuevo para cargarla igual.')
+    btn.innerHTML='Guardar igual (duplicada)'
+    btn.style.background='#b45309'
+    return
+  }
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Guardando…'; btn.style.background=''
   try{
     const fiscal=document.getElementById('c-fiscal').checked
     const umbral=Number(document.getElementById('umbral').value)||0
@@ -619,9 +628,10 @@ async function confirmar(){
 }
 
 function reset(){
-  comprobante=null; rows=[]; imgs=[]; saveState={}; _pickIdx=null; dupHit=null
+  comprobante=null; rows=[]; imgs=[]; saveState={}; _pickIdx=null; dupHit=null; dupAck=false
   document.getElementById('picker').classList.add('hide')
   const dw=document.getElementById('dup-warn'); if(dw){ dw.classList.add('hide'); dw.innerHTML='' }
+  const bc=document.getElementById('btn-confirm'); if(bc){ bc.innerHTML='Confirmar y guardar'; bc.style.background=''; bc.disabled=false }
   document.getElementById('file').value=''
   document.getElementById('thumbs').innerHTML=''
   document.getElementById('nfotos').textContent='0'
