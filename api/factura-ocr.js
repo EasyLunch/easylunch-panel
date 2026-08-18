@@ -62,7 +62,7 @@ export const maxDuration = 60
 // puntual; en ese caso reintentamos con espera y, si sigue, caemos al siguiente modelo.
 const MODELS = process.env.GEMINI_OCR_MODEL
   ? [process.env.GEMINI_OCR_MODEL]
-  : ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest']
+  : ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.0-flash']
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
@@ -136,24 +136,25 @@ export default async function handler(req, res) {
 
     const parts = [{ text: PROMPT }, ...inlines.map(i => ({ inlineData: i }))]
 
-    // Estrategia: recorrer la cadena de modelos. En cada uno, hasta 3 intentos con espera
-    // creciente si el error es transitorio (503 "high demand" / 429 / 500). Si el modelo no
-    // existe, pasar al siguiente. Si un modelo devuelve OK, listo.
-    let r = null, model = null, ultimoMsg = ''
+    // Estrategia RÁPIDA ante saturación: en vez de gastar 3 reintentos lentos en cada modelo
+    // saturado (podía tardar 2 min), hacemos PASADAS por toda la cadena probando cada modelo UNA
+    // vez (fast-fail): así caemos en segundos al primero con capacidad. Si toda la cadena está
+    // saturada, esperamos poco y hacemos otra pasada. Un error real (no transitorio) corta.
+    let r = null, model = null, ultimoMsg = '', hardError = false
+    const PASADAS = 3
     outer:
-    for (const m of MODELS) {
-      for (let intento = 0; intento < 3; intento++) {
+    for (let pasada = 0; pasada < PASADAS && !hardError; pasada++) {
+      for (const m of MODELS) {
         r = await callGemini(GK, m, parts)
         model = m
         if (r.ok) break outer
         ultimoMsg = (r.json && r.json.error && r.json.error.message) || ('HTTP ' + r.status)
-        if (modelNoDisponible(r)) break            // este modelo no sirve → probar el siguiente
-        if (esTransitorio(r) && intento < 2) {      // saturado → esperar y reintentar el mismo
-          await sleep(1500 * (intento + 1))         // 1.5s, luego 3s
-          continue
-        }
-        break                                       // error no reintentable → siguiente modelo
+        if (modelNoDisponible(r)) continue          // este modelo no existe → siguiente, sin esperar
+        if (esTransitorio(r)) continue              // saturado → siguiente modelo YA (fast-fail)
+        hardError = true; break                     // error real (ej. imagen inválida) → cortar
       }
+      if (r && r.ok) break
+      if (!hardError && pasada < PASADAS - 1) await sleep(1500)  // toda la cadena saturada → pausa breve y otra pasada
     }
 
     // Último recurso: si ningún modelo de la lista respondió, listar modelos disponibles y probar uno.
