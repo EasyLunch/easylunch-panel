@@ -57,6 +57,19 @@
   .stat .s{background:#f8fafc;border:1px solid var(--borde);border-radius:10px;padding:10px 14px;flex:1;min-width:120px}
   .stat .s b{display:block;font-size:20px;color:#0f172a}
   .stat .s span{font-size:11px;color:var(--gris)}
+  .pick-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px;border:1px solid var(--borde);border-radius:9px;background:#fff;font-size:14px;text-align:left;cursor:pointer;color:#111827}
+  .pick-btn:active{border-color:var(--verde)}
+  .pick-btn .pick-ch{color:var(--gris);flex:none}
+  #picker{position:fixed;inset:0;background:var(--bg);z-index:110;display:flex;flex-direction:column}
+  #picker .pk-head{background:#fff;border-bottom:1px solid var(--borde);padding:12px 14px;display:flex;gap:8px;align-items:center;position:sticky;top:0}
+  #picker .pk-head input{flex:1}
+  #picker .pk-list{flex:1;overflow-y:auto;padding:8px 12px;-webkit-overflow-scrolling:touch}
+  .pk-item{width:100%;text-align:left;background:#fff;border:1px solid var(--borde);border-radius:10px;padding:11px 12px;margin-bottom:7px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .pk-item:active{background:#f0fdf4;border-color:var(--verde)}
+  .pk-item .nm{font-weight:600;font-size:14px}
+  .pk-item .mt{font-size:11px;color:var(--gris)}
+  .pk-item.sp{background:#f8fafc;font-weight:700;color:#0f172a}
+  .pk-item.sp.new{color:#1d4ed8}
 </style>
 </head>
 <body>
@@ -152,6 +165,15 @@
 </div>
 </div>
 
+<!-- BUSCADOR DE INSUMOS -->
+<div id="picker" class="hide">
+  <div class="pk-head">
+    <input id="pk-q" type="text" placeholder="Buscar insumo…" autocomplete="off" oninput="renderPickerList(this.value)">
+    <button class="btn sec sm" onclick="closePicker()">Cerrar</button>
+  </div>
+  <div class="pk-list" id="pk-list"></div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -159,10 +181,18 @@
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
 const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }
-async function sbGet(q){ const r = await fetch(`${SB}/${q}`, { headers:H }); if(!r.ok) throw new Error(await r.text()); return r.json() }
-async function sbInsert(t, rows, ret){ const r = await fetch(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer: ret?'return=representation':'return=minimal' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()); return ret? r.json():null }
-async function sbPatch(t, filtro, body){ const r = await fetch(`${SB}/${t}?${filtro}`, { method:'PATCH', headers:H, body:JSON.stringify(body) }); if(!r.ok) throw new Error(await r.text()) }
-async function sbUpsert(t, rows){ const r = await fetch(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()) }
+// fetch con timeout: en el celular una petición puede quedar colgada para siempre (spinner infinito).
+// Con esto, si no responde en ~20s corta y avisa, en vez de quedar "Guardando…" sin fin.
+async function fetchT(url, opts={}, ms=20000){
+  const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), ms)
+  try{ return await fetch(url,{ ...opts, signal:ctrl.signal }) }
+  catch(e){ if(e.name==='AbortError') throw new Error('Se cortó la conexión (tardó demasiado). Revisá la señal y tocá Guardar de nuevo.'); throw e }
+  finally{ clearTimeout(to) }
+}
+async function sbGet(q){ const r = await fetchT(`${SB}/${q}`, { headers:H }); if(!r.ok) throw new Error(await r.text()); return r.json() }
+async function sbInsert(t, rows, ret){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer: ret?'return=representation':'return=minimal' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()); return ret? r.json():null }
+async function sbPatch(t, filtro, body){ const r = await fetchT(`${SB}/${t}?${filtro}`, { method:'PATCH', headers:H, body:JSON.stringify(body) }); if(!r.ok) throw new Error(await r.text()) }
+async function sbUpsert(t, rows){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()) }
 
 // ─── Auth (mismo esquema que el panel) ─────────────────────────────────────
 const USERS = {
@@ -178,6 +208,8 @@ function doLogin(){
 
 // ─── Estado ────────────────────────────────────────────────────────────────
 let insumos=[], insMap={}, conversiones={}, categorias=[], comprobante=null, rows=[], imgs=[]
+let aliasMap={}            // memoria global: norm(descripcion) -> insumo_id (aprendido de cargas previas)
+let saveState={}           // guardado en curso: {compraId, itemsDone, histDone, convDone, aliasDone} para reintentar sin duplicar
 const UNIDADES=['kg','g','lt','ml','unidad','docena','atado','sobre']
 // factor = cuántas unidades BASE hay en 1 unidad de COMPRA: CONV_STD[compra][base]
 const CONV_STD={
@@ -238,6 +270,10 @@ async function start(){
       const cv = await sbGet('insumo_unidades_compra?select=insumo_id,nombre_compra,factor&activo=eq.true')
       cv.forEach(c=>{ const k=String(c.insumo_id); (conversiones[k]=conversiones[k]||{})[String(c.nombre_compra).toLowerCase()]=Number(c.factor) })
     }catch(e){ /* tabla nueva puede no existir aún */ }
+    try{
+      const al = await sbGet('insumo_alias?select=alias,insumo_id')
+      aliasMap={}; al.forEach(a=>{ if(a.alias && a.insumo_id) aliasMap[a.alias]=String(a.insumo_id) })
+    }catch(e){ /* tabla insumo_alias puede no existir aún (correr el SQL) */ }
     document.getElementById('sync').textContent = insumos.length+' insumos'
   }catch(e){ document.getElementById('sync').textContent='⚠️ sin conexión'; toast('No pude leer insumos: '+e.message) }
 }
@@ -310,6 +346,10 @@ function buildReview(){
   document.getElementById('c-nro').value=(c.punto_venta?c.punto_venta+'-':'')+(c.nro_comprobante||'')
   document.getElementById('c-fiscal').checked=!!c.es_fiscal
   rows=(c.items||[]).map(it=>{
+    // 1) memoria: si ya asociamos este texto antes, usamos ese insumo directo.
+    const ali=aliasMap[norm(it.descripcion)]
+    if(ali && insMap[ali]) return { it, insumoId:ali, factorManual:null, actualizar:true, score:1, aliased:true, nuevo:null }
+    // 2) si no, matcheo difuso.
     const bm=bestMatch(it.descripcion)
     return { it, insumoId: bm.score>=0.62?String(bm.id):'', factorManual:null, actualizar:true, score:bm.score, nuevo:null }
   })
@@ -359,6 +399,7 @@ function renderItems(){
       : (!k.ins)?'<span class="badge b-new">sin vincular</span>'
       : needFactor?'<span class="badge b-warn">falta conversión</span>'
       : alert?`<span class="badge b-alert">⚠ ${k.pct>0?'+':''}${k.pct.toFixed(1)}%</span>`
+      : r.aliased?'<span class="badge b-ok">✓ recordado</span>'
       : '<span class="badge b-ok">ok</span>'
     let bottom
     if(k.esNuevo){
@@ -399,7 +440,12 @@ function renderItems(){
         <div><label>Unidad compra</label><input value="${esc(r.it.unidad)}" oninput="upd(${idx},'unidad',this.value)"></div>
         <div><label>Precio unit. ${fiscal?'s/IVA':''}</label><input type="number" step="any" value="${r.it.precio_unit??''}" oninput="upd(${idx},'precio_unit',this.value)"></div>
       </div>
-      <div><label>Insumo vinculado</label><select onchange="upd(${idx},'insumoId',this.value)">${insumoOptions(r.nuevo?'__new__':r.insumoId)}</select></div>
+      <div><label>Insumo vinculado</label>
+        <button type="button" class="pick-btn" onclick="openPicker(${idx})">
+          <span>${k.esNuevo?'＋ Insumo nuevo (a crear)':(k.ins?esc(k.ins.nombre)+' · '+esc(k.ins.unidad):'🔎 Tocá para buscar / vincular…')}</span>
+          <span class="pick-ch">▾</span>
+        </button>
+      </div>
       ${bottom}
     `
     cont.appendChild(el2)
@@ -430,6 +476,33 @@ function updN(idx,campo,val){
 }
 function cancelN(idx){ rows[idx].nuevo=null; renderItems() }
 
+// ─── Buscador rápido de insumos ─────────────────────────────────────────────
+let _pickIdx=null
+// similaridad texto ↔ insumo (reusa el matcheo difuso)
+function simInsumo(q,i){ const a=norm(q), n=norm(i.nombre); if(!a||!n) return 0; let sc=Math.max(dice(a,n),0.6*tokenScore(a,n)); if(n.includes(a)||a.includes(n)) sc=Math.max(sc,0.82); return sc }
+function openPicker(idx){
+  _pickIdx=idx
+  document.getElementById('picker').classList.remove('hide')
+  const q=document.getElementById('pk-q'); q.value=''
+  renderPickerList('')
+  setTimeout(()=>{ try{ q.focus() }catch(e){} }, 60)
+}
+function closePicker(){ document.getElementById('picker').classList.add('hide'); _pickIdx=null }
+function pickChoose(id){ const idx=_pickIdx; closePicker(); if(idx!=null) upd(idx,'insumoId',id) }
+function renderPickerList(q){
+  const cont=document.getElementById('pk-list'); if(_pickIdx==null){ cont.innerHTML=''; return }
+  const r=rows[_pickIdx], desc=r?r.it.descripcion:'', qq=norm(q)
+  let list
+  if(!qq){ list=insumos.map(i=>({i,sc:simInsumo(desc,i)})).sort((a,b)=>b.sc-a.sc).slice(0,60) }
+  else   { list=insumos.map(i=>({i,sc:simInsumo(q,i)})).filter(x=>{ const n=norm(x.i.nombre); return n.includes(qq)||x.sc>=0.28 }).sort((a,b)=>b.sc-a.sc).slice(0,60) }
+  let html=''
+  html+=`<div class="pk-item sp new" onclick="pickChoose('__new__')"><span class="nm">＋ Crear insumo nuevo</span><span class="mt">alta desde la factura</span></div>`
+  html+=`<div class="pk-item sp" onclick="pickChoose('')"><span class="nm">✕ Sin vincular</span><span class="mt">solo gasto</span></div>`
+  for(const {i} of list) html+=`<div class="pk-item" onclick="pickChoose('${esc(String(i.id))}')"><span class="nm">${esc(i.nombre)}</span><span class="mt">${esc(i.unidad||'')}${i.categoria?' · '+esc(i.categoria):''}</span></div>`
+  if(!list.length) html+='<p class="muted" style="text-align:center;padding:14px">Sin resultados. Podés crear el insumo nuevo.</p>'
+  cont.innerHTML=html
+}
+
 function renderResumen(){
   const umbral=Number(document.getElementById('umbral').value)||0
   let upd=0,alerts=0,altas=0,sinVinc=0,totalGasto=0
@@ -453,12 +526,16 @@ async function confirmar(){
     const neto = Number(comprobante.total_neto) || (fiscal? sNeto : sTot)
     const total = Number(comprobante.total) || sTot
     const iva = Number(comprobante.total_iva) || (fiscal? Math.max(0,total-neto) : 0)
-    // 1) cabecera
-    const cab=await sbInsert('compras',[{ proveedor:document.getElementById('c-prov').value, cuit:document.getElementById('c-cuit').value, tipo:document.getElementById('c-tipo').value, nro_comprobante:document.getElementById('c-nro').value, fecha:document.getElementById('c-fecha').value||null, cond_iva:fiscal?'Responsable Inscripto':'No fiscal', neto, iva, total, origen:'foto', creado_por:usuario }],true)
-    const compraId=cab[0].id
+    // 1) cabecera — SOLO una vez. Si se cortó y reintentás, reusa la ya creada (no duplica).
+    if(!saveState.compraId){
+      const cab=await sbInsert('compras',[{ proveedor:document.getElementById('c-prov').value, cuit:document.getElementById('c-cuit').value, tipo:document.getElementById('c-tipo').value, nro_comprobante:document.getElementById('c-nro').value, fecha:document.getElementById('c-fecha').value||null, cond_iva:fiscal?'Responsable Inscripto':'No fiscal', neto, iva, total, origen:'foto', creado_por:usuario }],true)
+      saveState.compraId=cab[0].id
+    }
+    const compraId=saveState.compraId
     const items=[], hist=[], convNuevas=[]
+    const aliasObj={}   // dedup por alias (no repetir la misma clave en un upsert)
     let actualizados=0, alertas=0, creados=0
-    // 2) altas de insumos nuevos (crear antes de registrar los ítems)
+    // 2) altas de insumos nuevos (crear antes de registrar los ítems). r._creado evita recrear en un reintento.
     for(const r of rows){
       if(!r.nuevo) continue
       const k=calcRow(r); if(k.costoBase==null) continue
@@ -480,6 +557,9 @@ async function confirmar(){
       const ivaRow=fiscal? Math.max(0,(Number(r.it.total)||0)-(Number(r.it.subtotal_neto)||0)) : 0
       items.push({ compra_id:compraId, descripcion:r.it.descripcion, insumo_id:r.insumoId||null, cantidad:Number(r.it.cantidad)||null, unidad:r.it.unidad, precio_unit:Number(r.it.precio_unit)||null, iva_pct:Number(r.it.iva_pct)||0, subtotal_neto:snRow, iva:ivaRow, subtotal_total:Number(r.it.total)||null, factor_conversion:creado?null:k.factor, costo_base_aplicado:creado?r._creado:(aplicar?k.costoBase:null), actualizo_costo:creado||aplicar })
       if(k.pct!=null && Math.abs(k.pct)>=umbral) alertas++
+      // memoria global: recordar la asociación de este texto con el insumo elegido (incluye altas)
+      const dnorm=norm(r.it.descripcion)
+      if(dnorm && r.insumoId && insMap[r.insumoId]){ aliasObj[dnorm]={ alias:dnorm, insumo_id:r.insumoId }; aliasMap[dnorm]=r.insumoId }
       if(aplicar){
         await sbPatch('insumos','id=eq.'+encodeURIComponent(r.insumoId),{ precio:k.costoBase })
         hist.push({ insumo_id:r.insumoId, nombre_insumo:k.ins.nombre, precio_anterior:k.actual, precio_nuevo:k.costoBase, pct_cambio:k.pct, compra_id:compraId, origen:'factura', usuario })
@@ -489,10 +569,13 @@ async function confirmar(){
         if(u && u!==base && !(CONV_STD[u]&&CONV_STD[u][base]!=null) && k.factor) convNuevas.push({ insumo_id:r.insumoId, nombre_compra:u, factor:k.factor })
       }
     }
-    if(items.length) await sbInsert('compra_items',items)
-    if(hist.length) await sbInsert('insumo_precio_historial',hist)
-    if(convNuevas.length){ try{ await sbUpsert('insumo_unidades_compra',convNuevas) }catch(e){} }
-    // listo
+    // Inserciones agrupadas, cada una marcada para no repetir si hubo que reintentar tras un corte.
+    if(!saveState.itemsDone){ if(items.length) await sbInsert('compra_items',items); saveState.itemsDone=true }
+    if(!saveState.histDone){ if(hist.length) await sbInsert('insumo_precio_historial',hist); saveState.histDone=true }
+    if(!saveState.convDone){ if(convNuevas.length){ try{ await sbUpsert('insumo_unidades_compra',convNuevas) }catch(e){} } saveState.convDone=true }
+    if(!saveState.aliasDone){ const aliasRows=Object.values(aliasObj); if(aliasRows.length){ try{ await sbUpsert('insumo_alias',aliasRows) }catch(e){} } saveState.aliasDone=true }
+    // éxito → limpiar estado de guardado
+    saveState={}
     document.getElementById('card-result').classList.add('hide')
     document.getElementById('footbar').classList.add('hide')
     document.getElementById('done-stat').innerHTML=`
@@ -501,11 +584,12 @@ async function confirmar(){
       <div class="s"><b style="color:${alertas?'#dc2626':'#0f172a'}">${alertas}</b><span>alertas</span></div>
       <div class="s"><b>${fmt$(total)}</b><span>registrado</span></div>`
     document.getElementById('card-done').classList.remove('hide')
-  }catch(e){ toast('Error al guardar: '+e.message); btn.disabled=false; btn.textContent='Confirmar y guardar' }
+  }catch(e){ toast('Error al guardar: '+e.message); btn.disabled=false; btn.innerHTML='Confirmar y guardar' }
 }
 
 function reset(){
-  comprobante=null; rows=[]; imgs=[]
+  comprobante=null; rows=[]; imgs=[]; saveState={}; _pickIdx=null
+  document.getElementById('picker').classList.add('hide')
   document.getElementById('file').value=''
   document.getElementById('thumbs').innerHTML=''
   document.getElementById('nfotos').textContent='0'
