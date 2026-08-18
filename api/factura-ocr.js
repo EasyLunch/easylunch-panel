@@ -54,10 +54,15 @@ Reglas:
 - TICKETS MANUSCRITOS: a veces el nombre del producto está escrito a mano al lado del renglón impreso "cantidad x precio = importe". Usá ESE nombre manuscrito como "descripcion". Verificá cantidad x precio_unit ≈ importe; si no coincide, "confianza":"baja".
 - Si algo no se lee seguro, devolvé tu mejor lectura con "confianza":"baja".`
 
-let CACHED_MODEL = null
-async function pickModel(GK) {
-  if (process.env.GEMINI_OCR_MODEL) return process.env.GEMINI_OCR_MODEL
-  if (CACHED_MODEL) return CACHED_MODEL
+// Permite que Vercel deje correr la función lo suficiente (arranque en frío + Gemini).
+export const maxDuration = 60
+
+// Modelo por defecto: se usa DIRECTO, sin listar modelos (eso agregaba latencia en cada
+// arranque en frío y hacía que el primer intento desde el celular se colgara ~30s).
+// Solo si este modelo falla por "no disponible" se lista y se elige otro (resiliencia a deprecaciones).
+let CACHED_MODEL = process.env.GEMINI_OCR_MODEL || 'gemini-flash-latest'
+
+async function pickModelFromList(GK) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GK}&pageSize=1000`)
   const j = await r.json()
   const names = (j.models || [])
@@ -76,9 +81,22 @@ async function pickModel(GK) {
     return s
   }
   const ranked = names.filter(n => !bad.test(n)).sort((a, b) => score(b) - score(a))
-  CACHED_MODEL = ranked[0] || 'gemini-2.0-flash'
-  return CACHED_MODEL
+  return ranked[0] || 'gemini-2.0-flash'
 }
+
+// Un intento contra un modelo dado. Devuelve {ok, status, json}.
+async function callGemini(GK, model, parts) {
+  const g = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GK}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.1 } })
+  })
+  const json = await g.json().catch(() => ({}))
+  return { ok: g.ok, status: g.status, json }
+}
+const modelNoDisponible = r =>
+  r.status === 404 ||
+  /not found|not supported|no.?such.?model|is not available|deprecat/i.test((r.json && r.json.error && r.json.error.message) || '')
 
 function toInline(s, fallbackMime) {
   if (typeof s !== 'string') return null
@@ -104,21 +122,24 @@ export default async function handler(req, res) {
     const GK = process.env.GEMINI_API_KEY
     if (!GK) return res.status(500).json({ error: 'Falta GEMINI_API_KEY en Vercel (Settings → Environment Variables)' })
 
-    let model
-    try { model = await pickModel(GK) }
-    catch (e) { return res.status(502).json({ error: 'No pude listar modelos de Gemini: ' + String(e).slice(0, 150) }) }
-
     const parts = [{ text: PROMPT }, ...inlines.map(i => ({ inlineData: i }))]
-    const g = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GK}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA, temperature: 0.1 } })
-    })
-    const gj = await g.json()
-    if (!g.ok) {
-      // si el modelo elegido dejó de estar disponible, limpiar cache para reintentar en la próxima
-      CACHED_MODEL = null
-      return res.status(502).json({ error: 'Gemini (' + model + '): ' + ((gj.error && gj.error.message) || g.status) })
+
+    // 1) Intento directo con el modelo cacheado/por defecto (camino rápido, sin listar).
+    let model = CACHED_MODEL
+    let r = await callGemini(GK, model, parts)
+    // 2) Solo si el modelo dejó de existir, listo modelos, elijo otro y reintento una vez.
+    if (!r.ok && modelNoDisponible(r)) {
+      try {
+        model = await pickModelFromList(GK)
+        CACHED_MODEL = model
+        r = await callGemini(GK, model, parts)
+      } catch (e) {
+        return res.status(502).json({ error: 'No pude listar modelos de Gemini: ' + String(e).slice(0, 150) })
+      }
+    }
+    const gj = r.json
+    if (!r.ok) {
+      return res.status(502).json({ error: 'Gemini (' + model + '): ' + ((gj.error && gj.error.message) || r.status) })
     }
     const txt = ((gj.candidates || [])[0]?.content?.parts || []).map(p => p.text).filter(Boolean).join('')
     if (!txt) return res.status(502).json({ error: 'Gemini no devolvió datos (probá de nuevo)' })
