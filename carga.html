@@ -266,14 +266,35 @@ function rmImg(i){ imgs.splice(i,1); renderThumbs() }
 // ─── Procesar (OCR) ─────────────────────────────────────────────────────────
 async function procesar(){
   if(!imgs.length) return
-  const b=document.getElementById('btn-proc'); b.disabled=true; b.innerHTML='<span class="spin"></span> Leyendo…'
+  const b=document.getElementById('btn-proc'); b.disabled=true
+  const setTxt=t=>{ b.innerHTML='<span class="spin"></span> '+t }
+  // Un intento con timeout propio (la 1ª lectura tras un rato puede tardar ~30s por el arranque del servidor)
+  const intento=async ()=>{
+    const ctrl=new AbortController()
+    const to=setTimeout(()=>ctrl.abort(), 90000)  // 90s de tope
+    try{
+      const r=await fetch('/api/factura-ocr',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ images:imgs }), signal:ctrl.signal })
+      let j={}; try{ j=await r.json() }catch(_){}
+      if(!r.ok||!j.ok) throw new Error(j.error||('Servidor respondió '+r.status))
+      return j
+    }catch(e){
+      if(e.name==='AbortError') throw new Error('Tardó demasiado. Probá con menos fotos o de nuevo en un momento.')
+      throw e
+    }finally{ clearTimeout(to) }
+  }
   try{
-    const r=await fetch('/api/factura-ocr',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ images:imgs }) })
-    const j=await r.json()
-    if(!r.ok||!j.ok) throw new Error(j.error||'Error de OCR')
+    setTxt('Leyendo… (hasta ~30s la 1ª vez)')
+    let j
+    try{ j=await intento() }
+    catch(e1){
+      // Reintento automático una vez: el 2º intento suele ser rápido (servidor ya despierto)
+      setTxt('Reintentando…')
+      await new Promise(res=>setTimeout(res,1000))
+      j=await intento()
+    }
     comprobante=j.comprobante
     buildReview()
-  }catch(e){ toast('Error: '+e.message) }
+  }catch(e){ toast('Error de OCR: '+e.message) }
   finally{ b.disabled=false; b.innerHTML='Procesar (<span id="nfotos">'+imgs.length+'</span>)' }
 }
 
