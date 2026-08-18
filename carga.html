@@ -179,7 +179,7 @@
 
 <script>
 // ─── Versión visible (para saber qué build corre el celu) ──────────────────
-const BUILD = 'v5 · 18-08'
+const BUILD = 'v6 · 18-08'
 // ─── Config Supabase (misma base que Producción / Recetario) ───────────────
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
@@ -436,25 +436,25 @@ function renderItems(){
       const n=r.nuevo, uniOpts=UNIDADES.map(u=>`<option ${u===n.unidad?'selected':''}>${u}</option>`).join('')
       bottom=`<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;margin-top:8px">
         <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:8px">Nuevo insumo para la base</div>
-        <div style="margin-bottom:8px"><label>Nombre</label><input value="${esc(n.nombre)}" oninput="updN(${idx},'nombre',this.value)"></div>
+        <div style="margin-bottom:8px"><label>Nombre</label><input value="${esc(n.nombre)}" onchange="updN(${idx},'nombre',this.value)"></div>
         <div class="grid2">
-          <div><label>Categoría</label><input list="cats-list" placeholder="ej. vacuno, pescado, sin tacc…" value="${esc(n.categoria)}" oninput="updN(${idx},'categoria',this.value)"></div>
+          <div><label>Categoría</label><input list="cats-list" placeholder="ej. vacuno, pescado, sin tacc…" value="${esc(n.categoria)}" onchange="updN(${idx},'categoria',this.value)"></div>
           <div><label>Unidad base</label><select onchange="updN(${idx},'unidad',this.value)">${uniOpts}</select></div>
         </div>
         <div class="grid2" style="margin-top:8px">
-          <div><label>Precio ${fiscal?'s/IVA':''} por ${n.unidad}</label><input type="number" step="any" value="${n.precio??''}" oninput="updN(${idx},'precio',this.value)"></div>
-          <div><label>Proveedor</label><input value="${esc(n.proveedor)}" oninput="updN(${idx},'proveedor',this.value)"></div>
+          <div><label>Precio ${fiscal?'s/IVA':''} por ${n.unidad}</label><input type="number" step="any" value="${n.precio??''}" onchange="updN(${idx},'precio',this.value)"></div>
+          <div><label>Proveedor</label><input value="${esc(n.proveedor)}" onchange="updN(${idx},'proveedor',this.value)"></div>
         </div>
         <div class="grid2" style="margin-top:8px">
-          <div><label>Merma en crudo %</label><input type="number" step="any" value="${n.merma_crudo}" oninput="updN(${idx},'merma_crudo',this.value)"></div>
-          <div><label>Variación cocción %</label><input type="number" step="any" value="${n.variacion_coccion}" oninput="updN(${idx},'variacion_coccion',this.value)"></div>
+          <div><label>Merma en crudo %</label><input type="number" step="any" value="${n.merma_crudo}" onchange="updN(${idx},'merma_crudo',this.value)"></div>
+          <div><label>Variación cocción %</label><input type="number" step="any" value="${n.variacion_coccion}" onchange="updN(${idx},'variacion_coccion',this.value)"></div>
         </div>
         <div style="margin-top:8px;font-size:12px" class="${k.costoBase!=null?'':'muted'}">${k.costoBase!=null?('Se creará con costo '+fmt$(k.costoBase)+'/'+n.unidad):'Completá un precio válido'}</div>
         <button class="btn sec sm" style="margin-top:8px" onclick="cancelN(${idx})">Cancelar alta</button>
       </div>`
     } else if(k.ins){
       bottom=`${`<div class="grid2" style="margin-top:8px">
-        <div><label>Conversión: 1 ${r.it.unidad||'u'} = ? ${base}</label><input type="number" step="any" value="${k.factor??''}" placeholder="ej. 20" oninput="upd(${idx},'factor',this.value)"></div>
+        <div><label>Conversión: 1 ${r.it.unidad||'u'} = ? ${base}</label><input type="number" step="any" value="${k.factor??''}" placeholder="ej. 20" onchange="upd(${idx},'factor',this.value)"></div>
         <div style="display:flex;align-items:flex-end"><span class="muted">${k.factor?('→ costo/'+base+' '+fmt$(k.costoBase)):'ingresá cuántos '+base+' trae'}</span></div>
       </div>`}
       <div class="costline"><span>Costo actual: <b>${fmt$(k.actual)}</b>/${base}</span><span>Nuevo: <b>${k.costoBase!=null?fmt$(k.costoBase):'—'}</b> ${k.pct!=null?`<span class="${k.pct>0?'pct-up':'pct-dn'}">(${k.pct>0?'+':''}${k.pct.toFixed(1)}%)</span>`:''}</span></div>
@@ -466,9 +466,9 @@ function renderItems(){
     el2.innerHTML=`
       <div class="top"><div class="desc">${esc(r.it.descripcion)||'(sin nombre)'}</div>${badge}</div>
       <div class="grid3">
-        <div><label>Cantidad</label><input type="number" step="any" value="${r.it.cantidad??''}" oninput="upd(${idx},'cantidad',this.value)"></div>
-        <div><label>Unidad compra</label><input value="${esc(r.it.unidad)}" oninput="upd(${idx},'unidad',this.value)"></div>
-        <div><label>Precio unit. ${fiscal?'s/IVA':''}</label><input type="number" step="any" value="${r.it.precio_unit??''}" oninput="upd(${idx},'precio_unit',this.value)"></div>
+        <div><label>Cantidad</label><input type="number" step="any" value="${r.it.cantidad??''}" onchange="upd(${idx},'cantidad',this.value)"></div>
+        <div><label>Unidad compra</label><input value="${esc(r.it.unidad)}" onchange="upd(${idx},'unidad',this.value)"></div>
+        <div><label>Precio unit. ${fiscal?'s/IVA':''}</label><input type="number" step="any" value="${r.it.precio_unit??''}" onchange="upd(${idx},'precio_unit',this.value)"></div>
       </div>
       <div><label>Insumo vinculado</label>
         <button type="button" class="pick-btn" onclick="openPicker(${idx})">
