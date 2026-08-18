@@ -57,10 +57,22 @@ Reglas:
 // Permite que Vercel deje correr la función lo suficiente (arranque en frío + Gemini).
 export const maxDuration = 60
 
-// Modelo por defecto: se usa DIRECTO, sin listar modelos (eso agregaba latencia en cada
-// arranque en frío y hacía que el primer intento desde el celular se colgara ~30s).
-// Solo si este modelo falla por "no disponible" se lista y se elige otro (resiliencia a deprecaciones).
-let CACHED_MODEL = process.env.GEMINI_OCR_MODEL || 'gemini-flash-latest'
+// Cadena de modelos: se prueban en orden. Si GEMINI_OCR_MODEL está seteado, se usa solo ese.
+// El motivo de tener varios: Gemini a veces devuelve 503 "high demand / overloaded" en un modelo
+// puntual; en ese caso reintentamos con espera y, si sigue, caemos al siguiente modelo.
+const MODELS = process.env.GEMINI_OCR_MODEL
+  ? [process.env.GEMINI_OCR_MODEL]
+  : ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-lite-latest']
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// ¿El error es transitorio (vale la pena reintentar el MISMO modelo)?
+// 503 overloaded / "high demand", 429 rate limit, 500 internal, timeouts.
+const esTransitorio = r => {
+  const msg = (r.json && r.json.error && r.json.error.message) || ''
+  return r.status === 503 || r.status === 429 || r.status === 500 ||
+    /high demand|overloaded|try again later|unavailable|temporarily|deadline|internal error|timeout/i.test(msg)
+}
 
 async function pickModelFromList(GK) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GK}&pageSize=1000`)
@@ -124,23 +136,46 @@ export default async function handler(req, res) {
 
     const parts = [{ text: PROMPT }, ...inlines.map(i => ({ inlineData: i }))]
 
-    // 1) Intento directo con el modelo cacheado/por defecto (camino rápido, sin listar).
-    let model = CACHED_MODEL
-    let r = await callGemini(GK, model, parts)
-    // 2) Solo si el modelo dejó de existir, listo modelos, elijo otro y reintento una vez.
-    if (!r.ok && modelNoDisponible(r)) {
-      try {
-        model = await pickModelFromList(GK)
-        CACHED_MODEL = model
-        r = await callGemini(GK, model, parts)
-      } catch (e) {
-        return res.status(502).json({ error: 'No pude listar modelos de Gemini: ' + String(e).slice(0, 150) })
+    // Estrategia: recorrer la cadena de modelos. En cada uno, hasta 3 intentos con espera
+    // creciente si el error es transitorio (503 "high demand" / 429 / 500). Si el modelo no
+    // existe, pasar al siguiente. Si un modelo devuelve OK, listo.
+    let r = null, model = null, ultimoMsg = ''
+    outer:
+    for (const m of MODELS) {
+      for (let intento = 0; intento < 3; intento++) {
+        r = await callGemini(GK, m, parts)
+        model = m
+        if (r.ok) break outer
+        ultimoMsg = (r.json && r.json.error && r.json.error.message) || ('HTTP ' + r.status)
+        if (modelNoDisponible(r)) break            // este modelo no sirve → probar el siguiente
+        if (esTransitorio(r) && intento < 2) {      // saturado → esperar y reintentar el mismo
+          await sleep(1500 * (intento + 1))         // 1.5s, luego 3s
+          continue
+        }
+        break                                       // error no reintentable → siguiente modelo
       }
     }
-    const gj = r.json
-    if (!r.ok) {
-      return res.status(502).json({ error: 'Gemini (' + model + '): ' + ((gj.error && gj.error.message) || r.status) })
+
+    // Último recurso: si ningún modelo de la lista respondió, listar modelos disponibles y probar uno.
+    if (!r || !r.ok) {
+      try {
+        const alt = await pickModelFromList(GK)
+        if (alt && !MODELS.includes(alt)) {
+          const r2 = await callGemini(GK, alt, parts)
+          if (r2.ok) { r = r2; model = alt }
+        }
+      } catch (e) { /* seguimos con el error original */ }
     }
+
+    if (!r || !r.ok) {
+      const saturado = r && esTransitorio(r)
+      return res.status(saturado ? 503 : 502).json({
+        error: saturado
+          ? 'El lector está con mucha demanda en este momento. Esperá unos segundos y tocá Procesar de nuevo.'
+          : 'Gemini (' + model + '): ' + ultimoMsg
+      })
+    }
+    const gj = r.json
     const txt = ((gj.candidates || [])[0]?.content?.parts || []).map(p => p.text).filter(Boolean).join('')
     if (!txt) return res.status(502).json({ error: 'Gemini no devolvió datos (probá de nuevo)' })
     let data
