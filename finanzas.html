@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Easy Lunch — Control Financiero</title>
+<style>
+:root{
+  --bg:#0f1115; --card:#171a21; --card2:#1e222b; --line:#2a2f3a;
+  --tx:#e8eaed; --mut:#9aa3b2; --acc:#4f9dff; --acc2:#3ad19b;
+  --warn:#ffb84d; --bad:#ff6b6b; --chip:#232833;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--acc);text-decoration:none}
+.hide{display:none!important}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:12px 16px;background:#12151b;border-bottom:1px solid var(--line)}
+.logo{font-weight:700}
+.build{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.sp{flex:1}
+.hdr-btn{font-size:13px;color:var(--mut);border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--card);cursor:pointer}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--mut);padding:8px 12px;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--acc);color:#04101f;font-weight:600}
+.lbl{font-size:12px;color:var(--mut);margin-right:2px}
+select,input{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi .k{font-size:12px;color:var(--mut)}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px;letter-spacing:-.3px}
+.kpi .s{font-size:11px;color:var(--mut);margin-top:3px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h3{margin:0 0 12px;font-size:14px;font-weight:600}
+.card h3 .sub{font-weight:400;color:var(--mut);font-size:12px}
+.bar-row{display:grid;grid-template-columns:120px 1fr auto;gap:10px;align-items:center;margin:7px 0;font-size:13px}
+.bar-row .nm{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{background:var(--card2);border-radius:6px;height:16px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--acc),#7bb8ff);border-radius:6px}
+.bar-row .amt{color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+.col-bars{display:flex;align-items:flex-end;gap:6px;height:150px;padding-top:8px}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px}
+.col .cbar{width:70%;background:linear-gradient(180deg,#7bb8ff,var(--acc));border-radius:6px 6px 0 0;min-height:2px}
+.col .clab{font-size:10px;color:var(--mut);white-space:nowrap}
+.col .cval{font-size:10px;color:var(--tx);font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px;position:sticky;top:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl-wrap{overflow-x:auto}
+.badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line)}
+.badge.fis{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
+.badge.no{color:var(--warn);border-color:#5c451f;background:#2a220f}
+.chip{font-size:11px;color:var(--mut);background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+.muted{color:var(--mut)}
+.itemrow td{background:var(--card2);font-size:12px;color:var(--mut)}
+tr.compra{cursor:pointer}
+tr.compra:hover td{background:#1b1f28}
+/* login */
+#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.loginbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:360px;width:100%}
+.loginbox h2{margin:0 0 4px}
+.loginbox p{color:var(--mut);font-size:13px;margin:0 0 16px}
+.loginbox input{width:100%;margin-bottom:10px;padding:11px}
+.btn{background:var(--acc);color:#04101f;border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;width:100%;font-size:14px}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-top:4px}
+.loading{text-align:center;color:var(--mut);padding:40px}
+.note{font-size:12px;color:var(--mut);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="loginbox">
+    <h2>💰 Control Financiero</h2>
+    <p>Easy Lunch — acceso restringido</p>
+    <input id="lu" placeholder="Usuario / email" autocomplete="username">
+    <input id="lp" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button class="btn" onclick="doLogin()">Ingresar</button>
+    <div class="err" id="lerr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+<header>
+  <span class="logo">💰 Control Financiero</span>
+  <span class="build" id="build">v1</span>
+  <span class="sp"></span>
+  <a class="hdr-btn" href="/">← Panel</a>
+  <button class="hdr-btn" onclick="logout()">Salir</button>
+</header>
+<main>
+  <div class="note" id="note"></div>
+
+  <div class="controls">
+    <span class="lbl">Período</span>
+    <div class="seg" id="segPeriodo">
+      <button data-p="dia">Día</button>
+      <button data-p="semana">Semana</button>
+      <button data-p="mes" class="on">Mes</button>
+    </div>
+    <span class="lbl" style="margin-left:8px">Comprobantes</span>
+    <div class="seg" id="segFiscal">
+      <button data-f="todos" class="on">Todos</button>
+      <button data-f="fiscal">Fiscal</button>
+      <button data-f="nofiscal">No fiscal</button>
+    </div>
+    <span class="sp"></span>
+    <span class="lbl">Desde</span><input type="date" id="desde">
+    <span class="lbl">Hasta</span><input type="date" id="hasta">
+    <button class="hdr-btn" onclick="clearRange()">Limpiar</button>
+  </div>
+
+  <div id="content"><div class="loading">Cargando datos…</div></div>
+</main>
+</div>
+
+<script>
+const BUILD = 'v1 · 20-08';
+const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
+let SB_KEY = null;
+let H = {};
+
+async function ensureKey(){
+  if(SB_KEY) return true;
+  try{
+    const html = await fetch('/carga.html',{cache:'no-store'}).then(r=>r.text());
+    const m = html.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
+    if(!m) throw new Error('no key');
+    SB_KEY = m[0];
+    H = {apikey:SB_KEY, Authorization:'Bearer '+SB_KEY};
+    return true;
+  }catch(e){ return false; }
+}
+
+const USERS = {
+  'pbronstein@easylunch.com.ar':'Viel912',
+  'easylunch':'Viel912',
+  'info@easylunch.com.ar':'Viel912'
+};
+const ADMIN = ['pbronstein@easylunch.com.ar','easylunch'];
+
+function doLogin(){
+  const u=(document.getElementById('lu').value||'').trim().toLowerCase();
+  const p=document.getElementById('lp').value||'';
+  if(USERS[u] && USERS[u]===p){
+    if(!ADMIN.includes(u)){ document.getElementById('lerr').textContent='Este usuario no tiene acceso al módulo financiero.'; return; }
+    localStorage.setItem('el_auth','1'); localStorage.setItem('el_user',u);
+    startApp();
+  } else {
+    document.getElementById('lerr').textContent='Usuario o contraseña incorrectos.';
+  }
+}
+function logout(){ localStorage.removeItem('el_auth'); localStorage.removeItem('el_user'); location.reload(); }
+function gate(){
+  const u=localStorage.getItem('el_user'), a=localStorage.getItem('el_auth');
+  if(a && u && ADMIN.includes(u)){ startApp(); return; }
+  document.getElementById('login').classList.remove('hide');
+}
+
+let COMPRAS=[], ITEMS=[], INSUMOS={};
+let periodo='mes', fiscalFilt='todos';
+
+const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
+const fmt2 = new Intl.NumberFormat('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
+const money = n => fmt.format(Math.round(+n||0));
+
+function esFiscal(c){ return /factura/i.test(c.tipo||'') && (c.cond_iva||'')!=='No fiscal'; }
+
+async function startApp(){
+  document.getElementById('login').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  document.getElementById('build').textContent = BUILD;
+  wireControls();
+  await loadData();
+  render();
+}
+
+async function loadData(){
+  const ok = await ensureKey();
+  if(!ok){ document.getElementById('content').innerHTML='<div class="loading">No se pudo obtener la clave de acceso a datos. Recargá la página o revisá que carga.html esté publicado.</div>'; return; }
+  try{
+    const [c,i,ins] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/compras?select=*&order=fecha.asc`,{headers:H}).then(r=>r.json()),
+      fetch(`${SB_URL}/rest/v1/compra_items?select=*`,{headers:H}).then(r=>r.json()),
+      fetch(`${SB_URL}/rest/v1/insumos?select=id,nombre,categoria`,{headers:H}).then(r=>r.json())
+    ]);
+    COMPRAS = Array.isArray(c)?c:[];
+    ITEMS = Array.isArray(i)?i:[];
+    INSUMOS = {};
+    (Array.isArray(ins)?ins:[]).forEach(x=>INSUMOS[x.id]={nombre:x.nombre,categoria:x.categoria});
+  }catch(e){
+    document.getElementById('content').innerHTML='<div class="loading">Error cargando datos: '+e+'</div>';
+  }
+}
+
+function wireControls(){
+  document.querySelectorAll('#segPeriodo button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#segPeriodo button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); periodo=b.dataset.p; render();
+  });
+  document.querySelectorAll('#segFiscal button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#segFiscal button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); fiscalFilt=b.dataset.f; render();
+  });
+  document.getElementById('desde').onchange=render;
+  document.getElementById('hasta').onchange=render;
+}
+function clearRange(){ document.getElementById('desde').value=''; document.getElementById('hasta').value=''; render(); }
+
+function filtered(){
+  const d=document.getElementById('desde').value, h=document.getElementById('hasta').value;
+  return COMPRAS.filter(c=>{
+    if(fiscalFilt==='fiscal' && !esFiscal(c)) return false;
+    if(fiscalFilt==='nofiscal' && esFiscal(c)) return false;
+    if(d && c.fecha < d) return false;
+    if(h && c.fecha > h) return false;
+    return true;
+  });
+}
+
+function periodKey(fecha){
+  const dt = new Date(fecha+'T00:00:00');
+  if(periodo==='dia') return fecha;
+  if(periodo==='mes') return fecha.slice(0,7);
+  const day=(dt.getDay()+6)%7; const mon=new Date(dt); mon.setDate(dt.getDate()-day);
+  return mon.toISOString().slice(0,10);
+}
+function periodLabel(k){
+  if(periodo==='mes'){ const [y,m]=k.split('-'); return ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+m-1]+' '+y.slice(2); }
+  if(periodo==='dia'){ const [y,m,d]=k.split('-'); return d+'/'+m; }
+  const [y,m,d]=k.split('-'); return 'sem '+d+'/'+m;
+}
+
+function render(){
+  const rows = filtered();
+  const ids = new Set(rows.map(c=>c.id));
+  const items = ITEMS.filter(it=>ids.has(it.compra_id));
+
+  const sumTotal = rows.reduce((a,c)=>a+(+c.total||0),0);
+  const sumNeto  = rows.reduce((a,c)=>a+(+c.neto||0),0);
+  const sumIva   = rows.reduce((a,c)=>a+(+c.iva||0),0);
+  const nFis = rows.filter(esFiscal).length;
+
+  const perMap={};
+  rows.forEach(c=>{ const k=periodKey(c.fecha); perMap[k]=(perMap[k]||0)+(+c.total||0); });
+  const perKeys=Object.keys(perMap).sort();
+  const perMax=Math.max(1,...perKeys.map(k=>perMap[k]));
+
+  const catMap={};
+  items.forEach(it=>{
+    const cat = (it.insumo_id && INSUMOS[it.insumo_id]) ? (INSUMOS[it.insumo_id].categoria||'otros') : 'sin categoría';
+    catMap[cat]=(catMap[cat]||0)+(+it.subtotal_total||0);
+  });
+  const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  const catMax=Math.max(1,...cats.map(x=>x[1]));
+
+  const provMap={};
+  rows.forEach(c=>{ const p=c.proveedor||'—'; provMap[p]=(provMap[p]||0)+(+c.total||0); });
+  const provs=Object.entries(provMap).sort((a,b)=>b[1]-a[1]);
+  const provMax=Math.max(1,...provs.map(x=>x[1]));
+
+  const kpis = `
+    <div class="kpis">
+      <div class="kpi"><div class="k">Total comprado</div><div class="v">${money(sumTotal)}</div><div class="s">lo que salió de caja</div></div>
+      <div class="kpi"><div class="k">Neto (sin IVA)</div><div class="v">${money(sumNeto)}</div><div class="s">costo real de insumos</div></div>
+      <div class="kpi"><div class="k">IVA (crédito fiscal)</div><div class="v">${money(sumIva)}</div><div class="s">recuperable en fiscales</div></div>
+      <div class="kpi"><div class="k">Comprobantes</div><div class="v">${rows.length}</div><div class="s">${nFis} fiscales · ${rows.length-nFis} no fiscales</div></div>
+    </div>`;
+
+  const colBars = `
+    <div class="card">
+      <h3>Evolución del gasto <span class="sub">· por ${periodo} · total con IVA</span></h3>
+      ${perKeys.length? `<div class="col-bars">`+perKeys.map(k=>{
+        const h=Math.round((perMap[k]/perMax)*120);
+        return `<div class="col"><div class="cval">${(perMap[k]/1000).toFixed(0)}k</div><div class="cbar" style="height:${h}px" title="${money(perMap[k])}"></div><div class="clab">${periodLabel(k)}</div></div>`;
+      }).join('')+`</div>` : `<div class="muted">Sin datos en el rango.</div>`}
+    </div>`;
+
+  const catCard = `
+    <div class="card">
+      <h3>Gasto por categoría <span class="sub">· con IVA</span></h3>
+      ${cats.length? cats.map(([n,v])=>`
+        <div class="bar-row"><div class="nm">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/catMax*100).toFixed(1)}%"></div></div><div class="amt">${money(v)}</div></div>
+      `).join('') : `<div class="muted">Sin ítems en el rango.</div>`}
+    </div>`;
+
+  const provCard = `
+    <div class="card">
+      <h3>Gasto por proveedor <span class="sub">· con IVA</span></h3>
+      ${provs.length? provs.map(([n,v])=>`
+        <div class="bar-row"><div class="nm" title="${n}">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/provMax*100).toFixed(1)}%;background:linear-gradient(90deg,#3ad19b,#7be0bf)"></div></div><div class="amt">${money(v)}</div></div>
+      `).join('') : `<div class="muted">Sin compras en el rango.</div>`}
+    </div>`;
+
+  const rowsSorted = [...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const tabla = `
+    <div class="card">
+      <h3>Comprobantes <span class="sub">· ${rows.length} · tocá una fila para ver el detalle</span></h3>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Nº</th>
+          <th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th><th>Estado</th><th>Foto</th>
+        </tr></thead>
+        <tbody>
+        ${rowsSorted.map(c=>{
+          const its = ITEMS.filter(it=>it.compra_id===c.id);
+          const fis = esFiscal(c);
+          const foto = c.foto_url ? `<a href="${c.foto_url}" target="_blank">ver</a>` : '<span class="muted">—</span>';
+          const itHtml = its.map(it=>{
+            const nm = it.descripcion || (it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].nombre:'—');
+            const cat = it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].categoria:'—';
+            return `<tr class="itemrow"><td></td><td colspan="3">${nm} <span class="chip">${cat}</span></td><td class="num">${money(it.subtotal_neto)}</td><td class="num">${money(it.iva)}</td><td class="num">${money(it.subtotal_total)}</td><td colspan="2">${fmt2.format(it.cantidad)} ${it.unidad||''}</td></tr>`;
+          }).join('');
+          return `<tr class="compra" onclick="this.nextElementSibling&&this.nextElementSibling.classList.toggle('hide')">
+            <td>${c.fecha||''}</td><td>${c.proveedor||'—'}</td><td>${c.tipo||'—'}</td><td>${c.nro_comprobante||'—'}</td>
+            <td class="num">${money(c.neto)}</td><td class="num">${money(c.iva)}</td><td class="num">${money(c.total)}</td>
+            <td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fiscal'}</span></td><td>${foto}</td>
+          </tr>
+          <tr class="hide"><td colspan="9" style="padding:0"><table style="margin:0">${itHtml||'<tr class="itemrow"><td colspan="9">Sin ítems detallados.</td></tr>'}</table></td></tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>`;
+
+  document.getElementById('content').innerHTML = kpis + colBars + `<div class="grid">`+catCard+provCard+`</div>` + tabla;
+}
+
+document.getElementById('note').innerHTML = 'Esta vista lee las <b>compras cargadas por foto</b> (Fase 3A). <b>Fiscal</b> = Factura A con IVA discriminado (crédito fiscal recuperable); <b>No fiscal</b> = tickets / sin factura. Próximo: sumar movimientos del banco (Macro) y facturación a clientes (AFIP) para el cash flow completo.';
+
+gate();
+</script>
+</body>
+</html>
