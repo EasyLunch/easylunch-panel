@@ -170,5 +170,8 @@ function doLogin(){
     }
 }
 </script>
+<script id="el-fin-fix">
+(function(){function sync(){var app=document.getElementById("app");if(!app||getComputedStyle(app).display==="none")return;var mine=null,cotiz=false;document.querySelectorAll(".card").forEach(function(c){var h=c.querySelector("h3");var t=h?h.textContent:"";if(t.indexOf("Control Financiero")>-1){mine=c;return;}if(c.getAttribute("data-app")==="financiero"&&getComputedStyle(c).display!=="none")cotiz=true;});if(mine)mine.style.display=cotiz?"flex":"none";}setInterval(sync,400);})();
+</script>
 </body>
 </html>
