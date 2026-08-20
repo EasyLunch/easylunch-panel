@@ -69,6 +69,25 @@ tr.compra:hover td{background:#1b1f28}
 .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:4px}
 .loading{text-align:center;color:var(--mut);padding:40px}
 .note{font-size:12px;color:var(--mut);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;line-height:1.5}
+.pago-badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pago-badge.pend{color:var(--warn);border-color:#5c451f;background:#2a220f}
+.pago-badge.paga{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
+.mini-btn{font-size:11px;padding:3px 8px;border-radius:7px;border:1px solid var(--line);background:var(--card2);color:var(--tx);cursor:pointer}
+.mini-btn:hover{background:#242a35}
+.mini-btn.pay{border-color:#1f5c45;color:var(--acc2)}
+.pago-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pago-sub{font-size:10px;color:var(--mut)}
+.kpi.alert .v{color:var(--warn)}
+#payModal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
+#payModal.show{display:flex}
+.paybox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:380px;width:100%}
+.paybox h3{margin:0 0 4px;font-size:16px}
+.paybox .pm-sub{color:var(--mut);font-size:13px;margin:0 0 10px}
+.paybox label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
+.paybox select,.paybox input{width:100%}
+.paybox .row{display:flex;gap:10px;margin-top:18px}
+.btn-sec{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;flex:1}
+.pm-err{color:var(--bad);font-size:12px;min-height:16px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -110,6 +129,12 @@ tr.compra:hover td{background:#1b1f28}
       <button data-f="fiscal">Fiscal</button>
       <button data-f="nofiscal">No fiscal</button>
     </div>
+    <span class="lbl" style="margin-left:8px">Pago</span>
+    <div class="seg" id="segPago">
+      <button data-g="todos" class="on">Todos</button>
+      <button data-g="pendiente">Pendientes</button>
+      <button data-g="pagada">Pagas</button>
+    </div>
     <span class="sp"></span>
     <span class="lbl">Desde</span><input type="date" id="desde">
     <span class="lbl">Hasta</span><input type="date" id="hasta">
@@ -120,8 +145,32 @@ tr.compra:hover td{background:#1b1f28}
 </main>
 </div>
 
+<!-- MODAL: marcar factura como paga -->
+<div id="payModal">
+  <div class="paybox">
+    <h3>Marcar como paga</h3>
+    <p class="pm-sub" id="pm-info"></p>
+    <label>Medio de pago</label>
+    <select id="pm-medio">
+      <option>Transferencia</option>
+      <option>Efectivo</option>
+      <option>Cheque</option>
+      <option>Débito automático</option>
+      <option>Tarjeta</option>
+      <option>Otro</option>
+    </select>
+    <label>Fecha de pago</label>
+    <input type="date" id="pm-fecha">
+    <div class="pm-err" id="pm-err"></div>
+    <div class="row">
+      <button class="btn-sec" onclick="closePay()">Cancelar</button>
+      <button class="btn" id="pm-confirm" onclick="confirmPay()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const BUILD = 'v1 · 20-08';
+const BUILD = 'v2 · 20-08';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null;
 let H = {};
@@ -164,13 +213,51 @@ function gate(){
 }
 
 let COMPRAS=[], ITEMS=[], INSUMOS={};
-let periodo='mes', fiscalFilt='todos';
+let periodo='mes', fiscalFilt='todos', pagoFilt='todos';
+let payTargetId=null;
 
 const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
 const fmt2 = new Intl.NumberFormat('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const money = n => fmt.format(Math.round(+n||0));
 
 function esFiscal(c){ return /factura/i.test(c.tipo||'') && (c.cond_iva||'')!=='No fiscal'; }
+function esPaga(c){ return (c.estado_pago||'pendiente')==='pagada'; }
+
+async function patchCompra(id, body){
+  const r = await fetch(`${SB_URL}/rest/v1/compras?id=eq.${id}`, {method:'PATCH', headers:{...H,'Content-Type':'application/json','Prefer':'return=representation'}, body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const rows = await r.json();
+  return Array.isArray(rows)?rows[0]:null;
+}
+function openPay(id){
+  payTargetId=id;
+  const c=COMPRAS.find(x=>x.id===id); if(!c) return;
+  document.getElementById('pm-info').textContent = `${c.proveedor||'—'} · ${money(c.total)} · ${c.nro_comprobante||''}`;
+  document.getElementById('pm-err').textContent='';
+  const f=document.getElementById('pm-fecha'); f.value = (c.fecha_pago) || (c.fecha) || '';
+  document.getElementById('payModal').classList.add('show');
+}
+function closePay(){ document.getElementById('payModal').classList.remove('show'); payTargetId=null; }
+async function confirmPay(){
+  if(!payTargetId) return;
+  const medio=document.getElementById('pm-medio').value;
+  const fecha=document.getElementById('pm-fecha').value||null;
+  const btn=document.getElementById('pm-confirm'); btn.disabled=true; btn.textContent='Guardando…';
+  document.getElementById('pm-err').textContent='';
+  try{
+    const upd=await patchCompra(payTargetId,{estado_pago:'pagada',medio_pago:medio,fecha_pago:fecha});
+    const c=COMPRAS.find(x=>x.id===payTargetId); if(c){ c.estado_pago='pagada'; c.medio_pago=medio; c.fecha_pago=fecha; }
+    closePay(); render();
+  }catch(e){ document.getElementById('pm-err').textContent='No se pudo guardar: '+e.message; }
+  btn.disabled=false; btn.textContent='Confirmar pago';
+}
+async function unpay(id){
+  const c=COMPRAS.find(x=>x.id===id); if(!c) return;
+  const prev={e:c.estado_pago,m:c.medio_pago,f:c.fecha_pago};
+  c.estado_pago='pendiente'; c.medio_pago=null; c.fecha_pago=null; render();
+  try{ await patchCompra(id,{estado_pago:'pendiente',medio_pago:null,fecha_pago:null}); }
+  catch(e){ c.estado_pago=prev.e; c.medio_pago=prev.m; c.fecha_pago=prev.f; render(); }
+}
 
 async function startApp(){
   document.getElementById('login').classList.add('hide');
@@ -208,6 +295,10 @@ function wireControls(){
     document.querySelectorAll('#segFiscal button').forEach(x=>x.classList.remove('on'));
     b.classList.add('on'); fiscalFilt=b.dataset.f; render();
   });
+  document.querySelectorAll('#segPago button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#segPago button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); pagoFilt=b.dataset.g; render();
+  });
   document.getElementById('desde').onchange=render;
   document.getElementById('hasta').onchange=render;
 }
@@ -218,6 +309,8 @@ function filtered(){
   return COMPRAS.filter(c=>{
     if(fiscalFilt==='fiscal' && !esFiscal(c)) return false;
     if(fiscalFilt==='nofiscal' && esFiscal(c)) return false;
+    if(pagoFilt==='pendiente' && esPaga(c)) return false;
+    if(pagoFilt==='pagada' && !esPaga(c)) return false;
     if(d && c.fecha < d) return false;
     if(h && c.fecha > h) return false;
     return true;
@@ -246,6 +339,9 @@ function render(){
   const sumNeto  = rows.reduce((a,c)=>a+(+c.neto||0),0);
   const sumIva   = rows.reduce((a,c)=>a+(+c.iva||0),0);
   const nFis = rows.filter(esFiscal).length;
+  const sumPend = rows.filter(c=>!esPaga(c)).reduce((a,c)=>a+(+c.total||0),0);
+  const sumPag  = rows.filter(esPaga).reduce((a,c)=>a+(+c.total||0),0);
+  const nPend = rows.filter(c=>!esPaga(c)).length;
 
   const perMap={};
   rows.forEach(c=>{ const k=periodKey(c.fecha); perMap[k]=(perMap[k]||0)+(+c.total||0); });
@@ -271,6 +367,8 @@ function render(){
       <div class="kpi"><div class="k">Neto (sin IVA)</div><div class="v">${money(sumNeto)}</div><div class="s">costo real de insumos</div></div>
       <div class="kpi"><div class="k">IVA (crédito fiscal)</div><div class="v">${money(sumIva)}</div><div class="s">recuperable en fiscales</div></div>
       <div class="kpi"><div class="k">Comprobantes</div><div class="v">${rows.length}</div><div class="s">${nFis} fiscales · ${rows.length-nFis} no fiscales</div></div>
+      <div class="kpi alert"><div class="k">Pendiente de pago</div><div class="v">${money(sumPend)}</div><div class="s">${nPend} facturas sin pagar</div></div>
+      <div class="kpi"><div class="k">Pagado</div><div class="v">${money(sumPag)}</div><div class="s">${rows.length-nPend} facturas pagas</div></div>
     </div>`;
 
   const colBars = `
@@ -306,13 +404,17 @@ function render(){
       <table>
         <thead><tr>
           <th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Nº</th>
-          <th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th><th>Estado</th><th>Foto</th>
+          <th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th><th>Estado</th><th>Pago</th><th>Foto</th>
         </tr></thead>
         <tbody>
         ${rowsSorted.map(c=>{
           const its = ITEMS.filter(it=>it.compra_id===c.id);
           const fis = esFiscal(c);
           const foto = c.foto_url ? `<a href="${c.foto_url}" target="_blank">ver</a>` : '<span class="muted">—</span>';
+          const pagada = esPaga(c);
+          const pagoCell = pagada
+            ? `<div class="pago-cell"><span class="pago-badge paga">Pagada</span><span class="pago-sub">${c.medio_pago||''}${c.fecha_pago?(' · '+c.fecha_pago):''}</span><button class="mini-btn" title="Marcar pendiente" onclick="event.stopPropagation();unpay('${c.id}')">↩</button></div>`
+            : `<div class="pago-cell"><span class="pago-badge pend">Pendiente</span><button class="mini-btn pay" onclick="event.stopPropagation();openPay('${c.id}')">Marcar paga</button></div>`;
           const itHtml = its.map(it=>{
             const nm = it.descripcion || (it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].nombre:'—');
             const cat = it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].categoria:'—';
@@ -321,9 +423,9 @@ function render(){
           return `<tr class="compra" onclick="this.nextElementSibling&&this.nextElementSibling.classList.toggle('hide')">
             <td>${c.fecha||''}</td><td>${c.proveedor||'—'}</td><td>${c.tipo||'—'}</td><td>${c.nro_comprobante||'—'}</td>
             <td class="num">${money(c.neto)}</td><td class="num">${money(c.iva)}</td><td class="num">${money(c.total)}</td>
-            <td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fiscal'}</span></td><td>${foto}</td>
+            <td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fiscal'}</span></td><td>${pagoCell}</td><td>${foto}</td>
           </tr>
-          <tr class="hide"><td colspan="9" style="padding:0"><table style="margin:0">${itHtml||'<tr class="itemrow"><td colspan="9">Sin ítems detallados.</td></tr>'}</table></td></tr>`;
+          <tr class="hide"><td colspan="10" style="padding:0"><table style="margin:0">${itHtml||'<tr class="itemrow"><td colspan="9">Sin ítems detallados.</td></tr>'}</table></td></tr>`;
         }).join('')}
         </tbody>
       </table>
@@ -333,7 +435,7 @@ function render(){
   document.getElementById('content').innerHTML = kpis + colBars + `<div class="grid">`+catCard+provCard+`</div>` + tabla;
 }
 
-document.getElementById('note').innerHTML = 'Esta vista lee las <b>compras cargadas por foto</b> (Fase 3A). <b>Fiscal</b> = Factura A con IVA discriminado (crédito fiscal recuperable); <b>No fiscal</b> = tickets / sin factura. Próximo: sumar movimientos del banco (Macro) y facturación a clientes (AFIP) para el cash flow completo.';
+document.getElementById('note').innerHTML = 'Esta vista lee las <b>compras cargadas por foto</b> (Fase 3A). Marcá cada factura como <b>paga</b> (con medio y fecha) o dejala <b>pendiente</b> — arriba ves cuánto tenés pendiente de pago. <b>Fiscal</b> = Factura A con IVA (crédito fiscal); <b>No fiscal</b> = tickets / sin factura. Próximo: cruzar con el banco (Macro) para detectar solo los pagos por transferencia, y sumar la facturación a clientes (AFIP).';
 
 gate();
 </script>
