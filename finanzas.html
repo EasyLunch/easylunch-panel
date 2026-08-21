@@ -28,6 +28,7 @@ main{max-width:1100px;margin:0 auto;padding:16px}
 select,input{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi.hot{border-color:#5c451f;background:linear-gradient(180deg,#221b0f,#171a21)}
 .kpi .k{font-size:12px;color:var(--mut)}
 .kpi .v{font-size:22px;font-weight:700;margin-top:4px;letter-spacing:-.3px}
 .kpi .s{font-size:11px;color:var(--mut);margin-top:3px}
@@ -51,43 +52,42 @@ th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-
 th{color:var(--mut);font-weight:600;font-size:12px;position:sticky;top:0}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .tbl-wrap{overflow-x:auto}
-.badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line)}
+.badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
 .badge.fis{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
 .badge.no{color:var(--warn);border-color:#5c451f;background:#2a220f}
+.badge.pag{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
+.badge.pend{color:var(--warn);border-color:#5c451f;background:#2a220f}
 .chip{font-size:11px;color:var(--mut);background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
 .muted{color:var(--mut)}
 .itemrow td{background:var(--card2);font-size:12px;color:var(--mut)}
-tr.compra{cursor:pointer}
+tr.compra td{cursor:pointer}
 tr.compra:hover td{background:#1b1f28}
+.pay-btn{font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #1f5c45;background:#0f2a20;color:var(--acc2);cursor:pointer;white-space:nowrap}
+.pay-btn:hover{background:#123528}
+.rev-btn{font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mut);cursor:pointer;margin-left:6px}
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:380px;width:100%}
+.modal h3{margin:0 0 4px}
+.modal .who{font-size:13px;color:var(--mut);margin:0 0 16px}
+.modal label{display:block;font-size:12px;color:var(--mut);margin:12px 0 4px}
+.modal select,.modal input{width:100%}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.btn{background:var(--acc);color:#04101f;border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:14px}
+.btn.wide{width:100%}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx)}
 /* login */
 #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
 .loginbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:360px;width:100%}
 .loginbox h2{margin:0 0 4px}
 .loginbox p{color:var(--mut);font-size:13px;margin:0 0 16px}
 .loginbox input{width:100%;margin-bottom:10px;padding:11px}
-.btn{background:var(--acc);color:#04101f;border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;width:100%;font-size:14px}
 .err{color:var(--bad);font-size:13px;min-height:18px;margin-top:4px}
 .loading{text-align:center;color:var(--mut);padding:40px}
 .note{font-size:12px;color:var(--mut);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;line-height:1.5}
-.pago-badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
-.pago-badge.pend{color:var(--warn);border-color:#5c451f;background:#2a220f}
-.pago-badge.paga{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
-.mini-btn{font-size:11px;padding:3px 8px;border-radius:7px;border:1px solid var(--line);background:var(--card2);color:var(--tx);cursor:pointer}
-.mini-btn:hover{background:#242a35}
-.mini-btn.pay{border-color:#1f5c45;color:var(--acc2)}
-.pago-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.pago-sub{font-size:10px;color:var(--mut)}
-.kpi.alert .v{color:var(--warn)}
-#payModal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:20px}
-#payModal.show{display:flex}
-.paybox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;max-width:380px;width:100%}
-.paybox h3{margin:0 0 4px;font-size:16px}
-.paybox .pm-sub{color:var(--mut);font-size:13px;margin:0 0 10px}
-.paybox label{display:block;font-size:12px;color:var(--mut);margin:10px 0 4px}
-.paybox select,.paybox input{width:100%}
-.paybox .row{display:flex;gap:10px;margin-top:18px}
-.btn-sec{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;flex:1}
-.pm-err{color:var(--bad);font-size:12px;min-height:16px;margin-top:8px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2a20;border:1px solid #1f5c45;color:var(--acc2);padding:10px 16px;border-radius:10px;font-size:13px;z-index:70;opacity:0;transition:opacity .2s}
+.toast.show{opacity:1}
+.toast.err{background:#2a0f0f;border-color:#5c1f1f;color:var(--bad)}
 </style>
 </head>
 <body>
@@ -99,7 +99,7 @@ tr.compra:hover td{background:#1b1f28}
     <p>Easy Lunch — acceso restringido</p>
     <input id="lu" placeholder="Usuario / email" autocomplete="username">
     <input id="lp" type="password" placeholder="Contraseña" autocomplete="current-password">
-    <button class="btn" onclick="doLogin()">Ingresar</button>
+    <button class="btn wide" onclick="doLogin()">Ingresar</button>
     <div class="err" id="lerr"></div>
   </div>
 </div>
@@ -108,7 +108,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="app" class="hide">
 <header>
   <span class="logo">💰 Control Financiero</span>
-  <span class="build" id="build">v1</span>
+  <span class="build" id="build">v2</span>
   <span class="sp"></span>
   <a class="hdr-btn" href="/">← Panel</a>
   <button class="hdr-btn" onclick="logout()">Salir</button>
@@ -123,11 +123,11 @@ tr.compra:hover td{background:#1b1f28}
       <button data-p="semana">Semana</button>
       <button data-p="mes" class="on">Mes</button>
     </div>
-    <span class="lbl" style="margin-left:8px">Comprobantes</span>
+    <span class="lbl" style="margin-left:8px">Compr.</span>
     <div class="seg" id="segFiscal">
       <button data-f="todos" class="on">Todos</button>
       <button data-f="fiscal">Fiscal</button>
-      <button data-f="nofiscal">No fiscal</button>
+      <button data-f="nofiscal">No fisc.</button>
     </div>
     <span class="lbl" style="margin-left:8px">Pago</span>
     <div class="seg" id="segPago">
@@ -145,29 +145,8 @@ tr.compra:hover td{background:#1b1f28}
 </main>
 </div>
 
-<!-- MODAL: marcar factura como paga -->
-<div id="payModal">
-  <div class="paybox">
-    <h3>Marcar como paga</h3>
-    <p class="pm-sub" id="pm-info"></p>
-    <label>Medio de pago</label>
-    <select id="pm-medio">
-      <option>Transferencia</option>
-      <option>Efectivo</option>
-      <option>Cheque</option>
-      <option>Débito automático</option>
-      <option>Tarjeta</option>
-      <option>Otro</option>
-    </select>
-    <label>Fecha de pago</label>
-    <input type="date" id="pm-fecha">
-    <div class="pm-err" id="pm-err"></div>
-    <div class="row">
-      <button class="btn-sec" onclick="closePay()">Cancelar</button>
-      <button class="btn" id="pm-confirm" onclick="confirmPay()">Confirmar pago</button>
-    </div>
-  </div>
-</div>
+<div id="modalHost"></div>
+<div id="toast" class="toast"></div>
 
 <script>
 const BUILD = 'v2 · 20-08';
@@ -214,50 +193,13 @@ function gate(){
 
 let COMPRAS=[], ITEMS=[], INSUMOS={};
 let periodo='mes', fiscalFilt='todos', pagoFilt='todos';
-let payTargetId=null;
 
 const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
 const fmt2 = new Intl.NumberFormat('es-AR',{minimumFractionDigits:0,maximumFractionDigits:0});
 const money = n => fmt.format(Math.round(+n||0));
 
 function esFiscal(c){ return /factura/i.test(c.tipo||'') && (c.cond_iva||'')!=='No fiscal'; }
-function esPaga(c){ return (c.estado_pago||'pendiente')==='pagada'; }
-
-async function patchCompra(id, body){
-  const r = await fetch(`${SB_URL}/rest/v1/compras?id=eq.${id}`, {method:'PATCH', headers:{...H,'Content-Type':'application/json','Prefer':'return=representation'}, body:JSON.stringify(body)});
-  if(!r.ok) throw new Error('HTTP '+r.status);
-  const rows = await r.json();
-  return Array.isArray(rows)?rows[0]:null;
-}
-function openPay(id){
-  payTargetId=id;
-  const c=COMPRAS.find(x=>x.id===id); if(!c) return;
-  document.getElementById('pm-info').textContent = `${c.proveedor||'—'} · ${money(c.total)} · ${c.nro_comprobante||''}`;
-  document.getElementById('pm-err').textContent='';
-  const f=document.getElementById('pm-fecha'); f.value = (c.fecha_pago) || (c.fecha) || '';
-  document.getElementById('payModal').classList.add('show');
-}
-function closePay(){ document.getElementById('payModal').classList.remove('show'); payTargetId=null; }
-async function confirmPay(){
-  if(!payTargetId) return;
-  const medio=document.getElementById('pm-medio').value;
-  const fecha=document.getElementById('pm-fecha').value||null;
-  const btn=document.getElementById('pm-confirm'); btn.disabled=true; btn.textContent='Guardando…';
-  document.getElementById('pm-err').textContent='';
-  try{
-    const upd=await patchCompra(payTargetId,{estado_pago:'pagada',medio_pago:medio,fecha_pago:fecha});
-    const c=COMPRAS.find(x=>x.id===payTargetId); if(c){ c.estado_pago='pagada'; c.medio_pago=medio; c.fecha_pago=fecha; }
-    closePay(); render();
-  }catch(e){ document.getElementById('pm-err').textContent='No se pudo guardar: '+e.message; }
-  btn.disabled=false; btn.textContent='Confirmar pago';
-}
-async function unpay(id){
-  const c=COMPRAS.find(x=>x.id===id); if(!c) return;
-  const prev={e:c.estado_pago,m:c.medio_pago,f:c.fecha_pago};
-  c.estado_pago='pendiente'; c.medio_pago=null; c.fecha_pago=null; render();
-  try{ await patchCompra(id,{estado_pago:'pendiente',medio_pago:null,fecha_pago:null}); }
-  catch(e){ c.estado_pago=prev.e; c.medio_pago=prev.m; c.fecha_pago=prev.f; render(); }
-}
+function esPagada(c){ return (c.estado_pago||'pendiente')==='pagada'; }
 
 async function startApp(){
   document.getElementById('login').classList.add('hide');
@@ -270,7 +212,7 @@ async function startApp(){
 
 async function loadData(){
   const ok = await ensureKey();
-  if(!ok){ document.getElementById('content').innerHTML='<div class="loading">No se pudo obtener la clave de acceso a datos. Recargá la página o revisá que carga.html esté publicado.</div>'; return; }
+  if(!ok){ document.getElementById('content').innerHTML='<div class="loading">No se pudo obtener la clave de acceso a datos. Recargá la página.</div>'; return; }
   try{
     const [c,i,ins] = await Promise.all([
       fetch(`${SB_URL}/rest/v1/compras?select=*&order=fecha.asc`,{headers:H}).then(r=>r.json()),
@@ -309,8 +251,8 @@ function filtered(){
   return COMPRAS.filter(c=>{
     if(fiscalFilt==='fiscal' && !esFiscal(c)) return false;
     if(fiscalFilt==='nofiscal' && esFiscal(c)) return false;
-    if(pagoFilt==='pendiente' && esPaga(c)) return false;
-    if(pagoFilt==='pagada' && !esPaga(c)) return false;
+    if(pagoFilt==='pagada' && !esPagada(c)) return false;
+    if(pagoFilt==='pendiente' && esPagada(c)) return false;
     if(d && c.fecha < d) return false;
     if(h && c.fecha > h) return false;
     return true;
@@ -339,9 +281,9 @@ function render(){
   const sumNeto  = rows.reduce((a,c)=>a+(+c.neto||0),0);
   const sumIva   = rows.reduce((a,c)=>a+(+c.iva||0),0);
   const nFis = rows.filter(esFiscal).length;
-  const sumPend = rows.filter(c=>!esPaga(c)).reduce((a,c)=>a+(+c.total||0),0);
-  const sumPag  = rows.filter(esPaga).reduce((a,c)=>a+(+c.total||0),0);
-  const nPend = rows.filter(c=>!esPaga(c)).length;
+  const pendiente = rows.filter(c=>!esPagada(c)).reduce((a,c)=>a+(+c.total||0),0);
+  const pagado    = rows.filter(esPagada).reduce((a,c)=>a+(+c.total||0),0);
+  const nPend = rows.filter(c=>!esPagada(c)).length;
 
   const perMap={};
   rows.forEach(c=>{ const k=periodKey(c.fecha); perMap[k]=(perMap[k]||0)+(+c.total||0); });
@@ -363,20 +305,19 @@ function render(){
 
   const kpis = `
     <div class="kpis">
-      <div class="kpi"><div class="k">Total comprado</div><div class="v">${money(sumTotal)}</div><div class="s">lo que salió de caja</div></div>
+      <div class="kpi"><div class="k">Total comprado</div><div class="v">${money(sumTotal)}</div><div class="s">${rows.length} comprobantes</div></div>
+      <div class="kpi hot"><div class="k">Pendiente de pago</div><div class="v">${money(pendiente)}</div><div class="s">${nPend} facturas por pagar</div></div>
+      <div class="kpi"><div class="k">Pagado</div><div class="v">${money(pagado)}</div><div class="s">${rows.length-nPend} saldadas</div></div>
       <div class="kpi"><div class="k">Neto (sin IVA)</div><div class="v">${money(sumNeto)}</div><div class="s">costo real de insumos</div></div>
-      <div class="kpi"><div class="k">IVA (crédito fiscal)</div><div class="v">${money(sumIva)}</div><div class="s">recuperable en fiscales</div></div>
-      <div class="kpi"><div class="k">Comprobantes</div><div class="v">${rows.length}</div><div class="s">${nFis} fiscales · ${rows.length-nFis} no fiscales</div></div>
-      <div class="kpi alert"><div class="k">Pendiente de pago</div><div class="v">${money(sumPend)}</div><div class="s">${nPend} facturas sin pagar</div></div>
-      <div class="kpi"><div class="k">Pagado</div><div class="v">${money(sumPag)}</div><div class="s">${rows.length-nPend} facturas pagas</div></div>
+      <div class="kpi"><div class="k">IVA (crédito fiscal)</div><div class="v">${money(sumIva)}</div><div class="s">${nFis} fiscales · ${rows.length-nFis} no</div></div>
     </div>`;
 
   const colBars = `
     <div class="card">
       <h3>Evolución del gasto <span class="sub">· por ${periodo} · total con IVA</span></h3>
       ${perKeys.length? `<div class="col-bars">`+perKeys.map(k=>{
-        const h=Math.round((perMap[k]/perMax)*120);
-        return `<div class="col"><div class="cval">${(perMap[k]/1000).toFixed(0)}k</div><div class="cbar" style="height:${h}px" title="${money(perMap[k])}"></div><div class="clab">${periodLabel(k)}</div></div>`;
+        const hh=Math.round((perMap[k]/perMax)*120);
+        return `<div class="col"><div class="cval">${(perMap[k]/1000).toFixed(0)}k</div><div class="cbar" style="height:${hh}px" title="${money(perMap[k])}"></div><div class="clab">${periodLabel(k)}</div></div>`;
       }).join('')+`</div>` : `<div class="muted">Sin datos en el rango.</div>`}
     </div>`;
 
@@ -404,28 +345,33 @@ function render(){
       <table>
         <thead><tr>
           <th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Nº</th>
-          <th class="num">Neto</th><th class="num">IVA</th><th class="num">Total</th><th>Estado</th><th>Pago</th><th>Foto</th>
+          <th class="num">Total</th><th>Fiscal</th><th>Pago</th><th>Foto</th>
         </tr></thead>
         <tbody>
         ${rowsSorted.map(c=>{
           const its = ITEMS.filter(it=>it.compra_id===c.id);
           const fis = esFiscal(c);
+          const pag = esPagada(c);
           const foto = c.foto_url ? `<a href="${c.foto_url}" target="_blank">ver</a>` : '<span class="muted">—</span>';
-          const pagada = esPaga(c);
-          const pagoCell = pagada
-            ? `<div class="pago-cell"><span class="pago-badge paga">Pagada</span><span class="pago-sub">${c.medio_pago||''}${c.fecha_pago?(' · '+c.fecha_pago):''}</span><button class="mini-btn" title="Marcar pendiente" onclick="event.stopPropagation();unpay('${c.id}')">↩</button></div>`
-            : `<div class="pago-cell"><span class="pago-badge pend">Pendiente</span><button class="mini-btn pay" onclick="event.stopPropagation();openPay('${c.id}')">Marcar paga</button></div>`;
+          let pagoCell;
+          if(pag){
+            const info = [c.medio_pago, c.fecha_pago].filter(Boolean).join(' · ');
+            pagoCell = `<span class="badge pag">Pagada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''}<button class="rev-btn" onclick="event.stopPropagation();revertPay('${c.id}')" title="Volver a pendiente">↩</button>`;
+          } else {
+            pagoCell = `<button class="pay-btn" onclick="event.stopPropagation();openPay('${c.id}')">Marcar paga</button>`;
+          }
           const itHtml = its.map(it=>{
             const nm = it.descripcion || (it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].nombre:'—');
             const cat = it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].categoria:'—';
-            return `<tr class="itemrow"><td></td><td colspan="3">${nm} <span class="chip">${cat}</span></td><td class="num">${money(it.subtotal_neto)}</td><td class="num">${money(it.iva)}</td><td class="num">${money(it.subtotal_total)}</td><td colspan="2">${fmt2.format(it.cantidad)} ${it.unidad||''}</td></tr>`;
+            return `<tr class="itemrow"><td></td><td colspan="3">${nm} <span class="chip">${cat}</span></td><td class="num">${money(it.subtotal_total)}</td><td colspan="3">${fmt2.format(it.cantidad)} ${it.unidad||''} · neto ${money(it.subtotal_neto)}</td></tr>`;
           }).join('');
           return `<tr class="compra" onclick="this.nextElementSibling&&this.nextElementSibling.classList.toggle('hide')">
             <td>${c.fecha||''}</td><td>${c.proveedor||'—'}</td><td>${c.tipo||'—'}</td><td>${c.nro_comprobante||'—'}</td>
-            <td class="num">${money(c.neto)}</td><td class="num">${money(c.iva)}</td><td class="num">${money(c.total)}</td>
-            <td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fiscal'}</span></td><td>${pagoCell}</td><td>${foto}</td>
+            <td class="num">${money(c.total)}</td>
+            <td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fisc.'}</span></td>
+            <td>${pagoCell}</td><td>${foto}</td>
           </tr>
-          <tr class="hide"><td colspan="10" style="padding:0"><table style="margin:0">${itHtml||'<tr class="itemrow"><td colspan="9">Sin ítems detallados.</td></tr>'}</table></td></tr>`;
+          <tr class="hide"><td colspan="8" style="padding:0"><table style="margin:0">${itHtml||'<tr class="itemrow"><td colspan="8">Sin ítems detallados.</td></tr>'}</table></td></tr>`;
         }).join('')}
         </tbody>
       </table>
@@ -435,7 +381,72 @@ function render(){
   document.getElementById('content').innerHTML = kpis + colBars + `<div class="grid">`+catCard+provCard+`</div>` + tabla;
 }
 
-document.getElementById('note').innerHTML = 'Esta vista lee las <b>compras cargadas por foto</b> (Fase 3A). Marcá cada factura como <b>paga</b> (con medio y fecha) o dejala <b>pendiente</b> — arriba ves cuánto tenés pendiente de pago. <b>Fiscal</b> = Factura A con IVA (crédito fiscal); <b>No fiscal</b> = tickets / sin factura. Próximo: cruzar con el banco (Macro) para detectar solo los pagos por transferencia, y sumar la facturación a clientes (AFIP).';
+function findCompra(id){ return COMPRAS.find(c=>c.id===id); }
+
+function openPay(id){
+  const c=findCompra(id); if(!c) return;
+  const hoy=new Date().toISOString().slice(0,10);
+  document.getElementById('modalHost').innerHTML = `
+    <div class="modal-bg" onclick="if(event.target===this)closePay()">
+      <div class="modal">
+        <h3>Marcar como paga</h3>
+        <p class="who">${c.proveedor||'—'} · ${c.nro_comprobante||''} · <b>${money(c.total)}</b></p>
+        <label>Medio de pago</label>
+        <select id="pm">
+          <option>Transferencia</option>
+          <option>Efectivo</option>
+          <option>Cheque</option>
+          <option>Débito automático</option>
+          <option>Mercado Pago</option>
+          <option>Tarjeta</option>
+          <option>Otro</option>
+        </select>
+        <label>Fecha de pago</label>
+        <input type="date" id="pf" value="${hoy}">
+        <div class="modal-actions">
+          <button class="btn ghost" onclick="closePay()">Cancelar</button>
+          <button class="btn" style="flex:1" onclick="confirmPay('${id}')">Confirmar pago</button>
+        </div>
+      </div>
+    </div>`;
+}
+function closePay(){ document.getElementById('modalHost').innerHTML=''; }
+
+async function patchCompra(id, body){
+  const r = await fetch(`${SB_URL}/rest/v1/compras?id=eq.${encodeURIComponent(id)}`, {
+    method:'PATCH',
+    headers:{...H, 'Content-Type':'application/json', Prefer:'return=minimal'},
+    body: JSON.stringify(body)
+  });
+  if(!r.ok){ throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,120)); }
+}
+
+async function confirmPay(id){
+  const medio=document.getElementById('pm').value;
+  const fecha=document.getElementById('pf').value || new Date().toISOString().slice(0,10);
+  try{
+    await patchCompra(id, {estado_pago:'pagada', medio_pago:medio, fecha_pago:fecha});
+    const c=findCompra(id); if(c){ c.estado_pago='pagada'; c.medio_pago=medio; c.fecha_pago=fecha; }
+    closePay(); render(); toast('Marcada como paga ✓');
+  }catch(e){ toast('No se pudo guardar: '+e.message, true); }
+}
+
+async function revertPay(id){
+  try{
+    await patchCompra(id, {estado_pago:'pendiente', medio_pago:null, fecha_pago:null});
+    const c=findCompra(id); if(c){ c.estado_pago='pendiente'; c.medio_pago=null; c.fecha_pago=null; }
+    render(); toast('Vuelta a pendiente');
+  }catch(e){ toast('No se pudo actualizar: '+e.message, true); }
+}
+
+let toastT=null;
+function toast(msg, isErr){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(isErr?' err':'');
+  clearTimeout(toastT); toastT=setTimeout(()=>{ t.className='toast'+(isErr?' err':''); }, 2600);
+}
+
+document.getElementById('note').innerHTML = 'Compras cargadas por foto (Fase 3A). Marcá cada factura como <b>paga</b> (con su medio de pago) para llevar las <b>cuentas por pagar</b>. <b>Fiscal</b> = Factura A con IVA (crédito fiscal). Próximo: cruzar con el banco (Macro) para confirmar solos los pagos por transferencia, y sumar la facturación a clientes (AFIP).';
 
 gate();
 </script>
