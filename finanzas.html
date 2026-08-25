@@ -142,7 +142,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v5 · 24-08';
+const BUILD = 'v6 · 25-08';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -486,6 +486,7 @@ function renderFacturacion(){
 function facturacionControls(){
   const clientes=[...new Set(VENTAS.map(v=>v.cliente).filter(Boolean))].sort();
   return `<div class="note">Facturas emitidas en ARCA (Fase 3C), cargadas desde tus carpetas por cliente. Marcá cada factura como <b>cobrada</b> para llevar las cuentas por cobrar. Los ingresos por transferencia del banco se emparejan solos con el cliente que te pagó.</div>
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn" id="scanBtn" onclick="scanFacturas()">🔄 Buscar facturas nuevas en mis carpetas</button><span class="muted" style="font-size:12px">Elegí una vez tu carpeta “Facturación” y trae solo las facturas nuevas (las ya cargadas se saltan solas).</span></div>
   <div class="controls">
     <span class="lbl">Período</span>
     <div class="seg" id="fPer">${['dia','semana','mes'].map(p=>`<button data-p="${p}" class="${p===fPeriodo?'on':''}">${p==='dia'?'Día':p==='semana'?'Semana':'Mes'}</button>`).join('')}</div>
@@ -531,6 +532,69 @@ function renderFacturacionBody(){
     return `<tr><td>${v.fecha||''}</td><td title="${v.cliente||''}">${(v.cliente||'—').slice(0,30)}</td><td class="muted">${emi}</td><td>${v.tipo||''} ${v.punto_venta||''}-${v.nro_comprobante||''}</td><td class="num">${money(v.total)}</td><td>${cc}</td></tr>`;
   }).join('')}</tbody></table></div></div>`;
   body.innerHTML=kpis+evo+`<div class="grid">${cliCard}${cxcCard}</div>`+tabla;
+}
+
+// ====== Importar facturas emitidas desde las carpetas del cliente (File System Access API) ======
+const EMISORES = {'20288038903':'BRONSTEIN PABLO DAMIAN','30719230934':'BAD KITCHEN S.R.L.','30714717733':'ALIMENTO COTIDIANO S.R.L.'};
+const EMISOR_NOMBRES = /BRONSTEIN PABLO|BAD KITCHEN|ALIMENTO COTIDIANO/i;
+let PDFJS_READY=false;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error('No se pudo cargar la librería de PDF'));document.head.appendChild(s);});}
+async function ensurePdfjs(){ if(PDFJS_READY)return; await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'); window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; PDFJS_READY=true; }
+async function pdfText(buf){
+  const doc=await window.pdfjsLib.getDocument({data:buf}).promise; let txt='';
+  for(let p=1;p<=doc.numPages;p++){ const page=await doc.getPage(p); const c=await page.getTextContent(); let last=null; for(const it of c.items){ const y=it.transform[5]; if(last!==null&&Math.abs(y-last)>3)txt+='\n'; txt+=it.str+' '; last=y; } txt+='\n'; }
+  return txt.replace(/[ \t]+/g,' ');
+}
+function numAR(s){ if(s==null)return null; s=String(s).replace(/\$/g,'').replace(/\s/g,'').replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?null:n; }
+function fechaISO(txt){ const m=txt.match(/(\d{2})\/(\d{2})\/(\d{4})/); return m?`${m[3]}-${m[2]}-${m[1]}`:null; }
+function parseFactura(txt, archivo){
+  const tipo=/NOTA DE CR[EÉ]DITO/i.test(txt)?'NC':(/FACTURA\s+A/i.test(txt)?'A':(/FACTURA\s+B/i.test(txt)?'B':'?'));
+  const cuits=[...txt.matchAll(/\b(\d{11})\b/g)].map(m=>m[1]);
+  const emisor=cuits.find(c=>EMISORES[c]);
+  let recep=null, cliente=null;
+  for(const ln of txt.split('\n')){ const mm=ln.trim().match(/^(\d{11})\s+([A-ZÁÉÍÓÚÑ].{2,60}?)\s*$/); if(mm && mm[1]!==emisor && !EMISOR_NOMBRES.test(mm[2])){ recep=mm[1]; cliente=mm[2].trim(); break; } }
+  const pv=txt.match(/Punto de Venta:\s*Comp\.\s*Nro:\s*(\d{4,5})\s+(\d{6,8})/)||[];
+  const punto=pv[1]||null, nro=pv[2]||null;
+  const neto=numAR((txt.match(/Importe Neto Gravado:\s*\$?\s*([\d.,]+)/)||[])[1]);
+  const total=numAR((txt.match(/Importe Total:\s*\$?\s*([\d.,]+)/)||[])[1]);
+  const otros=numAR((txt.match(/Importe Otros Tributos:\s*\$?\s*([\d.,]+)/)||[])[1])||0;
+  const iva=(neto!=null&&total!=null)?Math.round((total-neto-otros)*100)/100:null;
+  const cae=(txt.match(/\b([78]\d{13})\b/)||[])[1]||null;
+  const totStr=(total!=null)?(Number.isInteger(total)?total+'.0':''+total):null;
+  const hash=(recep&&punto&&nro&&totStr)?`${recep}|${punto}|${nro}|${totStr}`:null;
+  return { id:(crypto.randomUUID?crypto.randomUUID():'v-'+Date.now()+'-'+Math.random().toString(16).slice(2)), fecha:fechaISO(txt), cliente, cliente_cuit:recep, emisor:EMISORES[emisor]||'', tipo, punto_venta:punto, nro_comprobante:nro, neto, iva, total, cae, archivo, hash };
+}
+async function* walkDir(handle, prefix){
+  for await (const [name,h] of handle.entries()){
+    if(h.kind==='file'){ if(/\.pdf$/i.test(name)) yield {name, handle:h}; }
+    else if(h.kind==='directory'){ yield* walkDir(h, prefix+name+'/'); }
+  }
+}
+async function scanFacturas(){
+  if(!window.showDirectoryPicker){ toast('Esta función necesita Chrome o Edge de escritorio.',true); return; }
+  let dir; try{ dir=await window.showDirectoryPicker({id:'facturacion',mode:'read'}); }catch(e){ return; }
+  const btn=document.getElementById('scanBtn'); if(btn){btn.disabled=true;btn.textContent='Leyendo carpetas…';}
+  try{
+    await ensurePdfjs();
+    const existing=new Set(VENTAS.map(v=>v.hash));
+    const files=[]; for await (const f of walkDir(dir,'')) files.push(f);
+    const nuevos=[]; let errores=0, salteadas=0, i=0;
+    for(const f of files){
+      i++; if(btn && i%10===0) btn.textContent=`Procesando ${i}/${files.length}…`;
+      try{
+        const file=await f.handle.getFile();
+        const r=parseFactura(await pdfText(new Uint8Array(await file.arrayBuffer())), f.name);
+        if(!r.hash){ errores++; continue; }
+        if(existing.has(r.hash)){ salteadas++; continue; }
+        existing.add(r.hash); nuevos.push(r);
+      }catch(e){ errores++; }
+    }
+    if(!nuevos.length){ toast(`Sin novedades: ${files.length} PDF revisados, ${salteadas} ya estaban${errores?', '+errores+' no reconocidas':''}.`); if(btn){btn.disabled=false;btn.textContent='🔄 Buscar facturas nuevas en mis carpetas';} return; }
+    const rr=await fetch(`${SB_URL}/rest/v1/ventas?on_conflict=hash`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(nuevos)});
+    if(!rr.ok) throw new Error('HTTP '+rr.status+' '+(await rr.text()).slice(0,120));
+    await reloadVentas(); renderFacturacion();
+    toast(`✓ ${nuevos.length} factura(s) nueva(s) cargada(s)${errores?' · '+errores+' no reconocidas':''}`);
+  }catch(e){ toast('Error: '+e.message,true); if(btn){btn.disabled=false;btn.textContent='🔄 Buscar facturas nuevas en mis carpetas';} }
 }
 
 // ============ cobros ventas (marcado manual) ============
