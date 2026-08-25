@@ -142,7 +142,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v6 · 25-08';
+const BUILD = 'v7 · 25-08';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -424,7 +424,8 @@ function cuitDigits(s){ return (s||'').replace(/\D/g,''); }
 function diasEntre(a,b){ return Math.abs((new Date(b)-new Date(a))/86400000); }
 function proponerConciliacion(){
   const pend=COMPRAS.filter(c=>!esPagada(c));
-  const egresos=MOVBANCO.filter(m=>(+m.importe)<0 && !m.compra_id);
+  const NO_PROV=new Set(['extraccion_efectivo','impuesto','comision_bancaria','interno','servicio','egreso_tarjeta']);
+  const egresos=MOVBANCO.filter(m=>(+m.importe)<0 && !m.compra_id && !NO_PROV.has(m.categoria));
   const usados=new Set(); const matches=[];
   // priorizar compras con CUIT y monto exacto
   pend.forEach(c=>{
@@ -432,10 +433,11 @@ function proponerConciliacion(){
     let best=null,bs=-1;
     egresos.forEach(m=>{
       if(usados.has(m.id))return; const amt=-(+m.importe);
-      if(Math.abs(amt-total)>Math.max(1,total*0.005))return;
-      if((m.fecha||'')<(c.fecha||''))return;
+      if(Math.abs(amt-total)>Math.max(50,total*0.015))return;
+      const dd=(new Date(m.fecha)-new Date(c.fecha))/86400000;
+      if(dd<-7||dd>75)return;
       const cuitOk=cd&&cuitDigits(m.concepto).includes(cd);
-      const score=(cuitOk?100:0)+(Math.abs(amt-total)<0.5?10:0)-diasEntre(c.fecha,m.fecha)*0.01;
+      const score=(cuitOk?100:0)+(Math.abs(amt-total)<0.5?15:(Math.abs(amt-total)<total*0.005?8:0))-Math.abs(dd)*0.05;
       if(score>bs){bs=score;best={m,cuitOk};}
     });
     if(best){matches.push({compra:c,mov:best.m,cuitOk:best.cuitOk});usados.add(best.m.id);}
@@ -617,10 +619,11 @@ function proponerCobros(){
     let best=null,bs=-1;
     ingresos.forEach(m=>{
       if(usados.has(m.id))return; const amt=+m.importe;
-      if(Math.abs(amt-total)>Math.max(1,total*0.005))return;
-      if((m.fecha||'')<(v.fecha||''))return;
+      if(Math.abs(amt-total)>Math.max(50,total*0.015))return;
+      const dd=(new Date(m.fecha)-new Date(v.fecha))/86400000;
+      if(dd<-7||dd>75)return;
       const cuitOk=cd&&cuitDigits(m.concepto).includes(cd);
-      const score=(cuitOk?100:0)+(Math.abs(amt-total)<0.5?10:0)-diasEntre(v.fecha,m.fecha)*0.01;
+      const score=(cuitOk?100:0)+(Math.abs(amt-total)<0.5?15:(Math.abs(amt-total)<total*0.005?8:0))-Math.abs(dd)*0.05;
       if(score>bs){bs=score;best={m,cuitOk};}
     });
     if(best){matches.push({venta:v,mov:best.m,cuitOk:best.cuitOk});usados.add(best.m.id);}
