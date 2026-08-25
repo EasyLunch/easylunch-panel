@@ -142,7 +142,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v7 · 25-08';
+const BUILD = 'v8 · 25-08';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -271,8 +271,8 @@ function setTab(t){
 function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') renderBanco(); else if(tab==='facturacion') renderFacturacion(); else renderResumen(); }
 
 // ============ util período ============
-function periodKey(fecha,per){ const dt=new Date(fecha+'T00:00:00'); if(per==='dia')return fecha; if(per==='mes')return fecha.slice(0,7); const day=(dt.getDay()+6)%7, mon=new Date(dt); mon.setDate(dt.getDate()-day); return mon.toISOString().slice(0,10); }
-function periodLabel(k,per){ if(per==='mes'){const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+m-1]+' '+y.slice(2);} if(per==='dia'){const[y,m,d]=k.split('-');return d+'/'+m;} const[y,m,d]=k.split('-');return 'sem '+d+'/'+m; }
+function periodKey(fecha,per){ if(!fecha||typeof fecha!=='string')return 'sf'; const dt=new Date(fecha+'T00:00:00'); if(isNaN(dt))return 'sf'; if(per==='dia')return fecha; if(per==='mes')return fecha.slice(0,7); const day=(dt.getDay()+6)%7, mon=new Date(dt); mon.setDate(dt.getDate()-day); return mon.toISOString().slice(0,10); }
+function periodLabel(k,per){ if(k==='sf')return 's/fecha'; if(per==='mes'){const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+m-1]+' '+y.slice(2);} if(per==='dia'){const[y,m,d]=k.split('-');return d+'/'+m;} const[y,m,d]=k.split('-');return 'sem '+d+'/'+m; }
 
 // ============ COMPRAS ============
 function renderCompras(){
