@@ -128,12 +128,14 @@ tr.compra:hover td{background:#1b1f28}
   <div class="tab on" data-tab="compras" onclick="setTab('compras')">🧾 Compras</div>
   <div class="tab" data-tab="banco" onclick="setTab('banco')">🏦 Banco</div>
   <div class="tab" data-tab="facturacion" onclick="setTab('facturacion')">💵 Facturación</div>
+  <div class="tab" data-tab="cashflow" onclick="setTab('cashflow')">💸 Cash Flow</div>
   <div class="tab" data-tab="resumen" onclick="setTab('resumen')">📊 Resumen</div>
 </div>
 <main>
   <div id="tab-compras"><div class="loading">Cargando…</div></div>
   <div id="tab-banco" class="hide"></div>
   <div id="tab-facturacion" class="hide"></div>
+  <div id="tab-cashflow" class="hide"></div>
   <div id="tab-resumen" class="hide"></div>
 </main>
 </div>
@@ -142,7 +144,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v8 · 25-08';
+const BUILD = 'v9 · 25-08';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -175,6 +177,23 @@ let tab='compras';
 let cPeriodo='mes', fiscalFilt='todos', pagoFilt='todos';
 let bPeriodo='mes', tipoFilt='todos', catFilt='todos';
 let fPeriodo='mes', cobroFilt='todos', clienteFilt='todos';
+let cfPeriodo='mes';
+let RUBRO_MAP={}, PROV_CUITS=new Set();
+const RUBROS={
+  mercaderia:{l:'Mercadería / materia prima',t:'variable'},
+  logistica:{l:'Logística / delivery',t:'variable'},
+  comisiones:{l:'Comisiones y gastos bancarios',t:'variable'},
+  sueldos:{l:'Sueldos y honorarios',t:'fijo'},
+  cargas:{l:'Cargas sociales',t:'fijo'},
+  alquiler:{l:'Alquiler',t:'fijo'},
+  servicios:{l:'Servicios (luz/gas/internet)',t:'fijo'},
+  impuestos:{l:'Impuestos',t:'impuesto'},
+  retiros:{l:'Retiros de socios / efectivo',t:'financiero'},
+  otros:{l:'Otros',t:'otro'},
+  a_clasificar:{l:'A clasificar',t:'pendiente'}
+};
+const TIPO_LABEL={variable:'Costos variables',fijo:'Costos fijos',impuesto:'Impuestos',financiero:'Retiros / financiero',otro:'Otros',pendiente:'A clasificar'};
+const RUBRO_KEYS=Object.keys(RUBROS);
 let PARSED=null;
 
 const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
@@ -243,16 +262,19 @@ async function startApp(){
 }
 async function loadAll(){
   try{
-    const [c,i,ins,mb,vt]=await Promise.all([
+    const [c,i,ins,mb,vt,rm]=await Promise.all([
       fetch(`${SB_URL}/rest/v1/compras?select=*&order=fecha.asc`,{headers:H}).then(r=>r.json()),
       fetch(`${SB_URL}/rest/v1/compra_items?select=*`,{headers:H}).then(r=>r.json()),
       fetch(`${SB_URL}/rest/v1/insumos?select=id,nombre,categoria`,{headers:H}).then(r=>r.json()),
       fetch(`${SB_URL}/rest/v1/movimientos_banco?select=*`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-      fetch(`${SB_URL}/rest/v1/ventas?select=*&order=fecha.asc`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[])
+      fetch(`${SB_URL}/rest/v1/ventas?select=*&order=fecha.asc`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(`${SB_URL}/rest/v1/rubro_map?select=clave,rubro`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[])
     ]);
     COMPRAS=Array.isArray(c)?c:[]; ITEMS=Array.isArray(i)?i:[]; INSUMOS={};
     (Array.isArray(ins)?ins:[]).forEach(x=>INSUMOS[x.id]={nombre:x.nombre,categoria:x.categoria});
     MOVBANCO=Array.isArray(mb)?mb:[]; VENTAS=Array.isArray(vt)?vt:[];
+    RUBRO_MAP={}; (Array.isArray(rm)?rm:[]).forEach(x=>RUBRO_MAP[x.clave]=x.rubro);
+    PROV_CUITS=new Set(COMPRAS.map(c=>(c.cuit||'').replace(/\D/g,'')).filter(s=>s.length===11));
   }catch(e){ document.getElementById('tab-compras').innerHTML='<div class="loading">Error cargando datos: '+e+'</div>'; }
 }
 async function reloadBanco(){
@@ -265,10 +287,10 @@ async function reloadVentas(){
 function setTab(t){
   tab=t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
-  ['compras','banco','facturacion','resumen'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hide',x!==t));
+  ['compras','banco','facturacion','cashflow','resumen'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hide',x!==t));
   render();
 }
-function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') renderBanco(); else if(tab==='facturacion') renderFacturacion(); else renderResumen(); }
+function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') renderBanco(); else if(tab==='facturacion') renderFacturacion(); else if(tab==='cashflow') renderCashflow(); else renderResumen(); }
 
 // ============ util período ============
 function periodKey(fecha,per){ if(!fecha||typeof fecha!=='string')return 'sf'; const dt=new Date(fecha+'T00:00:00'); if(isNaN(dt))return 'sf'; if(per==='dia')return fecha; if(per==='mes')return fecha.slice(0,7); const day=(dt.getDay()+6)%7, mon=new Date(dt); mon.setDate(dt.getDate()-day); return mon.toISOString().slice(0,10); }
@@ -655,6 +677,77 @@ async function confirmCobros(){
   }
   toast(`Conciliadas ${ok} de ${sel.length} ✓`);
   renderBanco();
+}
+
+// ============ CASH FLOW / estructura de costos ============
+function cuitDe(m){ return ((m.concepto||'').match(/\b(\d{11})\b/)||[])[1]||null; }
+function autoRubro(m){
+  if(m.rubro) return m.rubro;
+  const cat=m.categoria, con=(m.concepto||'').toUpperCase(), cuit=cuitDe(m);
+  if(cuit && RUBRO_MAP[cuit]) return RUBRO_MAP[cuit];
+  if(cat==='impuesto') return 'impuestos';
+  if(cat==='servicio') return 'servicios';
+  if(cat==='comision_bancaria') return 'comisiones';
+  if(cat==='extraccion_efectivo') return 'retiros';
+  if(cat==='interno') return 'otros';
+  if(cat==='egreso_transferencia'){
+    if(/ALQ/.test(con)) return 'alquiler';
+    if(/HON|SUELDO|JORNAL|QUINCENA/.test(con)) return 'sueldos';
+    if(cuit==='20288038903') return 'retiros';
+    if(cuit && PROV_CUITS.has(cuit)) return 'mercaderia';
+    if(/FAC/.test(con)) return 'mercaderia';
+    return 'a_clasificar';
+  }
+  return 'a_clasificar';
+}
+async function setRubro(id,rubro){
+  const m=MOVBANCO.find(x=>x.id===id); if(!m)return; const prev=m.rubro; m.rubro=rubro;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/movimientos_banco?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({rubro})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const cuit=cuitDe(m);
+    if(cuit){ RUBRO_MAP[cuit]=rubro; fetch(`${SB_URL}/rest/v1/rubro_map?on_conflict=clave`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({clave:cuit,rubro})}).catch(()=>{}); }
+    renderCashflow(); toast('Rubro: '+(RUBROS[rubro]?RUBROS[rubro].l:rubro));
+  }catch(e){ m.rubro=prev; toast('No se pudo guardar (¿corriste el SQL de rubros?): '+e.message,true); }
+}
+function rubroSelect(m){ const cur=autoRubro(m); return `<select class="catsel" onchange="setRubro('${m.id}',this.value)">${RUBRO_KEYS.map(k=>`<option value="${k}" ${k===cur?'selected':''}>${RUBROS[k].l}</option>`).join('')}</select>`; }
+function renderCashflow(){
+  const host=document.getElementById('tab-cashflow');
+  if(!MOVBANCO.length){ host.innerHTML='<div class="note">Cash Flow y estructura de costos. Subí el export de Macro en la pestaña Banco para ver los números.</div>'; return; }
+  const egresos=MOVBANCO.filter(m=>+m.importe<0);
+  const ingresos=MOVBANCO.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
+  const porRubro={}; egresos.forEach(m=>{const r=autoRubro(m); porRubro[r]=(porRubro[r]||0)+(-+m.importe);});
+  const porTipo={variable:0,fijo:0,impuesto:0,financiero:0,otro:0,pendiente:0};
+  Object.entries(porRubro).forEach(([r,v])=>{ const t=RUBROS[r]?RUBROS[r].t:'otro'; porTipo[t]+=v; });
+  const variable=porTipo.variable, fijo=porTipo.fijo, imp=porTipo.impuesto, pend=porTipo.pendiente;
+  const margen=ingresos-variable, resultado=margen-fijo-imp;
+  const mPct=ingresos?margen/ingresos*100:0, peq=mPct>0?fijo/(mPct/100):null;
+  const pct=v=>ingresos?((v/ingresos*100).toFixed(1)+'%'):'—';
+  const nPend=egresos.filter(m=>autoRubro(m)==='a_clasificar').length;
+  const kpis=`<div class="kpis">
+    <div class="kpi good"><div class="k">Ingresos (cobros)</div><div class="v pos">${money(ingresos)}</div><div class="s">entra al banco</div></div>
+    <div class="kpi"><div class="k">Costos variables</div><div class="v">${money(variable)}</div><div class="s">${pct(variable)} de ventas</div></div>
+    <div class="kpi"><div class="k">Margen de contribución</div><div class="v ${margen>=0?'pos':'neg'}">${money(margen)}</div><div class="s">${mPct.toFixed(1)}%</div></div>
+    <div class="kpi"><div class="k">Costos fijos</div><div class="v">${money(fijo)}</div><div class="s">${pct(fijo)} de ventas</div></div>
+    <div class="kpi"><div class="k">Impuestos</div><div class="v">${money(imp)}</div><div class="s">${pct(imp)} de ventas</div></div>
+    <div class="kpi ${resultado>=0?'good':'hot'}"><div class="k">Resultado</div><div class="v ${resultado>=0?'pos':'neg'}">${money(resultado)}</div><div class="s">ingresos − costos − imp.</div></div>
+  </div>`;
+  const tiposOrden=['variable','fijo','impuesto','financiero','otro','pendiente'];
+  const maxv=Math.max(1,...Object.values(porRubro));
+  const estr=tiposOrden.filter(t=>porTipo[t]>0).map(t=>{
+    const rubrosT=Object.entries(porRubro).filter(([r])=>(RUBROS[r]?RUBROS[r].t:'otro')===t).sort((a,b)=>b[1]-a[1]);
+    return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:5px"><span>${TIPO_LABEL[t]}</span><span class="muted">${money(porTipo[t])} · ${pct(porTipo[t])}</span></div>${rubrosT.map(([r,v])=>`<div class="bar-row"><div class="nm">${RUBROS[r]?RUBROS[r].l:r}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxv*100).toFixed(1)}%;background:${t==='impuesto'?'linear-gradient(90deg,#ffb84d,#ffd699)':t==='variable'?'linear-gradient(90deg,#4f9dff,#7bb8ff)':t==='fijo'?'linear-gradient(90deg,#3ad19b,#7be0bf)':'linear-gradient(90deg,#9aa3b2,#c3c9d4)'}"></div></div><div class="amt">${money(v)}</div></div>`).join('')}</div>`;
+  }).join('');
+  const estrCard=`<div class="card"><h3>Estructura de costos <span class="sub">· por tipo y rubro</span></h3>${estr}${peq?`<div class="note" style="margin-top:6px">Punto de equilibrio: hay que facturar <b>${money(peq)}</b> por período para cubrir los costos fijos (margen ${mPct.toFixed(1)}%).</div>`:''}</div>`;
+  const pend2=egresos.filter(m=>autoRubro(m)==='a_clasificar').sort((a,b)=>a.importe-b.importe);
+  const clasCard = pend2.length?`<div class="card"><h3>A clasificar <span class="sub">· ${pend2.length} mov · ${money(pend)}</span></h3><div class="muted" style="margin-bottom:8px">Asigná el rubro y el sistema lo recuerda para el mismo beneficiario (por CUIT), así la próxima ya lo toma solo.</div><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Rubro</th></tr></thead><tbody>${pend2.map(m=>`<tr><td>${m.fecha||''}</td><td title="${m.concepto||''}">${(m.concepto||'').slice(0,40)}</td><td class="num neg">${money(m.importe)}</td><td>${rubroSelect(m)}</td></tr>`).join('')}</tbody></table></div></div>`:`<div class="card"><h3>A clasificar</h3><div class="muted">Todo clasificado ✓</div></div>`;
+  const perMap={}; MOVBANCO.forEach(m=>{const k=periodKey(m.fecha,cfPeriodo); perMap[k]=perMap[k]||{in:0,out:0}; if(+m.importe>=0)perMap[k].in+=+m.importe; else perMap[k].out+=+m.importe;});
+  const pk=Object.keys(perMap).sort(); const pmax=Math.max(1,...pk.map(k=>Math.max(perMap[k].in,-perMap[k].out)));
+  const cf=`<div class="card"><h3>Flujo de caja <span class="sub">· por ${cfPeriodo} · verde entra / rojo sale</span></h3><div class="cf-bars">${pk.map(k=>`<div class="cf-col" title="entra ${money(perMap[k].in)} / sale ${money(perMap[k].out)}"><div class="cf-in" style="height:${Math.round(perMap[k].in/pmax*80)}px"></div><div class="cf-out" style="height:${Math.round(-perMap[k].out/pmax*80)}px"></div><div class="cf-lab">${periodLabel(k,cfPeriodo)}</div></div>`).join('')}</div></div>`;
+  const all=[...egresos].sort((a,b)=>a.importe-b.importe);
+  const fullCard=`<div class="card"><h3>Todos los egresos <span class="sub">· ${all.length} · cambiá el rubro si algo quedó mal</span></h3><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Rubro</th></tr></thead><tbody>${all.map(m=>`<tr><td>${m.fecha||''}</td><td title="${m.concepto||''}">${(m.concepto||'').slice(0,38)}</td><td class="num neg">${money(m.importe)}</td><td>${rubroSelect(m)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const nota=`<div class="note">Cash Flow y estructura de costos a partir del banco. Los egresos se agrupan en rubros y por tipo (variable / fijo / impuestos).${nPend?` <b>${nPend} movimiento(s) sin clasificar</b> — el resultado es parcial hasta terminar de clasificarlos abajo.`:''}</div>`;
+  host.innerHTML=nota+kpis+estrCard+clasCard+cf+fullCard;
 }
 
 // ============ RESUMEN ============
