@@ -144,7 +144,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v10 · 25-08';
+const BUILD = 'v11 · 25-08';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -686,6 +686,7 @@ function cuitDe(m){ return ((m.concepto||'').match(/\b(\d{11})\b/)||[])[1]||null
 function normTxt(s){ return (s||'').toUpperCase().replace(/[0-9]/g,' ').replace(/[^A-ZÁÉÍÓÚÑ ]/g,' ').replace(/\s+/g,' ').trim(); }
 function autoRubro(m){
   if(m.rubro) return m.rubro;
+  if(m.compra_id) return 'mercaderia';
   const cat=m.categoria, con=(m.concepto||'').toUpperCase(), cuit=cuitDe(m);
   if(cuit && RUBRO_MAP[cuit]) return RUBRO_MAP[cuit];
   const nc=normTxt(m.concepto);
