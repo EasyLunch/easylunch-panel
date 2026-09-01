@@ -144,7 +144,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v11 · 25-08';
+const BUILD = 'v12 · 01-09';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -180,19 +180,35 @@ let fPeriodo='mes', cobroFilt='todos', clienteFilt='todos';
 let cfPeriodo='mes';
 let RUBRO_MAP={}, PROV_CUITS=new Set(), REGLAS=[];
 const RUBROS={
-  mercaderia:{l:'Mercadería / materia prima',t:'variable'},
-  logistica:{l:'Logística / delivery',t:'variable'},
-  comisiones:{l:'Comisiones y gastos bancarios',t:'variable'},
-  sueldos:{l:'Sueldos y honorarios',t:'fijo'},
+  mercaderia:{l:'Materia prima / insumos',t:'variable'},
+  descartables:{l:'Descartables',t:'variable'},
+  logistica:{l:'Logística / delivery',t:'indirecto'},
+  libreria:{l:'Librería',t:'indirecto'},
+  farmacia:{l:'Farmacia',t:'indirecto'},
+  mantenimiento:{l:'Mantenimiento',t:'indirecto'},
+  equipamiento:{l:'Equipamiento',t:'indirecto'},
+  otros_ind:{l:'Otros indirectos',t:'indirecto'},
+  sueldos:{l:'Sueldos',t:'fijo'},
   cargas:{l:'Cargas sociales',t:'fijo'},
+  honorarios:{l:'Honorarios (contador/abogado/desinf.)',t:'fijo'},
+  servicios:{l:'Servicios (agua/luz/gas/internet)',t:'fijo'},
   alquiler:{l:'Alquiler',t:'fijo'},
-  servicios:{l:'Servicios (luz/gas/internet)',t:'fijo'},
-  impuestos:{l:'Impuestos',t:'impuesto'},
+  comisiones:{l:'Gastos bancarios',t:'fijo'},
+  sistema:{l:'Gastos de sistema',t:'fijo'},
+  marketing:{l:'Comercial / marketing',t:'fijo'},
+  seguros:{l:'Seguros',t:'fijo'},
+  plataformas:{l:'Plataformas',t:'fijo'},
+  otros_fijos:{l:'Otros fijos',t:'fijo'},
+  iibb:{l:'Ingresos brutos',t:'impuesto'},
+  iva:{l:'IVA (y planes de IVA)',t:'impuesto'},
+  autonomos:{l:'Autónomos / monotributo',t:'impuesto'},
+  imp_cheque:{l:'Impuesto al cheque',t:'impuesto'},
+  impuestos:{l:'Otros impuestos',t:'impuesto'},
   retiros:{l:'Retiros de socios / efectivo',t:'financiero'},
   otros:{l:'Otros',t:'otro'},
   a_clasificar:{l:'A clasificar',t:'pendiente'}
 };
-const TIPO_LABEL={variable:'Costos variables',fijo:'Costos fijos',impuesto:'Impuestos',financiero:'Retiros / financiero',otro:'Otros',pendiente:'A clasificar'};
+const TIPO_LABEL={variable:'Costos variables',indirecto:'Costos indirectos',fijo:'Costos fijos',impuesto:'Impuestos',financiero:'Retiros / financiero',otro:'Otros',pendiente:'A clasificar'};
 const RUBRO_KEYS=Object.keys(RUBROS);
 let PARSED=null;
 
@@ -691,14 +707,21 @@ function autoRubro(m){
   if(cuit && RUBRO_MAP[cuit]) return RUBRO_MAP[cuit];
   const nc=normTxt(m.concepto);
   for(const rg of REGLAS){ const p=normTxt(rg.patron); if(p && nc.includes(p)) return rg.rubro; }
-  if(cat==='impuesto') return 'impuestos';
+  if(cat==='impuesto'){
+    if(/ING.*BRUT|IIBB|ARBA|AGIP|RENTAS|SIRCREB/.test(con)) return 'iibb';
+    if(/AUTONOMO|MONOTRIB/.test(con)) return 'autonomos';
+    if(/IVA/.test(con)) return 'iva';
+    if(/LEY\s*25413|DEB.*CRED|CRED.*DEB|IMP.*CHEQUE|DEBITOS Y CRED/.test(con)) return 'imp_cheque';
+    return 'impuestos';
+  }
   if(cat==='servicio') return 'servicios';
   if(cat==='comision_bancaria') return 'comisiones';
   if(cat==='extraccion_efectivo') return 'retiros';
   if(cat==='interno') return 'otros';
   if(cat==='egreso_transferencia'){
     if(/ALQ/.test(con)) return 'alquiler';
-    if(/HON|SUELDO|JORNAL|QUINCENA/.test(con)) return 'sueldos';
+    if(/HON/.test(con)) return 'honorarios';
+    if(/SUELDO|JORNAL|QUINCENA|SALARIO/.test(con)) return 'sueldos';
     if(cuit==='20288038903') return 'retiros';
     if(cuit && PROV_CUITS.has(cuit)) return 'mercaderia';
     if(/FAC/.test(con)) return 'mercaderia';
@@ -747,28 +770,31 @@ function renderCashflow(){
   const egresos=MOVBANCO.filter(m=>+m.importe<0);
   const ingresos=MOVBANCO.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
   const porRubro={}; egresos.forEach(m=>{const r=autoRubro(m); porRubro[r]=(porRubro[r]||0)+(-+m.importe);});
-  const porTipo={variable:0,fijo:0,impuesto:0,financiero:0,otro:0,pendiente:0};
+  const porTipo={variable:0,indirecto:0,fijo:0,impuesto:0,financiero:0,otro:0,pendiente:0};
   Object.entries(porRubro).forEach(([r,v])=>{ const t=RUBROS[r]?RUBROS[r].t:'otro'; porTipo[t]+=v; });
-  const variable=porTipo.variable, fijo=porTipo.fijo, imp=porTipo.impuesto, pend=porTipo.pendiente;
-  const margen=ingresos-variable, resultado=margen-fijo-imp;
-  const mPct=ingresos?margen/ingresos*100:0, peq=mPct>0?fijo/(mPct/100):null;
+  const variable=porTipo.variable, indir=porTipo.indirecto, fijo=porTipo.fijo, imp=porTipo.impuesto, pend=porTipo.pendiente;
+  const estructura=fijo+indir;
+  const margen=ingresos-variable, resultado=margen-indir-fijo-imp;
+  const mPct=ingresos?margen/ingresos*100:0, peq=mPct>0?estructura/(mPct/100):null;
   const pct=v=>ingresos?((v/ingresos*100).toFixed(1)+'%'):'—';
   const nPend=egresos.filter(m=>autoRubro(m)==='a_clasificar').length;
   const kpis=`<div class="kpis">
     <div class="kpi good"><div class="k">Ingresos (cobros)</div><div class="v pos">${money(ingresos)}</div><div class="s">entra al banco</div></div>
     <div class="kpi"><div class="k">Costos variables</div><div class="v">${money(variable)}</div><div class="s">${pct(variable)} de ventas</div></div>
     <div class="kpi"><div class="k">Margen de contribución</div><div class="v ${margen>=0?'pos':'neg'}">${money(margen)}</div><div class="s">${mPct.toFixed(1)}%</div></div>
+    <div class="kpi"><div class="k">Costos indirectos</div><div class="v">${money(indir)}</div><div class="s">${pct(indir)} de ventas</div></div>
     <div class="kpi"><div class="k">Costos fijos</div><div class="v">${money(fijo)}</div><div class="s">${pct(fijo)} de ventas</div></div>
     <div class="kpi"><div class="k">Impuestos</div><div class="v">${money(imp)}</div><div class="s">${pct(imp)} de ventas</div></div>
     <div class="kpi ${resultado>=0?'good':'hot'}"><div class="k">Resultado</div><div class="v ${resultado>=0?'pos':'neg'}">${money(resultado)}</div><div class="s">ingresos − costos − imp.</div></div>
   </div>`;
-  const tiposOrden=['variable','fijo','impuesto','financiero','otro','pendiente'];
+  const tiposOrden=['variable','indirecto','fijo','impuesto','financiero','otro','pendiente'];
+  const tipoColor={variable:'linear-gradient(90deg,#4f9dff,#7bb8ff)',indirecto:'linear-gradient(90deg,#b98cff,#d4bcff)',fijo:'linear-gradient(90deg,#3ad19b,#7be0bf)',impuesto:'linear-gradient(90deg,#ffb84d,#ffd699)',financiero:'linear-gradient(90deg,#ff8fa3,#ffc2cd)'};
   const maxv=Math.max(1,...Object.values(porRubro));
   const estr=tiposOrden.filter(t=>porTipo[t]>0).map(t=>{
     const rubrosT=Object.entries(porRubro).filter(([r])=>(RUBROS[r]?RUBROS[r].t:'otro')===t).sort((a,b)=>b[1]-a[1]);
-    return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:5px"><span>${TIPO_LABEL[t]}</span><span class="muted">${money(porTipo[t])} · ${pct(porTipo[t])}</span></div>${rubrosT.map(([r,v])=>`<div class="bar-row"><div class="nm">${RUBROS[r]?RUBROS[r].l:r}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxv*100).toFixed(1)}%;background:${t==='impuesto'?'linear-gradient(90deg,#ffb84d,#ffd699)':t==='variable'?'linear-gradient(90deg,#4f9dff,#7bb8ff)':t==='fijo'?'linear-gradient(90deg,#3ad19b,#7be0bf)':'linear-gradient(90deg,#9aa3b2,#c3c9d4)'}"></div></div><div class="amt">${money(v)}</div></div>`).join('')}</div>`;
+    return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:5px"><span>${TIPO_LABEL[t]}</span><span class="muted">${money(porTipo[t])} · ${pct(porTipo[t])}</span></div>${rubrosT.map(([r,v])=>`<div class="bar-row"><div class="nm">${RUBROS[r]?RUBROS[r].l:r}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxv*100).toFixed(1)}%;background:${tipoColor[t]||'linear-gradient(90deg,#9aa3b2,#c3c9d4)'}"></div></div><div class="amt">${money(v)}</div></div>`).join('')}</div>`;
   }).join('');
-  const estrCard=`<div class="card"><h3>Estructura de costos <span class="sub">· por tipo y rubro</span></h3>${estr}${peq?`<div class="note" style="margin-top:6px">Punto de equilibrio: hay que facturar <b>${money(peq)}</b> por período para cubrir los costos fijos (margen ${mPct.toFixed(1)}%).</div>`:''}</div>`;
+  const estrCard=`<div class="card"><h3>Estructura de costos <span class="sub">· por tipo y rubro</span></h3>${estr}${peq?`<div class="note" style="margin-top:6px">Punto de equilibrio: hay que facturar <b>${money(peq)}</b> por período para cubrir los costos fijos e indirectos (margen ${mPct.toFixed(1)}%).</div>`:''}</div>`;
   const reglasList = REGLAS.length?REGLAS.map(r=>`<span class="chip" style="margin:0 4px 4px 0;display:inline-block">${r.patron} → ${RUBROS[r.rubro]?RUBROS[r.rubro].l:r.rubro} <span onclick="delRegla('${r.patron}')" style="cursor:pointer;color:var(--bad)">✕</span></span>`).join(''):'<span class="muted">Sin reglas todavía. Ej: escribí YAGUAR y elegí Mercadería.</span>';
   const reglasCard=`<div class="card"><h3>Reglas por palabra <span class="sub">· automatizá por texto</span></h3><div style="margin-bottom:10px">${reglasList}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="regInput" placeholder="Palabra (ej: SUPER, YAGUAR, CARNES)" style="flex:1;min-width:150px"><select id="regRubro">${RUBRO_KEYS.filter(k=>k!=='a_clasificar').map(k=>`<option value="${k}">${RUBROS[k].l}</option>`).join('')}</select><button class="btn" onclick="addRegla()">Agregar</button></div><div class="muted" style="font-size:12px;margin-top:6px">Cualquier egreso cuyo concepto contenga esa palabra se clasifica solo, ahora y en el futuro.</div></div>`;
   const grupos={}; egresos.forEach(m=>{ const k=grupoKey(m); if(!grupos[k]) grupos[k]={key:k,s:0,n:0,ej:m.concepto||'',cur:autoRubro(m)}; grupos[k].s+=-+m.importe; grupos[k].n++; });
