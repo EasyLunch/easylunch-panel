@@ -145,7 +145,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v14 · 02-09';
+const BUILD = 'v15 · 02-09';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -204,6 +204,7 @@ const RUBROS={
   otros_fijos:{l:'Otros fijos',t:'fijo'},
   iibb:{l:'Ingresos brutos',t:'impuesto'},
   iva:{l:'IVA (y planes de IVA)',t:'impuesto'},
+  ganancias:{l:'Ganancias / retenciones',t:'impuesto'},
   autonomos:{l:'Autónomos / monotributo',t:'impuesto'},
   imp_cheque:{l:'Impuesto al cheque',t:'impuesto'},
   impuestos:{l:'Otros impuestos',t:'impuesto'},
@@ -225,6 +226,9 @@ function esPagada(c){ return (c.estado_pago||'pendiente')==='pagada' || ((+c.tot
 function esParcial(c){ return !esPagada(c) && pagadoDe(c)>0.5; }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function esCobrada(v){ return (v.estado_cobro||'pendiente')==='cobrado'; }
+function retTotal(v){ return (+v.ret_iva||0)+(+v.ret_ganancias||0)+(+v.ret_iibb||0)+(+v.ret_suss||0)+(+v.ret_otro||0); }
+function retInputs(v){ v=v||{}; const f=(id,lbl,val)=>`<div style="flex:1"><span class="muted" style="font-size:11px">${lbl}</span><input type="number" step="any" id="${id}" value="${+val||0}"></div>`; return `<label style="margin-top:8px">Retenciones (impuestos descontados al cobrar)</label><div style="display:flex;gap:6px">${f('r_iva','IVA',v.ret_iva)}${f('r_gan','Ganancias',v.ret_ganancias)}${f('r_iibb','Ing.Brutos',v.ret_iibb)}</div><div style="display:flex;gap:6px;margin-top:6px">${f('r_suss','SUSS',v.ret_suss)}${f('r_otro','Otras',v.ret_otro)}</div>`; }
+function retVals(){ const g=id=>{const e=document.getElementById(id); return e?(+e.value||0):0;}; return {ret_iva:g('r_iva'),ret_ganancias:g('r_gan'),ret_iibb:g('r_iibb'),ret_suss:g('r_suss'),ret_otro:g('r_otro')}; }
 
 // ---------- categorías banco ----------
 const CAUSAL_CAT={'2027':'ingreso_transferencia','3956':'ingreso_transferencia','3862':'ingreso_transferencia','4016':'ingreso_transferencia','4013':'ingreso_transferencia','4066':'ingreso_transferencia','493':'ingreso_transferencia','14':'ingreso_cheque','3913':'egreso_transferencia','4213':'egreso_transferencia','4085':'egreso_transferencia','3713':'egreso_transferencia','4202':'egreso_tarjeta','3702':'egreso_tarjeta','1059':'egreso_tarjeta','1684':'impuesto','1685':'impuesto','1297':'impuesto','4196':'impuesto','3914':'comision_bancaria','4190':'extraccion_efectivo','3690':'extraccion_efectivo','4274':'extraccion_efectivo','1994':'interno','23':'servicio'};
@@ -646,7 +650,7 @@ function renderFacturacionBody(){
   const rs=[...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const tabla=`<div class="card"><h3>Facturas emitidas <span class="sub">· ${rows.length}</span></h3><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Emisor</th><th>Nº</th><th class="num">Total</th><th>Cobro</th></tr></thead><tbody>${rs.map(v=>{
     const cob=esCobrada(v); let cc;
-    if(cob){const info=[v.fecha_cobro].filter(Boolean).join(' · ');cc=`<span class="badge pag">Cobrada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''}<button class="rev-btn" onclick="event.stopPropagation();revertCobro('${v.id}')">↩</button>`;}
+    if(cob){const rt=retTotal(v);const info=[v.fecha_cobro, rt>0.5?('ret '+money(rt)):''].filter(Boolean).join(' · ');cc=`<span class="badge pag">Cobrada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''} <button class="rev-btn" title="Cargar/editar retenciones" onclick="event.stopPropagation();openRet('${v.id}')">%</button><button class="rev-btn" onclick="event.stopPropagation();revertCobro('${v.id}')">↩</button>`;}
     else cc=`<button class="pay-btn" onclick="event.stopPropagation();openCobro('${v.id}')">Marcar cobrada</button>`;
     const emi=(v.emisor||'').replace('BRONSTEIN PABLO DAMIAN','Bronstein').replace('BAD KITCHEN S.R.L.','Bad Kitchen').replace('ALIMENTO COTIDIANO S.R.L.','Alim. Cotidiano');
     return `<tr><td>${v.fecha||''}</td><td title="${v.cliente||''}">${(v.cliente||'—').slice(0,30)}</td><td class="muted">${emi}</td><td>${v.tipo||''} ${v.punto_venta||''}-${v.nro_comprobante||''}</td><td class="num">${money(v.total)}</td><td>${cc}</td></tr>`;
@@ -720,10 +724,14 @@ async function scanFacturas(){
 // ============ cobros ventas (marcado manual) ============
 function findVenta(id){return VENTAS.find(v=>v.id===id);}
 function openCobro(id){ const v=findVenta(id); if(!v)return; const hoy=new Date().toISOString().slice(0,10);
-  document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Marcar como cobrada</h3><p class="who">${v.cliente||'—'} · ${v.nro_comprobante||''} · <b>${money(v.total)}</b></p><label>Fecha de cobro</label><input type="date" id="cf" value="${hoy}"><div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="confirmCobro('${id}')">Confirmar</button></div></div></div>`;
+  document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Marcar como cobrada</h3><p class="who">${esc(v.cliente||'—')} · ${esc(v.nro_comprobante||'')} · <b>${money(v.total)}</b></p><label>Fecha de cobro</label><input type="date" id="cf" value="${v.fecha_cobro||hoy}">${retInputs(v)}<div class="muted" style="font-size:11px;margin-top:4px">Las retenciones van a Impuestos en el Cash Flow.</div><div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="confirmCobro('${id}')">Confirmar</button></div></div></div>`;
 }
-async function patchVenta(id,body){ const r=await fetch(`${SB_URL}/rest/v1/ventas?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)}); if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,100)); }
-async function confirmCobro(id){ const fecha=document.getElementById('cf').value||new Date().toISOString().slice(0,10); try{ await patchVenta(id,{estado_cobro:'cobrado',fecha_cobro:fecha}); const v=findVenta(id); if(v){v.estado_cobro='cobrado';v.fecha_cobro=fecha;} closeModal(); renderFacturacion(); toast('Marcada como cobrada ✓'); }catch(e){ toast('No se pudo guardar: '+e.message,true); } }
+function openRet(id){ const v=findVenta(id); if(!v)return;
+  document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Retenciones de la factura</h3><p class="who">${esc(v.cliente||'—')} · ${esc(v.nro_comprobante||'')} · <b>${money(v.total)}</b></p>${retInputs(v)}<div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="confirmRet('${id}')">Guardar</button></div></div></div>`;
+}
+async function patchVenta(id,body){ const url=`${SB_URL}/rest/v1/ventas?id=eq.${encodeURIComponent(id)}`; let r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)}); if(!r.ok && /ret_/.test(JSON.stringify(body))){ const b2={...body}; ['ret_iva','ret_ganancias','ret_iibb','ret_suss','ret_otro'].forEach(k=>delete b2[k]); r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(b2)}); if(r.ok) throw new Error('SIN_RET'); } if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,100)); }
+async function confirmCobro(id){ const fecha=document.getElementById('cf').value||new Date().toISOString().slice(0,10); const ret=retVals(); const v=findVenta(id); try{ await patchVenta(id,{estado_cobro:'cobrado',fecha_cobro:fecha,...ret}); if(v){v.estado_cobro='cobrado';v.fecha_cobro=fecha;Object.assign(v,ret);} closeModal(); renderFacturacion(); toast('Marcada como cobrada ✓'); }catch(e){ if(e.message==='SIN_RET'){ if(v){v.estado_cobro='cobrado';v.fecha_cobro=fecha;} closeModal(); renderFacturacion(); toast('Cobrada ✓ (corré el SQL de retenciones para guardarlas)',true); } else toast('No se pudo guardar: '+e.message,true); } }
+async function confirmRet(id){ const ret=retVals(); const v=findVenta(id); try{ await patchVenta(id,{...ret}); if(v)Object.assign(v,ret); closeModal(); renderFacturacion(); toast('Retenciones guardadas ✓'); }catch(e){ if(e.message==='SIN_RET'){ toast('Falta correr el SQL de retenciones en Supabase.',true); } else toast('No se pudo: '+e.message,true); } }
 async function revertCobro(id){ try{ await patchVenta(id,{estado_cobro:'pendiente',fecha_cobro:null,movimiento_id:null}); const v=findVenta(id); if(v){v.estado_cobro='pendiente';v.fecha_cobro=null;v.movimiento_id=null;} renderFacturacion(); toast('Vuelta a pendiente'); }catch(e){ toast('No se pudo: '+e.message,true); } }
 
 // ============ CONCILIACIÓN (ingresos banco → ventas) ============
@@ -847,8 +855,13 @@ function renderCashflow(){
   if(!MOVBANCO.length){ host.innerHTML='<div class="note">Cash Flow y estructura de costos. Subí el export de Macro en la pestaña Banco para ver los números.</div>'; return; }
   const MBF=MOVBANCO.filter(m=>enRango(m.fecha));
   const egresos=MBF.filter(m=>+m.importe<0);
-  const ingresos=MBF.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
+  let ingresos=MBF.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
   const porRubro={}; egresos.forEach(m=>{const r=autoRubro(m); porRubro[r]=(porRubro[r]||0)+(-+m.importe);});
+  // Retenciones de impuestos sobre ventas cobradas → suman a impuestos (y a ingresos brutos, para no distorsionar la caja)
+  const RET_RUBRO={ret_iva:'iva',ret_ganancias:'ganancias',ret_iibb:'iibb',ret_suss:'impuestos',ret_otro:'impuestos'};
+  let retTot=0;
+  VENTAS.filter(v=>esCobrada(v) && enRango(v.fecha_cobro||v.fecha)).forEach(v=>{ Object.keys(RET_RUBRO).forEach(k=>{ const val=+v[k]||0; if(val>0.005){ porRubro[RET_RUBRO[k]]=(porRubro[RET_RUBRO[k]]||0)+val; retTot+=val; } }); });
+  ingresos+=retTot;
   const porTipo={variable:0,indirecto:0,fijo:0,impuesto:0,financiero:0,otro:0,pendiente:0};
   Object.entries(porRubro).forEach(([r,v])=>{ const t=RUBROS[r]?RUBROS[r].t:'otro'; porTipo[t]+=v; });
   const variable=porTipo.variable, indir=porTipo.indirecto, fijo=porTipo.fijo, imp=porTipo.impuesto, pend=porTipo.pendiente;
