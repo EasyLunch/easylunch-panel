@@ -129,6 +129,7 @@ tr.compra:hover td{background:#1b1f28}
   <div class="tab" data-tab="banco" onclick="setTab('banco')">🏦 Banco</div>
   <div class="tab" data-tab="facturacion" onclick="setTab('facturacion')">💵 Facturación</div>
   <div class="tab" data-tab="cashflow" onclick="setTab('cashflow')">💸 Cash Flow</div>
+  <div class="tab" data-tab="proyeccion" onclick="setTab('proyeccion')">📅 Proyección</div>
   <div class="tab" data-tab="resumen" onclick="setTab('resumen')">📊 Resumen</div>
 </div>
 <div id="filtroGlobal"></div>
@@ -137,6 +138,7 @@ tr.compra:hover td{background:#1b1f28}
   <div id="tab-banco" class="hide"></div>
   <div id="tab-facturacion" class="hide"></div>
   <div id="tab-cashflow" class="hide"></div>
+  <div id="tab-proyeccion" class="hide"></div>
   <div id="tab-resumen" class="hide"></div>
 </main>
 </div>
@@ -145,7 +147,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v15 · 02-09';
+const BUILD = 'v16 · 02-09';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -181,6 +183,7 @@ let fPeriodo='mes', cobroFilt='todos', clienteFilt='todos';
 let cfPeriodo='mes';
 let FDESDE='', FHASTA='';
 let PPG=[]; let _paySel=[];
+let PROY=[]; let proyDesde='', proyHasta='';
 let RUBRO_MAP={}, PROV_CUITS=new Set(), REGLAS=[];
 const RUBROS={
   mercaderia:{l:'Materia prima / insumos',t:'variable'},
@@ -290,20 +293,22 @@ async function startApp(){
 }
 async function loadAll(){
   try{
-    const [c,i,ins,mb,vt,rm,rg]=await Promise.all([
+    const [c,i,ins,mb,vt,rm,rg,pr]=await Promise.all([
       fetch(`${SB_URL}/rest/v1/compras?select=*&order=fecha.asc`,{headers:H}).then(r=>r.json()),
       fetch(`${SB_URL}/rest/v1/compra_items?select=*`,{headers:H}).then(r=>r.json()),
       fetch(`${SB_URL}/rest/v1/insumos?select=id,nombre,categoria`,{headers:H}).then(r=>r.json()),
       fetch(`${SB_URL}/rest/v1/movimientos_banco?select=*`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
       fetch(`${SB_URL}/rest/v1/ventas?select=*&order=fecha.asc`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
       fetch(`${SB_URL}/rest/v1/rubro_map?select=clave,rubro`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
-      fetch(`${SB_URL}/rest/v1/regla_rubro?select=patron,rubro`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[])
+      fetch(`${SB_URL}/rest/v1/regla_rubro?select=patron,rubro`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(`${SB_URL}/rest/v1/proyeccion?select=*`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[])
     ]);
     COMPRAS=Array.isArray(c)?c:[]; ITEMS=Array.isArray(i)?i:[]; INSUMOS={};
     (Array.isArray(ins)?ins:[]).forEach(x=>INSUMOS[x.id]={nombre:x.nombre,categoria:x.categoria});
     MOVBANCO=Array.isArray(mb)?mb:[]; VENTAS=Array.isArray(vt)?vt:[];
     RUBRO_MAP={}; (Array.isArray(rm)?rm:[]).forEach(x=>RUBRO_MAP[x.clave]=x.rubro);
     REGLAS=(Array.isArray(rg)?rg:[]).filter(x=>x.patron&&x.rubro);
+    PROY=Array.isArray(pr)?pr:[];
     PROV_CUITS=new Set(COMPRAS.map(c=>(c.cuit||'').replace(/\D/g,'')).filter(s=>s.length===11));
   }catch(e){ document.getElementById('tab-compras').innerHTML='<div class="loading">Error cargando datos: '+e+'</div>'; }
 }
@@ -317,10 +322,10 @@ async function reloadVentas(){
 function setTab(t){
   tab=t;
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
-  ['compras','banco','facturacion','cashflow','resumen'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hide',x!==t));
+  ['compras','banco','facturacion','cashflow','proyeccion','resumen'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hide',x!==t));
   render();
 }
-function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') renderBanco(); else if(tab==='facturacion') renderFacturacion(); else if(tab==='cashflow') renderCashflow(); else renderResumen(); }
+function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') renderBanco(); else if(tab==='facturacion') renderFacturacion(); else if(tab==='cashflow') renderCashflow(); else if(tab==='proyeccion') renderProyeccion(); else renderResumen(); }
 
 // ============ util período ============
 function periodKey(fecha,per){ if(!fecha||typeof fecha!=='string')return 'sf'; const dt=new Date(fecha+'T00:00:00'); if(isNaN(dt))return 'sf'; if(per==='dia')return fecha; if(per==='mes')return fecha.slice(0,7); const day=(dt.getDay()+6)%7, mon=new Date(dt); mon.setDate(dt.getDate()-day); return mon.toISOString().slice(0,10); }
@@ -898,6 +903,60 @@ function renderCashflow(){
   const nota=`<div class="note">Cash Flow y estructura de costos a partir del banco. Clasificá los egresos por <b>beneficiario</b> (abajo) o con <b>reglas por palabra</b>.${nPend?` Quedan <b>${nPend} sin clasificar</b> — el resultado es parcial hasta terminarlos.`:' Todo clasificado ✓'}</div>`;
   host.innerHTML=nota+kpis+estrCard+cf+reglasCard+gruposCard;
 }
+
+// ============ PROYECCIÓN DE GASTOS ============
+function proyMeses(){
+  let d=proyDesde, h=proyHasta;
+  if(!d){ const x=new Date(); x.setMonth(x.getMonth()-2); d=x.toISOString().slice(0,7); }
+  if(!h){ const x=new Date(); x.setMonth(x.getMonth()+6); h=x.toISOString().slice(0,7); }
+  if(d>h){ const t=d; d=h; h=t; }
+  const out=[]; let [y,m]=d.split('-').map(Number); const [hy,hm]=h.split('-').map(Number); let g=0;
+  while((y<hy||(y===hy&&m<=hm)) && g<120){ out.push(y+'-'+String(m).padStart(2,'0')); m++; if(m>12){m=1;y++;} g++; }
+  return out;
+}
+function proyItemMonto(it, ym){
+  const desde=(it.desde||'').slice(0,7); if(!desde||ym<desde) return 0;
+  const n=+it.cuotas||0;
+  if(n>0){ const [dy,dm]=desde.split('-').map(Number); const [yy,mm]=ym.split('-').map(Number); const diff=(yy-dy)*12+(mm-dm); if(diff<0||diff>=n) return 0; }
+  return +it.monto||0;
+}
+function realDelMes(ym){ return MOVBANCO.filter(m=>(m.fecha||'').slice(0,7)===ym && +m.importe<0).reduce((a,m)=>{ const r=autoRubro(m); const t=RUBROS[r]?RUBROS[r].t:'otro'; if(t==='financiero') return a; return a+(-+m.importe); },0); }
+function renderProyeccion(){
+  const host=document.getElementById('tab-proyeccion');
+  const meses=proyMeses(); const cur=new Date().toISOString().slice(0,7);
+  const dDef=proyDesde||meses[0], hDef=proyHasta||meses[meses.length-1];
+  const rango=`<div class="controls"><span class="lbl">Desde</span><input type="month" value="${dDef}" onchange="proyDesde=this.value;renderProyeccion()" style="width:auto"><span class="lbl">Hasta</span><input type="month" value="${hDef}" onchange="proyHasta=this.value;renderProyeccion()" style="width:auto"></div>`;
+  const rubroOpts=RUBRO_KEYS.filter(k=>k!=='a_clasificar').map(k=>`<option value="${k}">${RUBROS[k].l}</option>`).join('');
+  const form=`<div class="card"><h3>Agregar gasto proyectado</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:2;min-width:160px"><label>Concepto</label><input id="prCon" placeholder="Ej: Plan IVA AFIP, Alquiler, Cuota heladera"></div>
+      <div style="flex:1;min-width:130px"><label>Rubro</label><select id="prRub">${rubroOpts}</select></div>
+      <div style="flex:1;min-width:100px"><label>Monto por mes</label><input id="prMon" type="number" step="any"></div>
+      <div style="flex:1;min-width:120px"><label>Desde (mes)</label><input id="prDes" type="month" value="${cur}"></div>
+      <div style="flex:1;min-width:90px"><label>Cuotas</label><input id="prCuo" type="number" min="0" step="1" placeholder="fijo"></div>
+      <button class="btn" onclick="addProy()">Agregar</button>
+    </div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Cuotas = cantidad de meses (plan IVA, tarjeta en cuotas). Vacío o 0 = gasto fijo mensual (sueldos, alquiler…) que se proyecta en todo el rango.</div></div>`;
+  const itemsList = PROY.length? PROY.slice().sort((a,b)=>(a.desde||'').localeCompare(b.desde||'')).map(it=>{ const n=+it.cuotas||0; const desde=(it.desde||'').slice(0,7); return `<div class="bar-row"><div class="nm" style="flex:2">${esc(it.concepto||'—')} <span class="chip">${RUBROS[it.rubro]?RUBROS[it.rubro].l:it.rubro}</span></div><div class="muted" style="font-size:12px;flex:1">${desde}${n>0?(' · '+n+' cuotas'):' · fijo'}</div><div class="amt">${money(it.monto)}/mes</div><span onclick="delProy('${it.id}')" style="cursor:pointer;color:var(--bad);margin-left:8px">✕</span></div>`; }).join('') : '<div class="muted">Todavía no cargaste gastos proyectados. Cargá tus planes de IVA, cuotas de tarjeta y gastos fijos abajo.</div>';
+  const itemsCard=`<div class="card"><h3>Gastos cargados <span class="sub">· ${PROY.length}</span></h3>${itemsList}</div>`;
+  let maxTot=1; const datos=meses.map(ym=>{ const real=realDelMes(ym); const proy=PROY.reduce((a,it)=>a+proyItemMonto(it,ym),0); maxTot=Math.max(maxTot,real,proy); return {ym,real,proy}; });
+  const totProyFut=datos.filter(d=>d.ym>cur).reduce((a,d)=>a+d.proy,0);
+  const tabla=`<div class="card"><h3>Proyección mes a mes <span class="sub">· real (banco) vs proyectado</span></h3>
+    <div class="tbl-wrap"><table><thead><tr><th>Mes</th><th class="num">Real (banco)</th><th class="num">Proyectado</th><th></th></tr></thead><tbody>
+    ${datos.map(d=>{ const fut=d.ym>cur; return `<tr><td>${periodLabel(d.ym,'mes')}${d.ym===cur?' <span class="chip">actual</span>':(fut?' <span class="chip" style="background:#1b2b1b;color:#7be0bf">futuro</span>':'')}</td><td class="num ${d.real?'neg':'muted'}">${d.real?money(d.real):'—'}</td><td class="num">${d.proy?money(d.proy):'—'}</td><td style="width:38%"><div class="bar-track"><div class="bar-fill" style="width:${(Math.max(d.real,d.proy)/maxTot*100).toFixed(1)}%;background:${fut?'linear-gradient(90deg,#b98cff,#d4bcff)':'linear-gradient(90deg,#4f9dff,#7bb8ff)'}"></div></div></td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="note" style="margin-top:8px">Los meses pasados y el actual muestran el gasto <b>real</b> del banco; los futuros, lo <b>proyectado</b> con lo que cargaste. Proyectado total de meses futuros en el rango: <b>${money(totProyFut)}</b>.</div></div>`;
+  host.innerHTML=`<div class="note">Proyección de gastos mes a mes: histórico real + proyección a futuro cargando planes de IVA, cuotas de tarjeta y gastos fijos.</div>${rango}${tabla}${form}${itemsCard}`;
+}
+async function addProy(){
+  const concepto=document.getElementById('prCon').value.trim(); const rubro=document.getElementById('prRub').value;
+  const monto=+document.getElementById('prMon').value||0; const desde=document.getElementById('prDes').value||new Date().toISOString().slice(0,7);
+  const cuotas=Math.max(0,parseInt(document.getElementById('prCuo').value,10)||0);
+  if(!concepto||monto<=0){ toast('Completá concepto y monto.',true); return; }
+  const row={id:(crypto.randomUUID?crypto.randomUUID():'p-'+Date.now()+Math.random().toString(16).slice(2)), tipo:cuotas>0?'cuota':'fijo', concepto, rubro, monto, desde:desde+'-01', cuotas, activo:true};
+  try{ const r=await fetch(`${SB_URL}/rest/v1/proyeccion`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(row)}); if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,120)); PROY.push(row); renderProyeccion(); toast('Gasto proyectado agregado ✓'); }catch(e){ toast('No se pudo guardar (¿corriste el SQL de proyección?): '+e.message,true); }
+}
+async function delProy(id){ try{ await fetch(`${SB_URL}/rest/v1/proyeccion?id=eq.${encodeURIComponent(id)}`,{method:'DELETE',headers:H}); PROY=PROY.filter(x=>String(x.id)!==String(id)); renderProyeccion(); toast('Eliminado'); }catch(e){ toast('No se pudo: '+e.message,true); } }
 
 // ============ RESUMEN ============
 function renderResumen(){
