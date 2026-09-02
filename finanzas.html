@@ -131,6 +131,7 @@ tr.compra:hover td{background:#1b1f28}
   <div class="tab" data-tab="cashflow" onclick="setTab('cashflow')">💸 Cash Flow</div>
   <div class="tab" data-tab="resumen" onclick="setTab('resumen')">📊 Resumen</div>
 </div>
+<div id="filtroGlobal"></div>
 <main>
   <div id="tab-compras"><div class="loading">Cargando…</div></div>
   <div id="tab-banco" class="hide"></div>
@@ -144,7 +145,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v12 · 01-09';
+const BUILD = 'v13 · 01-09';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -178,6 +179,7 @@ let cPeriodo='mes', fiscalFilt='todos', pagoFilt='todos';
 let bPeriodo='mes', tipoFilt='todos', catFilt='todos';
 let fPeriodo='mes', cobroFilt='todos', clienteFilt='todos';
 let cfPeriodo='mes';
+let FDESDE='', FHASTA='';
 let RUBRO_MAP={}, PROV_CUITS=new Set(), REGLAS=[];
 const RUBROS={
   mercaderia:{l:'Materia prima / insumos',t:'variable'},
@@ -274,6 +276,7 @@ async function startApp(){
   const ok=await ensureKey();
   if(!ok){ document.getElementById('tab-compras').innerHTML='<div class="loading">No se pudo obtener la clave de datos. Recargá.</div>'; return; }
   await loadAll();
+  renderFiltroGlobal();
   render();
 }
 async function loadAll(){
@@ -313,6 +316,20 @@ function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') r
 // ============ util período ============
 function periodKey(fecha,per){ if(!fecha||typeof fecha!=='string')return 'sf'; const dt=new Date(fecha+'T00:00:00'); if(isNaN(dt))return 'sf'; if(per==='dia')return fecha; if(per==='mes')return fecha.slice(0,7); const day=(dt.getDay()+6)%7, mon=new Date(dt); mon.setDate(dt.getDate()-day); return mon.toISOString().slice(0,10); }
 function periodLabel(k,per){ if(k==='sf')return 's/fecha'; if(per==='mes'){const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+m-1]+' '+y.slice(2);} if(per==='dia'){const[y,m,d]=k.split('-');return d+'/'+m;} const[y,m,d]=k.split('-');return 'sem '+d+'/'+m; }
+// ============ filtro global por fecha (aplica a todas las solapas) ============
+function enRango(f){ if(!FDESDE&&!FHASTA)return true; if(!f||typeof f!=='string')return false; const d=f.slice(0,10); if(FDESDE&&d<FDESDE)return false; if(FHASTA&&d>FHASTA)return false; return true; }
+function mesesDisponibles(){ const s=new Set(); [].concat(COMPRAS,MOVBANCO,VENTAS).forEach(x=>{const f=x&&x.fecha; if(f&&typeof f==='string'&&f.length>=7)s.add(f.slice(0,7));}); return [...s].sort().reverse(); }
+function mesSel(){ return (FDESDE&&FHASTA&&FDESDE.slice(0,7)===FHASTA.slice(0,7)&&FDESDE.slice(8)==='01'&&FHASTA.slice(8)==='31')?FDESDE.slice(0,7):''; }
+function renderFiltroGlobal(){ const host=document.getElementById('filtroGlobal'); if(!host)return; const meses=mesesDisponibles(), sel=mesSel(), activo=!!(FDESDE||FHASTA);
+  host.className='controls'; host.innerHTML=`<span class="lbl">Desde</span><input type="date" value="${FDESDE}" onchange="setFDesde(this.value)" style="width:auto">
+    <span class="lbl">Hasta</span><input type="date" value="${FHASTA}" onchange="setFHasta(this.value)" style="width:auto">
+    <span class="lbl" style="margin-left:8px">Mes</span><select onchange="setFMes(this.value)" style="width:auto"><option value="">— todos —</option>${meses.map(m=>`<option value="${m}" ${m===sel?'selected':''}>${periodLabel(m,'mes')}</option>`).join('')}</select>
+    ${activo?`<button class="hdr-btn" style="margin-left:8px" onclick="resetFiltro()">✕ Quitar filtro</button><span class="lbl" style="color:var(--acc)">mostrando ${FDESDE||'inicio'} → ${FHASTA||'hoy'}</span>`:'<span class="lbl">sin filtro (todo)</span>'}`;
+}
+function setFDesde(v){ FDESDE=v; renderFiltroGlobal(); render(); }
+function setFHasta(v){ FHASTA=v; renderFiltroGlobal(); render(); }
+function setFMes(v){ if(!v){FDESDE='';FHASTA='';}else{FDESDE=v+'-01';FHASTA=v+'-31';} renderFiltroGlobal(); render(); }
+function resetFiltro(){ FDESDE='';FHASTA=''; renderFiltroGlobal(); render(); }
 
 // ============ COMPRAS ============
 function renderCompras(){
@@ -338,7 +355,7 @@ function wireComprasControls(){
   document.querySelectorAll('#cPag button').forEach(b=>b.onclick=()=>{pagoFilt=b.dataset.g;renderCompras();});
 }
 function renderComprasBody(){
-  const rows=COMPRAS.filter(c=>{ if(fiscalFilt==='fiscal'&&!esFiscal(c))return false; if(fiscalFilt==='nofiscal'&&esFiscal(c))return false; if(pagoFilt==='pagada'&&!esPagada(c))return false; if(pagoFilt==='pendiente'&&esPagada(c))return false; return true; });
+  const rows=COMPRAS.filter(c=>{ if(!enRango(c.fecha))return false; if(fiscalFilt==='fiscal'&&!esFiscal(c))return false; if(fiscalFilt==='nofiscal'&&esFiscal(c))return false; if(pagoFilt==='pagada'&&!esPagada(c))return false; if(pagoFilt==='pendiente'&&esPagada(c))return false; return true; });
   const ids=new Set(rows.map(c=>c.id)), items=ITEMS.filter(it=>ids.has(it.compra_id));
   const sumTotal=rows.reduce((a,c)=>a+(+c.total||0),0), sumNeto=rows.reduce((a,c)=>a+(+c.neto||0),0), sumIva=rows.reduce((a,c)=>a+(+c.iva||0),0);
   const nFis=rows.filter(esFiscal).length, pend=rows.filter(c=>!esPagada(c)).reduce((a,c)=>a+(+c.total||0),0), pag=rows.filter(esPagada).reduce((a,c)=>a+(+c.total||0),0), nPend=rows.filter(c=>!esPagada(c)).length;
@@ -441,7 +458,7 @@ async function saveParsed(){
 function renderBancoBody(){
   const host=document.getElementById('banco-body'); if(!host)return;
   if(!MOVBANCO.length){ host.innerHTML='<div class="card"><div class="muted">Todavía no hay movimientos cargados. Subí el export de Macro arriba.</div></div>'; return; }
-  const movs=MOVBANCO.filter(m=>{ if(tipoFilt!=='todos'&&m.tipo!==tipoFilt)return false; if(catFilt!=='todos'&&m.categoria!==catFilt)return false; return true; });
+  const movs=MOVBANCO.filter(m=>{ if(!enRango(m.fecha))return false; if(tipoFilt!=='todos'&&m.tipo!==tipoFilt)return false; if(catFilt!=='todos'&&m.categoria!==catFilt)return false; return true; });
   const ing=movs.filter(m=>m.importe>0).reduce((a,m)=>a+ +m.importe,0), egr=movs.filter(m=>m.importe<0).reduce((a,m)=>a+ +m.importe,0);
   const saldo=saldoActual(MOVBANCO);
   const perMap={}; movs.forEach(m=>{const k=periodKey(m.fecha,bPeriodo); perMap[k]=perMap[k]||{in:0,out:0}; if(m.importe>=0)perMap[k].in+=+m.importe; else perMap[k].out+=+m.importe;});
@@ -546,7 +563,7 @@ function wireFacturacionControls(){
 function renderFacturacionBody(){
   const body=document.getElementById('fact-body'); if(!body)return;
   if(!VENTAS.length){ body.innerHTML='<div class="card"><div class="muted">Todavía no hay facturas emitidas cargadas.</div></div>'; return; }
-  const rows=VENTAS.filter(v=>{ if(cobroFilt==='cobrado'&&!esCobrada(v))return false; if(cobroFilt==='pendiente'&&esCobrada(v))return false; if(clienteFilt!=='todos'&&v.cliente!==clienteFilt)return false; return true; });
+  const rows=VENTAS.filter(v=>{ if(!enRango(v.fecha))return false; if(cobroFilt==='cobrado'&&!esCobrada(v))return false; if(cobroFilt==='pendiente'&&esCobrada(v))return false; if(clienteFilt!=='todos'&&v.cliente!==clienteFilt)return false; return true; });
   const sumTotal=rows.reduce((a,v)=>a+(+v.total||0),0), sumNeto=rows.reduce((a,v)=>a+(+v.neto||0),0), sumIva=rows.reduce((a,v)=>a+(+v.iva||0),0);
   const cobr=rows.filter(esCobrada).reduce((a,v)=>a+(+v.total||0),0), pend=rows.filter(v=>!esCobrada(v)).reduce((a,v)=>a+(+v.total||0),0);
   const nPend=rows.filter(v=>!esCobrada(v)).length;
@@ -767,8 +784,9 @@ async function delRegla(patron){
 function renderCashflow(){
   const host=document.getElementById('tab-cashflow');
   if(!MOVBANCO.length){ host.innerHTML='<div class="note">Cash Flow y estructura de costos. Subí el export de Macro en la pestaña Banco para ver los números.</div>'; return; }
-  const egresos=MOVBANCO.filter(m=>+m.importe<0);
-  const ingresos=MOVBANCO.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
+  const MBF=MOVBANCO.filter(m=>enRango(m.fecha));
+  const egresos=MBF.filter(m=>+m.importe<0);
+  const ingresos=MBF.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
   const porRubro={}; egresos.forEach(m=>{const r=autoRubro(m); porRubro[r]=(porRubro[r]||0)+(-+m.importe);});
   const porTipo={variable:0,indirecto:0,fijo:0,impuesto:0,financiero:0,otro:0,pendiente:0};
   Object.entries(porRubro).forEach(([r,v])=>{ const t=RUBROS[r]?RUBROS[r].t:'otro'; porTipo[t]+=v; });
@@ -800,7 +818,7 @@ function renderCashflow(){
   const grupos={}; egresos.forEach(m=>{ const k=grupoKey(m); if(!grupos[k]) grupos[k]={key:k,s:0,n:0,ej:m.concepto||'',cur:autoRubro(m)}; grupos[k].s+=-+m.importe; grupos[k].n++; });
   const gArr=Object.values(grupos).sort((a,b)=>b.s-a.s);
   const gruposCard=`<div class="card"><h3>Egresos por beneficiario <span class="sub">· ${gArr.length} grupos · asigná el rubro a todo el grupo de una</span></h3><div class="tbl-wrap"><table><thead><tr><th>Beneficiario / concepto</th><th class="num">Total</th><th class="num">#</th><th>Rubro</th></tr></thead><tbody>${gArr.map(g=>`<tr style="${g.cur==='a_clasificar'?'background:#241d0e':''}"><td title="${(g.ej||'').replace(/"/g,'&quot;')}">${(g.ej||'').slice(0,40)}</td><td class="num neg">${money(-g.s)}</td><td class="num muted">${g.n}</td><td>${grupoSelect(g.key,g.cur)}</td></tr>`).join('')}</tbody></table></div></div>`;
-  const perMap={}; MOVBANCO.forEach(m=>{const k=periodKey(m.fecha,cfPeriodo); perMap[k]=perMap[k]||{in:0,out:0}; if(+m.importe>=0)perMap[k].in+=+m.importe; else perMap[k].out+=+m.importe;});
+  const perMap={}; MBF.forEach(m=>{const k=periodKey(m.fecha,cfPeriodo); perMap[k]=perMap[k]||{in:0,out:0}; if(+m.importe>=0)perMap[k].in+=+m.importe; else perMap[k].out+=+m.importe;});
   const pk=Object.keys(perMap).sort(); const pmax=Math.max(1,...pk.map(k=>Math.max(perMap[k].in,-perMap[k].out)));
   const cf=`<div class="card"><h3>Flujo de caja <span class="sub">· por ${cfPeriodo} · verde entra / rojo sale</span></h3><div class="cf-bars">${pk.map(k=>`<div class="cf-col" title="entra ${money(perMap[k].in)} / sale ${money(perMap[k].out)}"><div class="cf-in" style="height:${Math.round(perMap[k].in/pmax*80)}px"></div><div class="cf-out" style="height:${Math.round(-perMap[k].out/pmax*80)}px"></div><div class="cf-lab">${periodLabel(k,cfPeriodo)}</div></div>`).join('')}</div></div>`;
   const nota=`<div class="note">Cash Flow y estructura de costos a partir del banco. Clasificá los egresos por <b>beneficiario</b> (abajo) o con <b>reglas por palabra</b>.${nPend?` Quedan <b>${nPend} sin clasificar</b> — el resultado es parcial hasta terminarlos.`:' Todo clasificado ✓'}</div>`;
@@ -812,25 +830,28 @@ function renderResumen(){
   const host=document.getElementById('tab-resumen');
   const saldo=saldoActual(MOVBANCO);
   const mesAct=new Date().toISOString().slice(0,7);
-  const mMes=MOVBANCO.filter(m=>(m.fecha||'').slice(0,7)===mesAct);
+  const useR=!!(FDESDE||FHASTA);
+  const inR=f=>useR?enRango(f):((f||'').slice(0,7)===mesAct);
+  const periodoLbl=useR?((FDESDE||'inicio')+' → '+(FHASTA||'hoy')):mesAct;
+  const mMes=MOVBANCO.filter(m=>inR(m.fecha));
   const ingMes=mMes.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0), egrMes=mMes.filter(m=>+m.importe<0).reduce((a,m)=>a+ +m.importe,0);
   const pend=COMPRAS.filter(c=>!esPagada(c)).reduce((a,c)=>a+(+c.total||0),0), nPend=COMPRAS.filter(c=>!esPagada(c)).length;
-  const comprasMes=COMPRAS.filter(c=>(c.fecha||'').slice(0,7)===mesAct).reduce((a,c)=>a+(+c.total||0),0);
+  const comprasMes=COMPRAS.filter(c=>inR(c.fecha)).reduce((a,c)=>a+(+c.total||0),0);
   const porCobrar=VENTAS.filter(v=>!esCobrada(v)).reduce((a,v)=>a+(+v.total||0),0), nCobrar=VENTAS.filter(v=>!esCobrada(v)).length;
-  const factMes=VENTAS.filter(v=>(v.fecha||'').slice(0,7)===mesAct).reduce((a,v)=>a+(+v.total||0),0);
+  const factMes=VENTAS.filter(v=>inR(v.fecha)).reduce((a,v)=>a+(+v.total||0),0);
   host.innerHTML=`
     <div class="note">Vista rápida del negocio. La <b>caja</b> sale del banco (Macro); las <b>cuentas por pagar</b> salen de las compras cargadas por foto.</div>
     <div class="kpis">
       <div class="kpi good"><div class="k">Saldo en el banco</div><div class="v">${saldo!=null?money(saldo):'—'}</div><div class="s">último movimiento</div></div>
-      <div class="kpi"><div class="k">Ingresos del mes</div><div class="v pos">${money(ingMes)}</div><div class="s">${mesAct}</div></div>
-      <div class="kpi"><div class="k">Egresos del mes</div><div class="v neg">${money(egrMes)}</div><div class="s">${mesAct}</div></div>
+      <div class="kpi"><div class="k">Ingresos del mes</div><div class="v pos">${money(ingMes)}</div><div class="s">${periodoLbl}</div></div>
+      <div class="kpi"><div class="k">Egresos del mes</div><div class="v neg">${money(egrMes)}</div><div class="s">${periodoLbl}</div></div>
       <div class="kpi ${ingMes+egrMes>=0?'good':'hot'}"><div class="k">Resultado de caja del mes</div><div class="v ${ingMes+egrMes>=0?'pos':'neg'}">${money(ingMes+egrMes)}</div><div class="s">entradas − salidas</div></div>
     </div>
     <div class="kpis">
       <div class="kpi good"><div class="k">Por cobrar (clientes)</div><div class="v pos">${money(porCobrar)}</div><div class="s">${nCobrar} facturas emitidas</div></div>
       <div class="kpi hot"><div class="k">Pendiente de pago</div><div class="v">${money(pend)}</div><div class="s">${nPend} facturas de compra</div></div>
-      <div class="kpi"><div class="k">Facturado del mes</div><div class="v">${money(factMes)}</div><div class="s">${mesAct} (con IVA)</div></div>
-      <div class="kpi"><div class="k">Compras del mes</div><div class="v">${money(comprasMes)}</div><div class="s">${mesAct} (con IVA)</div></div>
+      <div class="kpi"><div class="k">Facturado del mes</div><div class="v">${money(factMes)}</div><div class="s">${periodoLbl} (con IVA)</div></div>
+      <div class="kpi"><div class="k">Compras del mes</div><div class="v">${money(comprasMes)}</div><div class="s">${periodoLbl} (con IVA)</div></div>
     </div>
     ${!MOVBANCO.length?'<div class="card"><div class="muted">Subí un export de Macro en la pestaña Banco para ver la caja real.</div></div>':''}`;
 }
