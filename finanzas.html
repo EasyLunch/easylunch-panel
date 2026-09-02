@@ -145,7 +145,7 @@ tr.compra:hover td{background:#1b1f28}
 <div id="toast" class="toast"></div>
 
 <script>
-const BUILD = 'v13 · 01-09';
+const BUILD = 'v14 · 02-09';
 const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
 let SB_KEY = null, H = {};
 
@@ -180,6 +180,7 @@ let bPeriodo='mes', tipoFilt='todos', catFilt='todos';
 let fPeriodo='mes', cobroFilt='todos', clienteFilt='todos';
 let cfPeriodo='mes';
 let FDESDE='', FHASTA='';
+let PPG=[]; let _paySel=[];
 let RUBRO_MAP={}, PROV_CUITS=new Set(), REGLAS=[];
 const RUBROS={
   mercaderia:{l:'Materia prima / insumos',t:'variable'},
@@ -218,7 +219,11 @@ const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maxim
 const fmt2 = new Intl.NumberFormat('es-AR',{maximumFractionDigits:0});
 const money = n => fmt.format(Math.round(+n||0));
 function esFiscal(c){ return /factura/i.test(c.tipo||'') && (c.cond_iva||'')!=='No fiscal'; }
-function esPagada(c){ return (c.estado_pago||'pendiente')==='pagada'; }
+function pagadoDe(c){ return +c.monto_pagado||0; }
+function saldoCompra(c){ if((c.estado_pago||'')==='pagada') return 0; return Math.max(0,(+c.total||0)-pagadoDe(c)); }
+function esPagada(c){ return (c.estado_pago||'pendiente')==='pagada' || ((+c.total||0)>0 && pagadoDe(c) >= (+c.total||0)-0.5); }
+function esParcial(c){ return !esPagada(c) && pagadoDe(c)>0.5; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function esCobrada(v){ return (v.estado_cobro||'pendiente')==='cobrado'; }
 
 // ---------- categorías banco ----------
@@ -339,7 +344,7 @@ function renderCompras(){
   renderComprasBody();
 }
 function comprasControls(){
-  return `<div class="note">Compras cargadas por foto (Fase 3A). Marcá cada factura como <b>paga</b> para llevar las cuentas por pagar.</div>
+  return `<div class="note">Compras cargadas por foto/archivo. Abajo, en <b>Cuentas por pagar</b>, seleccioná las facturas de un proveedor y registrá el pago (total o parcial) de una sola vez.</div>
   <div class="controls">
     <span class="lbl">Período</span>
     <div class="seg" id="cPer">${['dia','semana','mes'].map(p=>`<button data-p="${p}" class="${p===cPeriodo?'on':''}">${p==='dia'?'Día':p==='semana'?'Semana':'Mes'}</button>`).join('')}</div>
@@ -358,7 +363,7 @@ function renderComprasBody(){
   const rows=COMPRAS.filter(c=>{ if(!enRango(c.fecha))return false; if(fiscalFilt==='fiscal'&&!esFiscal(c))return false; if(fiscalFilt==='nofiscal'&&esFiscal(c))return false; if(pagoFilt==='pagada'&&!esPagada(c))return false; if(pagoFilt==='pendiente'&&esPagada(c))return false; return true; });
   const ids=new Set(rows.map(c=>c.id)), items=ITEMS.filter(it=>ids.has(it.compra_id));
   const sumTotal=rows.reduce((a,c)=>a+(+c.total||0),0), sumNeto=rows.reduce((a,c)=>a+(+c.neto||0),0), sumIva=rows.reduce((a,c)=>a+(+c.iva||0),0);
-  const nFis=rows.filter(esFiscal).length, pend=rows.filter(c=>!esPagada(c)).reduce((a,c)=>a+(+c.total||0),0), pag=rows.filter(esPagada).reduce((a,c)=>a+(+c.total||0),0), nPend=rows.filter(c=>!esPagada(c)).length;
+  const nFis=rows.filter(esFiscal).length, pend=rows.reduce((a,c)=>a+saldoCompra(c),0), pag=rows.reduce((a,c)=>a+(esPagada(c)?(+c.total||0):pagadoDe(c)),0), nPend=rows.filter(c=>!esPagada(c)).length;
   const perMap={}; rows.forEach(c=>{const k=periodKey(c.fecha,cPeriodo);perMap[k]=(perMap[k]||0)+(+c.total||0);}); const pk=Object.keys(perMap).sort(), pmax=Math.max(1,...pk.map(k=>perMap[k]));
   const catMap={}; items.forEach(it=>{const cat=(it.insumo_id&&INSUMOS[it.insumo_id])?(INSUMOS[it.insumo_id].categoria||'otros'):'sin categoría';catMap[cat]=(catMap[cat]||0)+(+it.subtotal_total||0);}); const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]), cmax=Math.max(1,...cats.map(x=>x[1]));
   const provMap={}; rows.forEach(c=>{const p=c.proveedor||'—';provMap[p]=(provMap[p]||0)+(+c.total||0);}); const provs=Object.entries(provMap).sort((a,b)=>b[1]-a[1]), vmax=Math.max(1,...provs.map(x=>x[1]));
@@ -371,25 +376,81 @@ function renderComprasBody(){
   const evo=`<div class="card"><h3>Evolución del gasto <span class="sub">· por ${cPeriodo}</span></h3><div class="cf-bars">${pk.length?pk.map(k=>`<div class="cf-col" title="${money(perMap[k])}"><div class="cf-in" style="background:linear-gradient(180deg,#7bb8ff,var(--acc));height:${Math.round(perMap[k]/pmax*150)}px"></div><div class="cf-lab">${periodLabel(k,cPeriodo)}<br>${(perMap[k]/1000).toFixed(0)}k</div></div>`).join(''):'<div class="muted">Sin datos.</div>'}</div></div>`;
   const catCard=`<div class="card"><h3>Gasto por categoría</h3>${cats.length?cats.map(([n,v])=>`<div class="bar-row"><div class="nm">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/cmax*100).toFixed(1)}%;background:linear-gradient(90deg,var(--acc),#7bb8ff)"></div></div><div class="amt">${money(v)}</div></div>`).join(''):'<div class="muted">Sin ítems.</div>'}</div>`;
   const provCard=`<div class="card"><h3>Gasto por proveedor</h3>${provs.length?provs.map(([n,v])=>`<div class="bar-row"><div class="nm" title="${n}">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/vmax*100).toFixed(1)}%;background:linear-gradient(90deg,#3ad19b,#7be0bf)"></div></div><div class="amt">${money(v)}</div></div>`).join(''):'<div class="muted">Sin compras.</div>'}</div>`;
+  // ---- Cuentas por pagar (agrupadas por proveedor) ----
+  const pendientes=COMPRAS.filter(c=>enRango(c.fecha) && !esPagada(c) && saldoCompra(c)>0.5);
+  const ppMap={};
+  pendientes.forEach(c=>{ const p=(c.proveedor||'—').trim()||'—'; (ppMap[p]=ppMap[p]||[]).push(c); });
+  PPG=Object.keys(ppMap).map(p=>({prov:p, facturas:ppMap[p].slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''))}))
+        .map(g=>({...g, saldo:g.facturas.reduce((a,c)=>a+saldoCompra(c),0)}))
+        .sort((a,b)=>b.saldo-a.saldo);
+  const totalPP=PPG.reduce((a,g)=>a+g.saldo,0);
+  const porPagarCard=`<div class="card"><h3>Cuentas por pagar <span class="sub">· ${money(totalPP)} en ${pendientes.length} facturas de ${PPG.length} proveedores · seleccioná y registrá el pago</span></h3>${
+    PPG.length? PPG.map((g,gi)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:700;flex:1;cursor:pointer"><input type="checkbox" checked onchange="ppToggleAll(${gi},this.checked)"> ${esc(g.prov)}</label>
+        <span class="muted" style="font-size:12px">${g.facturas.length} fact.</span>
+        <b class="neg" style="min-width:90px;text-align:right">${money(g.saldo)}</b>
+        <button class="pay-btn" onclick="openPagoProv(${gi})">Registrar pago</button>
+      </div>
+      <div class="tbl-wrap"><table style="margin:0"><tbody>${g.facturas.map(c=>`<tr><td style="width:26px"><input type="checkbox" class="pp-chk" data-g="${gi}" value="${c.id}" checked></td><td>${c.fecha||'—'}</td><td>${esc(c.nro_comprobante||'—')}</td><td class="num muted" title="total ${money(c.total)}">${esParcial(c)?('pagó '+money(pagadoDe(c))):''}</td><td class="num neg">${money(saldoCompra(c))}</td></tr>`).join('')}</tbody></table></div>
+    </div>`).join('') : '<div class="muted">No hay facturas pendientes de pago en el período. 🎉</div>'
+  }</div>`;
   const rs=[...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const tabla=`<div class="card"><h3>Comprobantes <span class="sub">· ${rows.length} · tocá una fila para el detalle</span></h3><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Nº</th><th class="num">Total</th><th>Fiscal</th><th>Pago</th></tr></thead><tbody>${rs.map(c=>{
     const its=ITEMS.filter(it=>it.compra_id===c.id), fis=esFiscal(c), pag=esPagada(c);
-    let pc; if(pag){const info=[c.medio_pago,c.fecha_pago].filter(Boolean).join(' · ');pc=`<span class="badge pag">Pagada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''}<button class="rev-btn" onclick="event.stopPropagation();revertPay('${c.id}')">↩</button>`;}else pc=`<button class="pay-btn" onclick="event.stopPropagation();openPay('${c.id}')">Marcar paga</button>`;
+    let pc; if(pag){const info=[c.medio_pago,c.fecha_pago].filter(Boolean).join(' · ');pc=`<span class="badge pag">Pagada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''}<button class="rev-btn" onclick="event.stopPropagation();revertPay('${c.id}')">↩</button>`;}else if(esParcial(c)){pc=`<span class="badge" style="background:#3a2f10;color:#ffd699">Parcial</span> <span class="muted" style="font-size:11px">saldo ${money(saldoCompra(c))}</span> <button class="pay-btn" onclick="event.stopPropagation();openPay('${c.id}')">Pagar saldo</button><button class="rev-btn" onclick="event.stopPropagation();revertPay('${c.id}')">↩</button>`;}else pc=`<button class="pay-btn" onclick="event.stopPropagation();openPay('${c.id}')">Marcar paga</button>`;
     const ih=its.map(it=>{const nm=it.descripcion||(it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].nombre:'—');const cat=it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].categoria:'—';return `<tr class="itemrow"><td></td><td colspan="3">${nm} <span class="chip">${cat}</span></td><td class="num">${money(it.subtotal_total)}</td><td colspan="2">${fmt2.format(it.cantidad)} ${it.unidad||''}</td></tr>`;}).join('');
     return `<tr class="compra" onclick="this.nextElementSibling.classList.toggle('hide')"><td>${c.fecha||''}</td><td>${c.proveedor||'—'}</td><td>${c.tipo||'—'}</td><td>${c.nro_comprobante||'—'}</td><td class="num">${money(c.total)}</td><td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fisc.'}</span></td><td>${pc}</td></tr><tr class="hide"><td colspan="7" style="padding:0"><table style="margin:0">${ih||'<tr class="itemrow"><td colspan="7">Sin ítems.</td></tr>'}</table></td></tr>`;
   }).join('')}</tbody></table></div></div>`;
-  document.getElementById('compras-body').innerHTML=kpis+evo+`<div class="grid">${catCard}${provCard}</div>`+tabla;
+  document.getElementById('compras-body').innerHTML=kpis+porPagarCard+evo+`<div class="grid">${catCard}${provCard}</div>`+tabla;
 }
 
-// ============ pagos compras ============
-function findCompra(id){return COMPRAS.find(c=>c.id===id);}
-function openPay(id){ const c=findCompra(id); if(!c)return; const hoy=new Date().toISOString().slice(0,10);
-  document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Marcar como paga</h3><p class="who">${c.proveedor||'—'} · ${c.nro_comprobante||''} · <b>${money(c.total)}</b></p><label>Medio de pago</label><select id="pm"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Débito automático</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select><label>Fecha de pago</label><input type="date" id="pf" value="${hoy}"><div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="confirmPay('${id}')">Confirmar</button></div></div></div>`;
-}
+// ============ pagos compras (con pago parcial y agrupado por proveedor) ============
+function findCompra(id){return COMPRAS.find(c=>String(c.id)===String(id));}
 function closeModal(){ document.getElementById('modalHost').innerHTML=''; }
-async function patchCompra(id,body){ const r=await fetch(`${SB_URL}/rest/v1/compras?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)}); if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,100)); }
-async function confirmPay(id){ const medio=document.getElementById('pm').value, fecha=document.getElementById('pf').value||new Date().toISOString().slice(0,10); try{ await patchCompra(id,{estado_pago:'pagada',medio_pago:medio,fecha_pago:fecha}); const c=findCompra(id); if(c){c.estado_pago='pagada';c.medio_pago=medio;c.fecha_pago=fecha;} closeModal(); renderCompras(); toast('Marcada como paga ✓'); }catch(e){ toast('No se pudo guardar: '+e.message,true); } }
-async function revertPay(id){ try{ await patchCompra(id,{estado_pago:'pendiente',medio_pago:null,fecha_pago:null}); const c=findCompra(id); if(c){c.estado_pago='pendiente';c.medio_pago=null;c.fecha_pago=null;} renderCompras(); toast('Vuelta a pendiente'); }catch(e){ toast('No se pudo: '+e.message,true); } }
+function pagoModalHTML(titulo, sub, montoDef, onConfirm, nfac){
+  const hoy=new Date().toISOString().slice(0,10);
+  return `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>${titulo}</h3><p class="who">${sub}</p>
+    <label>Monto que pagás</label><input type="number" step="any" id="pmonto" value="${(+montoDef||0).toFixed(2)}">
+    ${nfac>1?'<div class="muted" style="font-size:12px;margin:-4px 0 8px">Si el monto es menor al saldo total, se aplica a las facturas más viejas primero; el resto queda pendiente.</div>':''}
+    <label>Medio de pago</label><select id="pm"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Débito automático</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select>
+    <label>Fecha de pago</label><input type="date" id="pf" value="${hoy}">
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="${onConfirm}">Confirmar</button></div></div></div>`;
+}
+async function patchCompra(id,body){
+  const url=`${SB_URL}/rest/v1/compras?id=eq.${encodeURIComponent(id)}`;
+  let r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
+  if(!r.ok && ('monto_pagado' in body)){ const b2={...body}; delete b2.monto_pagado; r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(b2)}); }
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,100));
+}
+async function applyPago(facturas, monto, medio, fecha){
+  const orden=facturas.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  let rem=+monto||0, aplicadas=0;
+  try{
+    for(const c of orden){
+      if(rem<=0.005) break;
+      const saldo=saldoCompra(c); if(saldo<=0.005) continue;
+      const ap=Math.min(saldo, rem);
+      const nuevo=pagadoDe(c)+ap;
+      const full=nuevo >= (+c.total||0)-0.5;
+      const body={monto_pagado:nuevo};
+      if(full){ body.estado_pago='pagada'; body.medio_pago=medio; body.fecha_pago=fecha; }
+      await patchCompra(c.id, body);
+      c.monto_pagado=nuevo; if(full){ c.estado_pago='pagada'; c.medio_pago=medio; c.fecha_pago=fecha; }
+      rem-=ap; aplicadas++;
+    }
+    closeModal(); renderCompras();
+    toast('Pago registrado en '+aplicadas+' factura'+(aplicadas===1?'':'s')+(rem>0.5?(' · sobró '+money(rem)):''));
+  }catch(e){ toast('No se pudo guardar: '+e.message,true); }
+}
+function openPay(id){ const c=findCompra(id); if(!c)return; const saldo=saldoCompra(c);
+  document.getElementById('modalHost').innerHTML=pagoModalHTML('Registrar pago', `${esc(c.proveedor||'—')} · ${esc(c.nro_comprobante||'')} · saldo <b>${money(saldo)}</b>`, saldo, `confirmPay('${id}')`, 1);
+}
+function confirmPay(id){ const c=findCompra(id); if(!c)return; const monto=+document.getElementById('pmonto').value||0; const medio=document.getElementById('pm').value; const fecha=document.getElementById('pf').value||new Date().toISOString().slice(0,10); if(monto<=0){ toast('Ingresá un monto mayor a 0.',true); return; } applyPago([c], monto, medio, fecha); }
+function ppToggleAll(gi,ck){ document.querySelectorAll('.pp-chk[data-g="'+gi+'"]').forEach(x=>{ x.checked=ck; }); }
+function openPagoProv(gi){ const g=PPG[gi]; if(!g)return; const ids=[...document.querySelectorAll('.pp-chk[data-g="'+gi+'"]:checked')].map(x=>x.value); if(!ids.length){ toast('Seleccioná al menos una factura.',true); return; } _paySel=ids; const sel=g.facturas.filter(c=>ids.includes(String(c.id))); const sum=sel.reduce((a,c)=>a+saldoCompra(c),0); document.getElementById('modalHost').innerHTML=pagoModalHTML('Pago a '+esc(g.prov), ids.length+' factura'+(ids.length===1?'':'s')+' seleccionada'+(ids.length===1?'':'s')+' · saldo <b>'+money(sum)+'</b>', sum, 'confirmPagoSel()', ids.length); }
+function confirmPagoSel(){ const monto=+document.getElementById('pmonto').value||0; const medio=document.getElementById('pm').value; const fecha=document.getElementById('pf').value||new Date().toISOString().slice(0,10); if(monto<=0){ toast('Ingresá un monto mayor a 0.',true); return; } const facturas=_paySel.map(id=>findCompra(id)).filter(Boolean); applyPago(facturas, monto, medio, fecha); }
+async function revertPay(id){ try{ await patchCompra(id,{estado_pago:'pendiente',medio_pago:null,fecha_pago:null,monto_pagado:0}); const c=findCompra(id); if(c){ c.estado_pago='pendiente'; c.medio_pago=null; c.fecha_pago=null; c.monto_pagado=0; } renderCompras(); toast('Vuelta a pendiente'); }catch(e){ toast('No se pudo: '+e.message,true); } }
 
 // ============ BANCO ============
 function saldoActual(movs){ if(!movs.length)return null; const maxF=movs.reduce((a,m)=>m.fecha>a?m.fecha:a,''); const day=movs.filter(m=>m.fecha===maxF&&m.saldo!=null); if(!day.length)return null; if(day.length===1)return day[0].saldo; const isPrev=s=>day.some(b=>Math.abs((b.saldo-b.importe)-s)<0.01&&b.saldo!==s); const last=day.find(m=>!isPrev(m.saldo)); return (last||day[0]).saldo; }
@@ -835,7 +896,7 @@ function renderResumen(){
   const periodoLbl=useR?((FDESDE||'inicio')+' → '+(FHASTA||'hoy')):mesAct;
   const mMes=MOVBANCO.filter(m=>inR(m.fecha));
   const ingMes=mMes.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0), egrMes=mMes.filter(m=>+m.importe<0).reduce((a,m)=>a+ +m.importe,0);
-  const pend=COMPRAS.filter(c=>!esPagada(c)).reduce((a,c)=>a+(+c.total||0),0), nPend=COMPRAS.filter(c=>!esPagada(c)).length;
+  const pend=COMPRAS.filter(c=>!esPagada(c)).reduce((a,c)=>a+saldoCompra(c),0), nPend=COMPRAS.filter(c=>!esPagada(c)).length;
   const comprasMes=COMPRAS.filter(c=>inR(c.fecha)).reduce((a,c)=>a+(+c.total||0),0);
   const porCobrar=VENTAS.filter(v=>!esCobrada(v)).reduce((a,v)=>a+(+v.total||0),0), nCobrar=VENTAS.filter(v=>!esCobrada(v)).length;
   const factMes=VENTAS.filter(v=>inR(v.fecha)).reduce((a,v)=>a+(+v.total||0),0);
