@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Easy Lunch — Control Financiero</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#0f1115; --card:#171a21; --card2:#1e222b; --line:#2a2f3a;
+  --tx:#e8eaed; --mut:#9aa3b2; --acc:#4f9dff; --acc2:#3ad19b;
+  --warn:#ffb84d; --bad:#ff6b6b; --chip:#232833;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--acc);text-decoration:none}
+.hide{display:none!important}
+header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:12px 16px;background:#12151b;border-bottom:1px solid var(--line)}
+.logo{font-weight:700}
+.build{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.sp{flex:1}
+.hdr-btn{font-size:13px;color:var(--mut);border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--card);cursor:pointer}
+.tabs{display:flex;gap:6px;padding:10px 16px 0;background:#12151b;border-bottom:1px solid var(--line);position:sticky;top:53px;z-index:19}
+.tab{padding:9px 16px;border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0;background:var(--card);color:var(--mut);cursor:pointer;font-size:14px;font-weight:600}
+.tab.on{background:var(--bg);color:var(--tx);border-color:var(--acc)}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:transparent;border:0;color:var(--mut);padding:8px 12px;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--acc);color:#04101f;font-weight:600}
+.lbl{font-size:12px;color:var(--mut);margin-right:2px}
+select,input{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.kpi.hot{border-color:#5c451f;background:linear-gradient(180deg,#221b0f,#171a21)}
+.kpi.good{border-color:#1f5c45;background:linear-gradient(180deg,#0f221a,#171a21)}
+.kpi .k{font-size:12px;color:var(--mut)}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px;letter-spacing:-.3px}
+.kpi .v.pos{color:var(--acc2)} .kpi .v.neg{color:var(--bad)}
+.kpi .s{font-size:11px;color:var(--mut);margin-top:3px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:820px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h3{margin:0 0 12px;font-size:14px;font-weight:600}
+.card h3 .sub{font-weight:400;color:var(--mut);font-size:12px}
+.bar-row{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;margin:7px 0;font-size:13px}
+.bar-row .nm{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{background:var(--card2);border-radius:6px;height:16px;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px}
+.bar-row .amt{color:var(--mut);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cf-bars{display:flex;align-items:stretch;gap:8px;height:180px;padding-top:8px}
+.cf-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px}
+.cf-in{background:linear-gradient(180deg,#7be0bf,var(--acc2));border-radius:4px 4px 0 0;min-height:1px}
+.cf-out{background:linear-gradient(180deg,#ff8f8f,var(--bad));border-radius:0 0 4px 4px;min-height:1px}
+.cf-lab{font-size:10px;color:var(--mut);text-align:center;margin-top:4px;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:600;font-size:12px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.pos{color:var(--acc2)} td.neg{color:var(--bad)}
+.tbl-wrap{overflow-x:auto;max-height:560px;overflow-y:auto}
+.badge{font-size:11px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.badge.fis{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
+.badge.no{color:var(--warn);border-color:#5c451f;background:#2a220f}
+.badge.pag{color:var(--acc2);border-color:#1f5c45;background:#0f2a20}
+.chip{font-size:11px;color:var(--mut);background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+.muted{color:var(--mut)}
+.itemrow td{background:var(--card2);font-size:12px;color:var(--mut)}
+tr.compra td{cursor:pointer}
+tr.compra:hover td{background:#1b1f28}
+.pay-btn{font-size:11px;padding:4px 8px;border-radius:8px;border:1px solid #1f5c45;background:#0f2a20;color:var(--acc2);cursor:pointer;white-space:nowrap}
+.rev-btn{font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--mut);cursor:pointer;margin-left:6px}
+.catsel{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:7px;padding:3px 6px;font-size:12px}
+/* drop zone */
+.drop{border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;color:var(--mut);cursor:pointer;transition:all .15s;background:var(--card)}
+.drop:hover,.drop.over{border-color:var(--acc);color:var(--tx);background:#131722}
+.drop b{color:var(--tx)}
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:20px}
+.modal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:380px;width:100%}
+.modal h3{margin:0 0 4px}
+.modal .who{font-size:13px;color:var(--mut);margin:0 0 16px}
+.modal label{display:block;font-size:12px;color:var(--mut);margin:12px 0 4px}
+.modal select,.modal input{width:100%}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+.btn{background:var(--acc);color:#04101f;border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer;font-size:14px}
+.btn.wide{width:100%}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--tx)}
+.btn:disabled{opacity:.5;cursor:default}
+/* login */
+#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.loginbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;max-width:360px;width:100%}
+.loginbox h2{margin:0 0 4px}
+.loginbox p{color:var(--mut);font-size:13px;margin:0 0 16px}
+.loginbox input{width:100%;margin-bottom:10px;padding:11px}
+.err{color:var(--bad);font-size:13px;min-height:18px;margin-top:4px}
+.loading{text-align:center;color:var(--mut);padding:40px}
+.note{font-size:12px;color:var(--mut);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px;line-height:1.5}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2a20;border:1px solid #1f5c45;color:var(--acc2);padding:10px 16px;border-radius:10px;font-size:13px;z-index:70;opacity:0;transition:opacity .2s;max-width:90%}
+.toast.show{opacity:1}
+.toast.err{background:#2a0f0f;border-color:#5c1f1f;color:var(--bad)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="loginbox">
+    <h2>💰 Control Financiero</h2>
+    <p>Easy Lunch — acceso restringido</p>
+    <input id="lu" placeholder="Usuario / email" autocomplete="username">
+    <input id="lp" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button class="btn wide" onclick="doLogin()">Ingresar</button>
+    <div class="err" id="lerr"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+<header>
+  <span class="logo">💰 Control Financiero</span>
+  <span class="build" id="build">v3</span>
+  <span class="sp"></span>
+  <a class="hdr-btn" href="/">← Panel</a>
+  <button class="hdr-btn" onclick="logout()">Salir</button>
+</header>
+<div class="tabs">
+  <div class="tab on" data-tab="compras" onclick="setTab('compras')">🧾 Compras</div>
+  <div class="tab" data-tab="banco" onclick="setTab('banco')">🏦 Banco</div>
+  <div class="tab" data-tab="facturacion" onclick="setTab('facturacion')">💵 Facturación</div>
+  <div class="tab" data-tab="cashflow" onclick="setTab('cashflow')">💸 Cash Flow</div>
+  <div class="tab" data-tab="resumen" onclick="setTab('resumen')">📊 Resumen</div>
+</div>
+<div id="filtroGlobal"></div>
+<main>
+  <div id="tab-compras"><div class="loading">Cargando…</div></div>
+  <div id="tab-banco" class="hide"></div>
+  <div id="tab-facturacion" class="hide"></div>
+  <div id="tab-cashflow" class="hide"></div>
+  <div id="tab-resumen" class="hide"></div>
+</main>
+</div>
+
+<div id="modalHost"></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const BUILD = 'v15 · 02-09';
+const SB_URL = 'https://xlwcozznliafhouhqjzl.supabase.co';
+let SB_KEY = null, H = {};
+
+async function ensureKey(){
+  if(SB_KEY) return true;
+  try{
+    const html = await fetch('/carga.html',{cache:'no-store'}).then(r=>r.text());
+    const m = html.match(/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/);
+    if(!m) throw 0;
+    SB_KEY = m[0]; H = {apikey:SB_KEY, Authorization:'Bearer '+SB_KEY};
+    return true;
+  }catch(e){ return false; }
+}
+
+const USERS = {'pbronstein@easylunch.com.ar':'Viel912','easylunch':'Viel912','info@easylunch.com.ar':'Viel912'};
+const ADMIN = ['pbronstein@easylunch.com.ar','easylunch'];
+function doLogin(){
+  const u=(document.getElementById('lu').value||'').trim().toLowerCase(), p=document.getElementById('lp').value||'';
+  if(USERS[u] && USERS[u]===p){
+    if(!ADMIN.includes(u)){ document.getElementById('lerr').textContent='Este usuario no tiene acceso al módulo financiero.'; return; }
+    localStorage.setItem('el_auth','1'); localStorage.setItem('el_user',u); startApp();
+  } else document.getElementById('lerr').textContent='Usuario o contraseña incorrectos.';
+}
+function logout(){ localStorage.removeItem('el_auth'); localStorage.removeItem('el_user'); location.reload(); }
+function gate(){ const u=localStorage.getItem('el_user'), a=localStorage.getItem('el_auth'); if(a&&u&&ADMIN.includes(u)) startApp(); else document.getElementById('login').classList.remove('hide'); }
+
+// ---------- estado ----------
+let COMPRAS=[], ITEMS=[], INSUMOS={}, MOVBANCO=[], VENTAS=[];
+let tab='compras';
+let cPeriodo='mes', fiscalFilt='todos', pagoFilt='todos';
+let bPeriodo='mes', tipoFilt='todos', catFilt='todos';
+let fPeriodo='mes', cobroFilt='todos', clienteFilt='todos';
+let cfPeriodo='mes';
+let FDESDE='', FHASTA='';
+let PPG=[]; let _paySel=[];
+let RUBRO_MAP={}, PROV_CUITS=new Set(), REGLAS=[];
+const RUBROS={
+  mercaderia:{l:'Materia prima / insumos',t:'variable'},
+  descartables:{l:'Descartables',t:'variable'},
+  logistica:{l:'Logística / delivery',t:'indirecto'},
+  libreria:{l:'Librería',t:'indirecto'},
+  farmacia:{l:'Farmacia',t:'indirecto'},
+  mantenimiento:{l:'Mantenimiento',t:'indirecto'},
+  equipamiento:{l:'Equipamiento',t:'indirecto'},
+  otros_ind:{l:'Otros indirectos',t:'indirecto'},
+  sueldos:{l:'Sueldos',t:'fijo'},
+  cargas:{l:'Cargas sociales',t:'fijo'},
+  honorarios:{l:'Honorarios (contador/abogado/desinf.)',t:'fijo'},
+  servicios:{l:'Servicios (agua/luz/gas/internet)',t:'fijo'},
+  alquiler:{l:'Alquiler',t:'fijo'},
+  comisiones:{l:'Gastos bancarios',t:'fijo'},
+  sistema:{l:'Gastos de sistema',t:'fijo'},
+  marketing:{l:'Comercial / marketing',t:'fijo'},
+  seguros:{l:'Seguros',t:'fijo'},
+  plataformas:{l:'Plataformas',t:'fijo'},
+  otros_fijos:{l:'Otros fijos',t:'fijo'},
+  iibb:{l:'Ingresos brutos',t:'impuesto'},
+  iva:{l:'IVA (y planes de IVA)',t:'impuesto'},
+  ganancias:{l:'Ganancias / retenciones',t:'impuesto'},
+  autonomos:{l:'Autónomos / monotributo',t:'impuesto'},
+  imp_cheque:{l:'Impuesto al cheque',t:'impuesto'},
+  impuestos:{l:'Otros impuestos',t:'impuesto'},
+  retiros:{l:'Retiros de socios / efectivo',t:'financiero'},
+  otros:{l:'Otros',t:'otro'},
+  a_clasificar:{l:'A clasificar',t:'pendiente'}
+};
+const TIPO_LABEL={variable:'Costos variables',indirecto:'Costos indirectos',fijo:'Costos fijos',impuesto:'Impuestos',financiero:'Retiros / financiero',otro:'Otros',pendiente:'A clasificar'};
+const RUBRO_KEYS=Object.keys(RUBROS);
+let PARSED=null;
+
+const fmt = new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',maximumFractionDigits:0});
+const fmt2 = new Intl.NumberFormat('es-AR',{maximumFractionDigits:0});
+const money = n => fmt.format(Math.round(+n||0));
+function esFiscal(c){ return /factura/i.test(c.tipo||'') && (c.cond_iva||'')!=='No fiscal'; }
+function pagadoDe(c){ return +c.monto_pagado||0; }
+function saldoCompra(c){ if((c.estado_pago||'')==='pagada') return 0; return Math.max(0,(+c.total||0)-pagadoDe(c)); }
+function esPagada(c){ return (c.estado_pago||'pendiente')==='pagada' || ((+c.total||0)>0 && pagadoDe(c) >= (+c.total||0)-0.5); }
+function esParcial(c){ return !esPagada(c) && pagadoDe(c)>0.5; }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esCobrada(v){ return (v.estado_cobro||'pendiente')==='cobrado'; }
+function retTotal(v){ return (+v.ret_iva||0)+(+v.ret_ganancias||0)+(+v.ret_iibb||0)+(+v.ret_suss||0)+(+v.ret_otro||0); }
+function retInputs(v){ v=v||{}; const f=(id,lbl,val)=>`<div style="flex:1"><span class="muted" style="font-size:11px">${lbl}</span><input type="number" step="any" id="${id}" value="${+val||0}"></div>`; return `<label style="margin-top:8px">Retenciones (impuestos descontados al cobrar)</label><div style="display:flex;gap:6px">${f('r_iva','IVA',v.ret_iva)}${f('r_gan','Ganancias',v.ret_ganancias)}${f('r_iibb','Ing.Brutos',v.ret_iibb)}</div><div style="display:flex;gap:6px;margin-top:6px">${f('r_suss','SUSS',v.ret_suss)}${f('r_otro','Otras',v.ret_otro)}</div>`; }
+function retVals(){ const g=id=>{const e=document.getElementById(id); return e?(+e.value||0):0;}; return {ret_iva:g('r_iva'),ret_ganancias:g('r_gan'),ret_iibb:g('r_iibb'),ret_suss:g('r_suss'),ret_otro:g('r_otro')}; }
+
+// ---------- categorías banco ----------
+const CAUSAL_CAT={'2027':'ingreso_transferencia','3956':'ingreso_transferencia','3862':'ingreso_transferencia','4016':'ingreso_transferencia','4013':'ingreso_transferencia','4066':'ingreso_transferencia','493':'ingreso_transferencia','14':'ingreso_cheque','3913':'egreso_transferencia','4213':'egreso_transferencia','4085':'egreso_transferencia','3713':'egreso_transferencia','4202':'egreso_tarjeta','3702':'egreso_tarjeta','1059':'egreso_tarjeta','1684':'impuesto','1685':'impuesto','1297':'impuesto','4196':'impuesto','3914':'comision_bancaria','4190':'extraccion_efectivo','3690':'extraccion_efectivo','4274':'extraccion_efectivo','1994':'interno','23':'servicio'};
+const CAT_LABEL={ingreso_transferencia:'Cobro (transferencia)',ingreso_cheque:'Cobro (cheque)',ingreso_otro:'Ingreso (otro)',egreso_transferencia:'Pago (transferencia)',egreso_tarjeta:'Tarjeta / Mercado Pago',impuesto:'Impuestos',comision_bancaria:'Comisión bancaria',extraccion_efectivo:'Extracción efectivo',servicio:'Servicios',interno:'Mov. interno',egreso_otro:'Egreso (otro)'};
+const CAT_LIST=['ingreso_transferencia','ingreso_cheque','ingreso_otro','egreso_transferencia','egreso_tarjeta','impuesto','comision_bancaria','extraccion_efectivo','servicio','interno','egreso_otro'];
+function fallbackCat(concepto, importe){
+  const c=(concepto||'').toUpperCase();
+  if(/MERPAGO|MERCADO ?PAGO|VISA|MASTER|TARJETA|3SM\*/.test(c)) return 'egreso_tarjeta';
+  if(/SIRCREB|ING\.?\s*BRUTOS|AFIP|IMP\.|IIBB|RETENC|LEY 25413|TASA GRAL|DB TASA|CR TASA/.test(c)) return 'impuesto';
+  if(/COMISION|COMIS\.|MANTENIMIENTO/.test(c)) return 'comision_bancaria';
+  if(/EXTRACCION|CAJERO|EFVO|EFECTIVO/.test(c)) return 'extraccion_efectivo';
+  if(/TRANSF|TEF|CREDIN|CCERR|ACREDITAC|CHEQUE|CBU|CVU/.test(c)) return importe>=0?'ingreso_transferencia':'egreso_transferencia';
+  if(/EDESUR|EDENOR|METROGAS|ABL|EXPENSAS|TELECOM|CLARO|MOVISTAR|PERSONAL/.test(c)) return 'servicio';
+  return importe>=0?'ingreso_otro':'egreso_otro';
+}
+function categorize(causal, concepto, importe){
+  let key=causal==null?'':String(causal).replace(/\.0$/,'').trim();
+  let cat=CAUSAL_CAT[key]||fallbackCat(concepto,importe);
+  if(importe>=0 && cat.startsWith('egreso')) cat='ingreso_otro';
+  if(importe<0 && cat.startsWith('ingreso')) cat='egreso_otro';
+  return cat;
+}
+const norm=s=>(s==null?'':String(s)).replace(/\s+/g,' ').trim();
+
+function parseMacro(buf){
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+  let cuenta='';
+  for(const r of rows){ const j=r.map(norm).join(' '); if(/N[uú]mero/i.test(j)){ const m=j.match(/(\d{10,})/); if(m){cuenta=m[1];break;} } }
+  let hi=-1, cols={};
+  for(let i=0;i<rows.length;i++){
+    const low=rows[i].map(x=>norm(x).toLowerCase());
+    if(low.includes('concepto')&&low.includes('importe')&&low.includes('saldo')){
+      hi=i; low.forEach((c,idx)=>{ if(c==='fecha')cols.fecha=idx; else if(c.includes('referencia'))cols.ref=idx; else if(c==='causal')cols.causal=idx; else if(c==='concepto')cols.concepto=idx; else if(c==='importe')cols.importe=idx; else if(c==='saldo')cols.saldo=idx; }); break;
+    }
+  }
+  if(hi<0) throw new Error('No encontré el encabezado de Macro (Fecha/Concepto/Importe/Saldo).');
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i], fecha=r[cols.fecha], importe=r[cols.importe], concepto=norm(r[cols.concepto]);
+    if(!(fecha instanceof Date) || isNaN(fecha) || typeof importe!=='number' || isNaN(importe)) continue;
+    const fechaISO=fecha.toISOString().slice(0,10);
+    const ref=norm(r[cols.ref]), causal=norm(r[cols.causal]), saldo=(typeof r[cols.saldo]==='number')?r[cols.saldo]:null;
+    out.push({fecha:fechaISO, referencia:ref, causal, concepto, importe, saldo, tipo:importe>=0?'ingreso':'egreso', categoria:categorize(causal,concepto,importe), cuenta, hash:[cuenta,fechaISO,ref,importe,saldo].join('|')});
+  }
+  return {cuenta, movimientos:out};
+}
+
+async function startApp(){
+  document.getElementById('login').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  document.getElementById('build').textContent=BUILD;
+  const ok=await ensureKey();
+  if(!ok){ document.getElementById('tab-compras').innerHTML='<div class="loading">No se pudo obtener la clave de datos. Recargá.</div>'; return; }
+  await loadAll();
+  renderFiltroGlobal();
+  render();
+}
+async function loadAll(){
+  try{
+    const [c,i,ins,mb,vt,rm,rg]=await Promise.all([
+      fetch(`${SB_URL}/rest/v1/compras?select=*&order=fecha.asc`,{headers:H}).then(r=>r.json()),
+      fetch(`${SB_URL}/rest/v1/compra_items?select=*`,{headers:H}).then(r=>r.json()),
+      fetch(`${SB_URL}/rest/v1/insumos?select=id,nombre,categoria`,{headers:H}).then(r=>r.json()),
+      fetch(`${SB_URL}/rest/v1/movimientos_banco?select=*`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(`${SB_URL}/rest/v1/ventas?select=*&order=fecha.asc`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(`${SB_URL}/rest/v1/rubro_map?select=clave,rubro`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch(`${SB_URL}/rest/v1/regla_rubro?select=patron,rubro`,{headers:H}).then(r=>r.ok?r.json():[]).catch(()=>[])
+    ]);
+    COMPRAS=Array.isArray(c)?c:[]; ITEMS=Array.isArray(i)?i:[]; INSUMOS={};
+    (Array.isArray(ins)?ins:[]).forEach(x=>INSUMOS[x.id]={nombre:x.nombre,categoria:x.categoria});
+    MOVBANCO=Array.isArray(mb)?mb:[]; VENTAS=Array.isArray(vt)?vt:[];
+    RUBRO_MAP={}; (Array.isArray(rm)?rm:[]).forEach(x=>RUBRO_MAP[x.clave]=x.rubro);
+    REGLAS=(Array.isArray(rg)?rg:[]).filter(x=>x.patron&&x.rubro);
+    PROV_CUITS=new Set(COMPRAS.map(c=>(c.cuit||'').replace(/\D/g,'')).filter(s=>s.length===11));
+  }catch(e){ document.getElementById('tab-compras').innerHTML='<div class="loading">Error cargando datos: '+e+'</div>'; }
+}
+async function reloadBanco(){
+  try{ const mb=await fetch(`${SB_URL}/rest/v1/movimientos_banco?select=*`,{headers:H}).then(r=>r.ok?r.json():[]); MOVBANCO=Array.isArray(mb)?mb:[]; }catch(e){}
+}
+async function reloadVentas(){
+  try{ const vt=await fetch(`${SB_URL}/rest/v1/ventas?select=*&order=fecha.asc`,{headers:H}).then(r=>r.ok?r.json():[]); VENTAS=Array.isArray(vt)?vt:[]; }catch(e){}
+}
+
+function setTab(t){
+  tab=t;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===t));
+  ['compras','banco','facturacion','cashflow','resumen'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hide',x!==t));
+  render();
+}
+function render(){ if(tab==='compras') renderCompras(); else if(tab==='banco') renderBanco(); else if(tab==='facturacion') renderFacturacion(); else if(tab==='cashflow') renderCashflow(); else renderResumen(); }
+
+// ============ util período ============
+function periodKey(fecha,per){ if(!fecha||typeof fecha!=='string')return 'sf'; const dt=new Date(fecha+'T00:00:00'); if(isNaN(dt))return 'sf'; if(per==='dia')return fecha; if(per==='mes')return fecha.slice(0,7); const day=(dt.getDay()+6)%7, mon=new Date(dt); mon.setDate(dt.getDate()-day); return mon.toISOString().slice(0,10); }
+function periodLabel(k,per){ if(k==='sf')return 's/fecha'; if(per==='mes'){const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][+m-1]+' '+y.slice(2);} if(per==='dia'){const[y,m,d]=k.split('-');return d+'/'+m;} const[y,m,d]=k.split('-');return 'sem '+d+'/'+m; }
+// ============ filtro global por fecha (aplica a todas las solapas) ============
+function enRango(f){ if(!FDESDE&&!FHASTA)return true; if(!f||typeof f!=='string')return false; const d=f.slice(0,10); if(FDESDE&&d<FDESDE)return false; if(FHASTA&&d>FHASTA)return false; return true; }
+function mesesDisponibles(){ const s=new Set(); [].concat(COMPRAS,MOVBANCO,VENTAS).forEach(x=>{const f=x&&x.fecha; if(f&&typeof f==='string'&&f.length>=7)s.add(f.slice(0,7));}); return [...s].sort().reverse(); }
+function mesSel(){ return (FDESDE&&FHASTA&&FDESDE.slice(0,7)===FHASTA.slice(0,7)&&FDESDE.slice(8)==='01'&&FHASTA.slice(8)==='31')?FDESDE.slice(0,7):''; }
+function renderFiltroGlobal(){ const host=document.getElementById('filtroGlobal'); if(!host)return; const meses=mesesDisponibles(), sel=mesSel(), activo=!!(FDESDE||FHASTA);
+  host.className='controls'; host.innerHTML=`<span class="lbl">Desde</span><input type="date" value="${FDESDE}" onchange="setFDesde(this.value)" style="width:auto">
+    <span class="lbl">Hasta</span><input type="date" value="${FHASTA}" onchange="setFHasta(this.value)" style="width:auto">
+    <span class="lbl" style="margin-left:8px">Mes</span><select onchange="setFMes(this.value)" style="width:auto"><option value="">— todos —</option>${meses.map(m=>`<option value="${m}" ${m===sel?'selected':''}>${periodLabel(m,'mes')}</option>`).join('')}</select>
+    ${activo?`<button class="hdr-btn" style="margin-left:8px" onclick="resetFiltro()">✕ Quitar filtro</button><span class="lbl" style="color:var(--acc)">mostrando ${FDESDE||'inicio'} → ${FHASTA||'hoy'}</span>`:'<span class="lbl">sin filtro (todo)</span>'}`;
+}
+function setFDesde(v){ FDESDE=v; renderFiltroGlobal(); render(); }
+function setFHasta(v){ FHASTA=v; renderFiltroGlobal(); render(); }
+function setFMes(v){ if(!v){FDESDE='';FHASTA='';}else{FDESDE=v+'-01';FHASTA=v+'-31';} renderFiltroGlobal(); render(); }
+function resetFiltro(){ FDESDE='';FHASTA=''; renderFiltroGlobal(); render(); }
+
+// ============ COMPRAS ============
+function renderCompras(){
+  const host=document.getElementById('tab-compras');
+  host.innerHTML = comprasControls() + '<div id="compras-body"></div>';
+  wireComprasControls();
+  renderComprasBody();
+}
+function comprasControls(){
+  return `<div class="note">Compras cargadas por foto/archivo. Abajo, en <b>Cuentas por pagar</b>, seleccioná las facturas de un proveedor y registrá el pago (total o parcial) de una sola vez.</div>
+  <div class="controls">
+    <span class="lbl">Período</span>
+    <div class="seg" id="cPer">${['dia','semana','mes'].map(p=>`<button data-p="${p}" class="${p===cPeriodo?'on':''}">${p==='dia'?'Día':p==='semana'?'Semana':'Mes'}</button>`).join('')}</div>
+    <span class="lbl" style="margin-left:8px">Compr.</span>
+    <div class="seg" id="cFis">${[['todos','Todos'],['fiscal','Fiscal'],['nofiscal','No fisc.']].map(([v,t])=>`<button data-f="${v}" class="${v===fiscalFilt?'on':''}">${t}</button>`).join('')}</div>
+    <span class="lbl" style="margin-left:8px">Pago</span>
+    <div class="seg" id="cPag">${[['todos','Todos'],['pendiente','Pendientes'],['pagada','Pagas']].map(([v,t])=>`<button data-g="${v}" class="${v===pagoFilt?'on':''}">${t}</button>`).join('')}</div>
+  </div>`;
+}
+function wireComprasControls(){
+  document.querySelectorAll('#cPer button').forEach(b=>b.onclick=()=>{cPeriodo=b.dataset.p;renderCompras();});
+  document.querySelectorAll('#cFis button').forEach(b=>b.onclick=()=>{fiscalFilt=b.dataset.f;renderCompras();});
+  document.querySelectorAll('#cPag button').forEach(b=>b.onclick=()=>{pagoFilt=b.dataset.g;renderCompras();});
+}
+function renderComprasBody(){
+  const rows=COMPRAS.filter(c=>{ if(!enRango(c.fecha))return false; if(fiscalFilt==='fiscal'&&!esFiscal(c))return false; if(fiscalFilt==='nofiscal'&&esFiscal(c))return false; if(pagoFilt==='pagada'&&!esPagada(c))return false; if(pagoFilt==='pendiente'&&esPagada(c))return false; return true; });
+  const ids=new Set(rows.map(c=>c.id)), items=ITEMS.filter(it=>ids.has(it.compra_id));
+  const sumTotal=rows.reduce((a,c)=>a+(+c.total||0),0), sumNeto=rows.reduce((a,c)=>a+(+c.neto||0),0), sumIva=rows.reduce((a,c)=>a+(+c.iva||0),0);
+  const nFis=rows.filter(esFiscal).length, pend=rows.reduce((a,c)=>a+saldoCompra(c),0), pag=rows.reduce((a,c)=>a+(esPagada(c)?(+c.total||0):pagadoDe(c)),0), nPend=rows.filter(c=>!esPagada(c)).length;
+  const perMap={}; rows.forEach(c=>{const k=periodKey(c.fecha,cPeriodo);perMap[k]=(perMap[k]||0)+(+c.total||0);}); const pk=Object.keys(perMap).sort(), pmax=Math.max(1,...pk.map(k=>perMap[k]));
+  const catMap={}; items.forEach(it=>{const cat=(it.insumo_id&&INSUMOS[it.insumo_id])?(INSUMOS[it.insumo_id].categoria||'otros'):'sin categoría';catMap[cat]=(catMap[cat]||0)+(+it.subtotal_total||0);}); const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]), cmax=Math.max(1,...cats.map(x=>x[1]));
+  const provMap={}; rows.forEach(c=>{const p=c.proveedor||'—';provMap[p]=(provMap[p]||0)+(+c.total||0);}); const provs=Object.entries(provMap).sort((a,b)=>b[1]-a[1]), vmax=Math.max(1,...provs.map(x=>x[1]));
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="k">Total comprado</div><div class="v">${money(sumTotal)}</div><div class="s">${rows.length} comprobantes</div></div>
+    <div class="kpi hot"><div class="k">Pendiente de pago</div><div class="v">${money(pend)}</div><div class="s">${nPend} por pagar</div></div>
+    <div class="kpi"><div class="k">Pagado</div><div class="v">${money(pag)}</div><div class="s">${rows.length-nPend} saldadas</div></div>
+    <div class="kpi"><div class="k">Neto (sin IVA)</div><div class="v">${money(sumNeto)}</div><div class="s">costo real</div></div>
+    <div class="kpi"><div class="k">IVA</div><div class="v">${money(sumIva)}</div><div class="s">${nFis} fisc · ${rows.length-nFis} no</div></div></div>`;
+  const evo=`<div class="card"><h3>Evolución del gasto <span class="sub">· por ${cPeriodo}</span></h3><div class="cf-bars">${pk.length?pk.map(k=>`<div class="cf-col" title="${money(perMap[k])}"><div class="cf-in" style="background:linear-gradient(180deg,#7bb8ff,var(--acc));height:${Math.round(perMap[k]/pmax*150)}px"></div><div class="cf-lab">${periodLabel(k,cPeriodo)}<br>${(perMap[k]/1000).toFixed(0)}k</div></div>`).join(''):'<div class="muted">Sin datos.</div>'}</div></div>`;
+  const catCard=`<div class="card"><h3>Gasto por categoría</h3>${cats.length?cats.map(([n,v])=>`<div class="bar-row"><div class="nm">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/cmax*100).toFixed(1)}%;background:linear-gradient(90deg,var(--acc),#7bb8ff)"></div></div><div class="amt">${money(v)}</div></div>`).join(''):'<div class="muted">Sin ítems.</div>'}</div>`;
+  const provCard=`<div class="card"><h3>Gasto por proveedor</h3>${provs.length?provs.map(([n,v])=>`<div class="bar-row"><div class="nm" title="${n}">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/vmax*100).toFixed(1)}%;background:linear-gradient(90deg,#3ad19b,#7be0bf)"></div></div><div class="amt">${money(v)}</div></div>`).join(''):'<div class="muted">Sin compras.</div>'}</div>`;
+  // ---- Cuentas por pagar (agrupadas por proveedor) ----
+  const pendientes=COMPRAS.filter(c=>enRango(c.fecha) && !esPagada(c) && saldoCompra(c)>0.5);
+  const ppMap={};
+  pendientes.forEach(c=>{ const p=(c.proveedor||'—').trim()||'—'; (ppMap[p]=ppMap[p]||[]).push(c); });
+  PPG=Object.keys(ppMap).map(p=>({prov:p, facturas:ppMap[p].slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''))}))
+        .map(g=>({...g, saldo:g.facturas.reduce((a,c)=>a+saldoCompra(c),0)}))
+        .sort((a,b)=>b.saldo-a.saldo);
+  const totalPP=PPG.reduce((a,g)=>a+g.saldo,0);
+  const porPagarCard=`<div class="card"><h3>Cuentas por pagar <span class="sub">· ${money(totalPP)} en ${pendientes.length} facturas de ${PPG.length} proveedores · seleccioná y registrá el pago</span></h3>${
+    PPG.length? PPG.map((g,gi)=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <label style="display:flex;align-items:center;gap:6px;font-weight:700;flex:1;cursor:pointer"><input type="checkbox" checked onchange="ppToggleAll(${gi},this.checked)"> ${esc(g.prov)}</label>
+        <span class="muted" style="font-size:12px">${g.facturas.length} fact.</span>
+        <b class="neg" style="min-width:90px;text-align:right">${money(g.saldo)}</b>
+        <button class="pay-btn" onclick="openPagoProv(${gi})">Registrar pago</button>
+      </div>
+      <div class="tbl-wrap"><table style="margin:0"><tbody>${g.facturas.map(c=>`<tr><td style="width:26px"><input type="checkbox" class="pp-chk" data-g="${gi}" value="${c.id}" checked></td><td>${c.fecha||'—'}</td><td>${esc(c.nro_comprobante||'—')}</td><td class="num muted" title="total ${money(c.total)}">${esParcial(c)?('pagó '+money(pagadoDe(c))):''}</td><td class="num neg">${money(saldoCompra(c))}</td></tr>`).join('')}</tbody></table></div>
+    </div>`).join('') : '<div class="muted">No hay facturas pendientes de pago en el período. 🎉</div>'
+  }</div>`;
+  const rs=[...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const tabla=`<div class="card"><h3>Comprobantes <span class="sub">· ${rows.length} · tocá una fila para el detalle</span></h3><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Tipo</th><th>Nº</th><th class="num">Total</th><th>Fiscal</th><th>Pago</th></tr></thead><tbody>${rs.map(c=>{
+    const its=ITEMS.filter(it=>it.compra_id===c.id), fis=esFiscal(c), pag=esPagada(c);
+    let pc; if(pag){const info=[c.medio_pago,c.fecha_pago].filter(Boolean).join(' · ');pc=`<span class="badge pag">Pagada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''}<button class="rev-btn" onclick="event.stopPropagation();revertPay('${c.id}')">↩</button>`;}else if(esParcial(c)){pc=`<span class="badge" style="background:#3a2f10;color:#ffd699">Parcial</span> <span class="muted" style="font-size:11px">saldo ${money(saldoCompra(c))}</span> <button class="pay-btn" onclick="event.stopPropagation();openPay('${c.id}')">Pagar saldo</button><button class="rev-btn" onclick="event.stopPropagation();revertPay('${c.id}')">↩</button>`;}else pc=`<button class="pay-btn" onclick="event.stopPropagation();openPay('${c.id}')">Marcar paga</button>`;
+    const ih=its.map(it=>{const nm=it.descripcion||(it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].nombre:'—');const cat=it.insumo_id&&INSUMOS[it.insumo_id]?INSUMOS[it.insumo_id].categoria:'—';return `<tr class="itemrow"><td></td><td colspan="3">${nm} <span class="chip">${cat}</span></td><td class="num">${money(it.subtotal_total)}</td><td colspan="2">${fmt2.format(it.cantidad)} ${it.unidad||''}</td></tr>`;}).join('');
+    return `<tr class="compra" onclick="this.nextElementSibling.classList.toggle('hide')"><td>${c.fecha||''}</td><td>${c.proveedor||'—'}</td><td>${c.tipo||'—'}</td><td>${c.nro_comprobante||'—'}</td><td class="num">${money(c.total)}</td><td><span class="badge ${fis?'fis':'no'}">${fis?'Fiscal':'No fisc.'}</span></td><td>${pc}</td></tr><tr class="hide"><td colspan="7" style="padding:0"><table style="margin:0">${ih||'<tr class="itemrow"><td colspan="7">Sin ítems.</td></tr>'}</table></td></tr>`;
+  }).join('')}</tbody></table></div></div>`;
+  document.getElementById('compras-body').innerHTML=kpis+porPagarCard+evo+`<div class="grid">${catCard}${provCard}</div>`+tabla;
+}
+
+// ============ pagos compras (con pago parcial y agrupado por proveedor) ============
+function findCompra(id){return COMPRAS.find(c=>String(c.id)===String(id));}
+function closeModal(){ document.getElementById('modalHost').innerHTML=''; }
+function pagoModalHTML(titulo, sub, montoDef, onConfirm, nfac){
+  const hoy=new Date().toISOString().slice(0,10);
+  return `<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>${titulo}</h3><p class="who">${sub}</p>
+    <label>Monto que pagás</label><input type="number" step="any" id="pmonto" value="${(+montoDef||0).toFixed(2)}">
+    ${nfac>1?'<div class="muted" style="font-size:12px;margin:-4px 0 8px">Si el monto es menor al saldo total, se aplica a las facturas más viejas primero; el resto queda pendiente.</div>':''}
+    <label>Medio de pago</label><select id="pm"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Débito automático</option><option>Mercado Pago</option><option>Tarjeta</option><option>Otro</option></select>
+    <label>Fecha de pago</label><input type="date" id="pf" value="${hoy}">
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="${onConfirm}">Confirmar</button></div></div></div>`;
+}
+async function patchCompra(id,body){
+  const url=`${SB_URL}/rest/v1/compras?id=eq.${encodeURIComponent(id)}`;
+  let r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
+  if(!r.ok && ('monto_pagado' in body)){ const b2={...body}; delete b2.monto_pagado; r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(b2)}); }
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,100));
+}
+async function applyPago(facturas, monto, medio, fecha){
+  const orden=facturas.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  let rem=+monto||0, aplicadas=0;
+  try{
+    for(const c of orden){
+      if(rem<=0.005) break;
+      const saldo=saldoCompra(c); if(saldo<=0.005) continue;
+      const ap=Math.min(saldo, rem);
+      const nuevo=pagadoDe(c)+ap;
+      const full=nuevo >= (+c.total||0)-0.5;
+      const body={monto_pagado:nuevo};
+      if(full){ body.estado_pago='pagada'; body.medio_pago=medio; body.fecha_pago=fecha; }
+      await patchCompra(c.id, body);
+      c.monto_pagado=nuevo; if(full){ c.estado_pago='pagada'; c.medio_pago=medio; c.fecha_pago=fecha; }
+      rem-=ap; aplicadas++;
+    }
+    closeModal(); renderCompras();
+    toast('Pago registrado en '+aplicadas+' factura'+(aplicadas===1?'':'s')+(rem>0.5?(' · sobró '+money(rem)):''));
+  }catch(e){ toast('No se pudo guardar: '+e.message,true); }
+}
+function openPay(id){ const c=findCompra(id); if(!c)return; const saldo=saldoCompra(c);
+  document.getElementById('modalHost').innerHTML=pagoModalHTML('Registrar pago', `${esc(c.proveedor||'—')} · ${esc(c.nro_comprobante||'')} · saldo <b>${money(saldo)}</b>`, saldo, `confirmPay('${id}')`, 1);
+}
+function confirmPay(id){ const c=findCompra(id); if(!c)return; const monto=+document.getElementById('pmonto').value||0; const medio=document.getElementById('pm').value; const fecha=document.getElementById('pf').value||new Date().toISOString().slice(0,10); if(monto<=0){ toast('Ingresá un monto mayor a 0.',true); return; } applyPago([c], monto, medio, fecha); }
+function ppToggleAll(gi,ck){ document.querySelectorAll('.pp-chk[data-g="'+gi+'"]').forEach(x=>{ x.checked=ck; }); }
+function openPagoProv(gi){ const g=PPG[gi]; if(!g)return; const ids=[...document.querySelectorAll('.pp-chk[data-g="'+gi+'"]:checked')].map(x=>x.value); if(!ids.length){ toast('Seleccioná al menos una factura.',true); return; } _paySel=ids; const sel=g.facturas.filter(c=>ids.includes(String(c.id))); const sum=sel.reduce((a,c)=>a+saldoCompra(c),0); document.getElementById('modalHost').innerHTML=pagoModalHTML('Pago a '+esc(g.prov), ids.length+' factura'+(ids.length===1?'':'s')+' seleccionada'+(ids.length===1?'':'s')+' · saldo <b>'+money(sum)+'</b>', sum, 'confirmPagoSel()', ids.length); }
+function confirmPagoSel(){ const monto=+document.getElementById('pmonto').value||0; const medio=document.getElementById('pm').value; const fecha=document.getElementById('pf').value||new Date().toISOString().slice(0,10); if(monto<=0){ toast('Ingresá un monto mayor a 0.',true); return; } const facturas=_paySel.map(id=>findCompra(id)).filter(Boolean); applyPago(facturas, monto, medio, fecha); }
+async function revertPay(id){ try{ await patchCompra(id,{estado_pago:'pendiente',medio_pago:null,fecha_pago:null,monto_pagado:0}); const c=findCompra(id); if(c){ c.estado_pago='pendiente'; c.medio_pago=null; c.fecha_pago=null; c.monto_pagado=0; } renderCompras(); toast('Vuelta a pendiente'); }catch(e){ toast('No se pudo: '+e.message,true); } }
+
+// ============ BANCO ============
+function saldoActual(movs){ if(!movs.length)return null; const maxF=movs.reduce((a,m)=>m.fecha>a?m.fecha:a,''); const day=movs.filter(m=>m.fecha===maxF&&m.saldo!=null); if(!day.length)return null; if(day.length===1)return day[0].saldo; const isPrev=s=>day.some(b=>Math.abs((b.saldo-b.importe)-s)<0.01&&b.saldo!==s); const last=day.find(m=>!isPrev(m.saldo)); return (last||day[0]).saldo; }
+function renderBanco(){
+  const host=document.getElementById('tab-banco');
+  host.innerHTML=`
+    <div class="card"><h3>Importar movimientos de Macro <span class="sub">· .xls / .xlsx / .csv del homebanking</span></h3>
+      <div class="drop" id="drop">Arrastrá el archivo acá o <b>tocá para elegirlo</b><br><span style="font-size:12px">Se detectan solos los duplicados</span><input type="file" id="file" accept=".xls,.xlsx,.csv" class="hide"></div>
+      <div id="preview"></div>
+    </div>
+    <div class="controls">
+      <span class="lbl">Período</span><div class="seg" id="bPer">${['dia','semana','mes'].map(p=>`<button data-p="${p}" class="${p===bPeriodo?'on':''}">${p==='dia'?'Día':p==='semana'?'Semana':'Mes'}</button>`).join('')}</div>
+      <span class="lbl" style="margin-left:8px">Tipo</span><div class="seg" id="bTipo">${[['todos','Todos'],['ingreso','Ingresos'],['egreso','Egresos']].map(([v,t])=>`<button data-t="${v}" class="${v===tipoFilt?'on':''}">${t}</button>`).join('')}</div>
+      <span class="lbl" style="margin-left:8px">Categoría</span>
+      <select id="bCat"><option value="todos">Todas</option>${CAT_LIST.map(c=>`<option value="${c}" ${c===catFilt?'selected':''}>${CAT_LABEL[c]}</option>`).join('')}</select>
+    </div>
+    <div id="banco-body"></div>`;
+  const drop=document.getElementById('drop'), file=document.getElementById('file');
+  drop.onclick=()=>file.click();
+  drop.ondragover=e=>{e.preventDefault();drop.classList.add('over');};
+  drop.ondragleave=()=>drop.classList.remove('over');
+  drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);};
+  file.onchange=e=>{if(e.target.files[0])handleFile(e.target.files[0]);};
+  document.querySelectorAll('#bPer button').forEach(b=>b.onclick=()=>{bPeriodo=b.dataset.p;renderBancoBody();});
+  document.querySelectorAll('#bTipo button').forEach(b=>b.onclick=()=>{tipoFilt=b.dataset.t;renderBancoBody();});
+  document.getElementById('bCat').onchange=e=>{catFilt=e.target.value;renderBancoBody();};
+  renderBancoBody();
+}
+function handleFile(f){
+  const rd=new FileReader();
+  rd.onload=()=>{ try{
+    const res=parseMacro(new Uint8Array(rd.result));
+    if(!res.movimientos.length){ toast('No encontré movimientos en el archivo.',true); return; }
+    const seen=new Set(MOVBANCO.map(m=>m.hash));
+    PARSED={cuenta:res.cuenta, archivo:f.name, movs:res.movimientos, nuevos:res.movimientos.filter(m=>!seen.has(m.hash))};
+    renderPreview();
+  }catch(e){ toast('Error leyendo el archivo: '+e.message,true); } };
+  rd.onerror=()=>toast('No se pudo leer el archivo.',true);
+  rd.readAsArrayBuffer(f);
+}
+function renderPreview(){
+  const P=PARSED; if(!P){document.getElementById('preview').innerHTML='';return;}
+  const nuevos=P.nuevos.length, dup=P.movs.length-nuevos;
+  const ing=P.nuevos.filter(m=>m.importe>0).reduce((a,m)=>a+m.importe,0), egr=P.nuevos.filter(m=>m.importe<0).reduce((a,m)=>a+m.importe,0);
+  const rows=P.movs.slice(0,300);
+  document.getElementById('preview').innerHTML=`
+    <div class="note" style="margin-top:14px">Archivo <b>${P.archivo}</b> · cuenta ${P.cuenta||'—'} · ${P.movs.length} movimientos (${nuevos} nuevos, ${dup} ya cargados). Nuevos: ingresos ${money(ing)} · egresos ${money(egr)}. Revisá las categorías y guardá.</div>
+    <div style="display:flex;gap:10px;margin:10px 0"><button class="btn" id="saveBtn" ${nuevos?'':'disabled'} onclick="saveParsed()">Guardar ${nuevos} nuevos</button><button class="btn ghost" onclick="PARSED=null;renderPreview()">Cancelar</button></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Categoría</th><th>Estado</th></tr></thead><tbody>
+    ${rows.map((m,i)=>{const isNew=P.nuevos.includes(m);return `<tr><td>${m.fecha}</td><td title="${m.concepto}">${m.concepto.slice(0,42)}</td><td class="num ${m.importe>=0?'pos':'neg'}">${money(m.importe)}</td><td><select class="catsel" onchange="setParsedCat(${P.movs.indexOf(m)},this.value)">${CAT_LIST.map(c=>`<option value="${c}" ${c===m.categoria?'selected':''}>${CAT_LABEL[c]}</option>`).join('')}</select></td><td>${isNew?'<span class="badge fis">nuevo</span>':'<span class="muted">ya cargado</span>'}</td></tr>`;}).join('')}
+    </tbody></table></div>${P.movs.length>300?'<div class="muted" style="margin-top:6px">Mostrando 300 de '+P.movs.length+'…</div>':''}`;
+}
+function setParsedCat(idx,val){ if(PARSED&&PARSED.movs[idx]){PARSED.movs[idx].categoria=val; PARSED.movs[idx].tipo=val.startsWith('ingreso')?'ingreso':'egreso';} }
+async function saveParsed(){
+  if(!PARSED||!PARSED.nuevos.length)return;
+  const btn=document.getElementById('saveBtn'); if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+  const uuid=()=> (crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(16).slice(2));
+  const payload=PARSED.nuevos.map(m=>({id:uuid(),fecha:m.fecha,referencia:m.referencia,causal:m.causal,concepto:m.concepto,importe:m.importe,saldo:m.saldo,tipo:m.tipo,categoria:m.categoria,cuenta:m.cuenta,banco:'Macro',origen_archivo:PARSED.archivo,hash:m.hash}));
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/movimientos_banco?on_conflict=hash`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(payload)});
+    if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,140));
+    toast(`Guardados ${payload.length} movimientos ✓`);
+    PARSED=null; await reloadBanco(); renderBanco();
+  }catch(e){ toast('No se pudo guardar: '+e.message,true); if(btn){btn.disabled=false;btn.textContent='Reintentar';} }
+}
+function renderBancoBody(){
+  const host=document.getElementById('banco-body'); if(!host)return;
+  if(!MOVBANCO.length){ host.innerHTML='<div class="card"><div class="muted">Todavía no hay movimientos cargados. Subí el export de Macro arriba.</div></div>'; return; }
+  const movs=MOVBANCO.filter(m=>{ if(!enRango(m.fecha))return false; if(tipoFilt!=='todos'&&m.tipo!==tipoFilt)return false; if(catFilt!=='todos'&&m.categoria!==catFilt)return false; return true; });
+  const ing=movs.filter(m=>m.importe>0).reduce((a,m)=>a+ +m.importe,0), egr=movs.filter(m=>m.importe<0).reduce((a,m)=>a+ +m.importe,0);
+  const saldo=saldoActual(MOVBANCO);
+  const perMap={}; movs.forEach(m=>{const k=periodKey(m.fecha,bPeriodo); perMap[k]=perMap[k]||{in:0,out:0}; if(m.importe>=0)perMap[k].in+=+m.importe; else perMap[k].out+=+m.importe;});
+  const pk=Object.keys(perMap).sort(); const pmax=Math.max(1,...pk.map(k=>Math.max(perMap[k].in,-perMap[k].out)));
+  const catMap={}; movs.forEach(m=>{catMap[m.categoria]=(catMap[m.categoria]||0)+ +m.importe;}); const cats=Object.entries(catMap).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])); const cmax=Math.max(1,...cats.map(x=>Math.abs(x[1])));
+  const kpis=`<div class="kpis">
+    <div class="kpi good"><div class="k">Saldo del banco</div><div class="v">${saldo!=null?money(saldo):'—'}</div><div class="s">último movimiento</div></div>
+    <div class="kpi"><div class="k">Ingresos</div><div class="v pos">${money(ing)}</div><div class="s">en el filtro</div></div>
+    <div class="kpi"><div class="k">Egresos</div><div class="v neg">${money(egr)}</div><div class="s">en el filtro</div></div>
+    <div class="kpi"><div class="k">Neto</div><div class="v ${ing+egr>=0?'pos':'neg'}">${money(ing+egr)}</div><div class="s">${movs.length} movimientos</div></div></div>`;
+  const cf=`<div class="card"><h3>Flujo de caja <span class="sub">· por ${bPeriodo} · verde entra / rojo sale</span></h3><div class="cf-bars">${pk.length?pk.map(k=>`<div class="cf-col" title="entra ${money(perMap[k].in)} / sale ${money(perMap[k].out)}"><div class="cf-in" style="height:${Math.round(perMap[k].in/pmax*80)}px"></div><div class="cf-out" style="height:${Math.round(-perMap[k].out/pmax*80)}px"></div><div class="cf-lab">${periodLabel(k,bPeriodo)}</div></div>`).join(''):'<div class="muted">Sin datos.</div>'}</div></div>`;
+  const catCard=`<div class="card"><h3>Por categoría</h3>${cats.map(([n,v])=>`<div class="bar-row"><div class="nm">${CAT_LABEL[n]||n}</div><div class="bar-track"><div class="bar-fill" style="width:${(Math.abs(v)/cmax*100).toFixed(1)}%;background:${v>=0?'linear-gradient(90deg,#3ad19b,#7be0bf)':'linear-gradient(90deg,#ff6b6b,#ff9f9f)'}"></div></div><div class="amt ${v>=0?'':'neg'}">${money(v)}</div></div>`).join('')}</div>`;
+  const ms=[...movs].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const tabla=`<div class="card"><h3>Movimientos <span class="sub">· ${movs.length}</span></h3><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th class="num">Saldo</th><th>Categoría</th></tr></thead><tbody>${ms.slice(0,500).map(m=>`<tr><td>${m.fecha}</td><td title="${m.concepto||''}">${(m.concepto||'').slice(0,44)}</td><td class="num ${+m.importe>=0?'pos':'neg'}">${money(m.importe)}</td><td class="num muted">${m.saldo!=null?money(m.saldo):''}</td><td><select class="catsel" onchange="updateMovCat('${m.id}',this.value)">${CAT_LIST.map(c=>`<option value="${c}" ${c===m.categoria?'selected':''}>${CAT_LABEL[c]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>${movs.length>500?'<div class="muted" style="margin-top:6px">Mostrando 500 de '+movs.length+'…</div>':''}</div>`;
+  host.innerHTML=kpis+cf+reconCard()+cobrosCard()+`<div class="grid">${catCard}<div class="card"><h3>Neto por categoría <span class="sub">· resumen</span></h3><div class="muted" style="line-height:1.6">Los cobros confirmados arriba quedan vinculados a cada factura en la pestaña Facturación.</div></div></div>`+tabla;
+}
+
+// ============ CONCILIACIÓN (egresos banco → compras) ============
+function cuitDigits(s){ return (s||'').replace(/\D/g,''); }
+function diasEntre(a,b){ return Math.abs((new Date(b)-new Date(a))/86400000); }
+function proponerConciliacion(){
+  const pend=COMPRAS.filter(c=>!esPagada(c));
+  const NO_PROV=new Set(['extraccion_efectivo','impuesto','comision_bancaria','interno','servicio','egreso_tarjeta']);
+  const egresos=MOVBANCO.filter(m=>(+m.importe)<0 && !m.compra_id && !NO_PROV.has(m.categoria));
+  const usados=new Set(); const matches=[];
+  // priorizar compras con CUIT y monto exacto
+  pend.forEach(c=>{
+    const cd=cuitDigits(c.cuit), total=+c.total||0; if(!total) return;
+    let best=null,bs=-1;
+    egresos.forEach(m=>{
+      if(usados.has(m.id))return; const amt=-(+m.importe);
+      if(Math.abs(amt-total)>Math.max(50,total*0.015))return;
+      const dd=(new Date(m.fecha)-new Date(c.fecha))/86400000;
+      if(dd<-7||dd>75)return;
+      const cuitOk=cd&&cuitDigits(m.concepto).includes(cd);
+      const score=(cuitOk?100:0)+(Math.abs(amt-total)<0.5?15:(Math.abs(amt-total)<total*0.005?8:0))-Math.abs(dd)*0.05;
+      if(score>bs){bs=score;best={m,cuitOk};}
+    });
+    if(best){matches.push({compra:c,mov:best.m,cuitOk:best.cuitOk});usados.add(best.m.id);}
+  });
+  return matches;
+}
+function reconCard(){
+  const M=proponerConciliacion(); window.__CONCIL=M;
+  const pendN=COMPRAS.filter(c=>!esPagada(c)).length;
+  if(!M.length) return `<div class="card"><h3>Conciliación banco → compras</h3><div class="muted">No encontré pagos nuevos para emparejar. ${pendN?pendN+' factura(s) de compra siguen pendientes (no apareció su pago en el banco).':'No hay facturas de compra pendientes.'}</div></div>`;
+  return `<div class="card"><h3>Conciliación banco → compras <span class="sub">· ${M.length} coincidencia(s)</span></h3>
+    <div class="muted" style="margin-bottom:10px">Revisá y confirmá: marca la factura como paga (transferencia) y la vincula al movimiento del banco.</div>
+    <div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="cAll" checked onclick="document.querySelectorAll('.cChk').forEach(x=>x.checked=this.checked)"></th><th>Proveedor</th><th class="num">Factura</th><th>Fecha</th><th>Pago (banco)</th><th class="num">Importe</th><th>Match</th></tr></thead><tbody>
+    ${M.map((x,i)=>`<tr><td><input type="checkbox" class="cChk" data-i="${i}" checked></td><td>${x.compra.proveedor||'—'}</td><td class="num">${money(x.compra.total)}</td><td>${x.compra.fecha||''}</td><td>${x.mov.fecha||''} · <span class="muted">${(x.mov.concepto||'').slice(0,24)}</span></td><td class="num neg">${money(x.mov.importe)}</td><td>${x.cuitOk?'<span class="badge fis">CUIT + monto</span>':'<span class="badge no">solo monto</span>'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <button class="btn" style="margin-top:12px" onclick="confirmConcile()">Confirmar seleccionadas</button></div>`;
+}
+async function confirmConcile(){
+  const M=window.__CONCIL||[]; const sel=[...document.querySelectorAll('.cChk')].filter(x=>x.checked).map(x=>M[+x.dataset.i]).filter(Boolean);
+  if(!sel.length){ toast('No seleccionaste ninguna.',true); return; }
+  let ok=0;
+  for(const x of sel){
+    try{
+      await patchCompra(x.compra.id,{estado_pago:'pagada',medio_pago:'Transferencia',fecha_pago:x.mov.fecha});
+      const r=await fetch(`${SB_URL}/rest/v1/movimientos_banco?id=eq.${encodeURIComponent(x.mov.id)}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({compra_id:x.compra.id})});
+      if(!r.ok) throw 0;
+      const c=findCompra(x.compra.id); if(c){c.estado_pago='pagada';c.medio_pago='Transferencia';c.fecha_pago=x.mov.fecha;}
+      const m=MOVBANCO.find(z=>z.id===x.mov.id); if(m) m.compra_id=x.compra.id;
+      ok++;
+    }catch(e){}
+  }
+  toast(`Conciliadas ${ok} de ${sel.length} ✓`);
+  renderBanco();
+}
+async function updateMovCat(id,val){
+  try{ const r=await fetch(`${SB_URL}/rest/v1/movimientos_banco?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({categoria:val,tipo:val.startsWith('ingreso')?'ingreso':'egreso'})});
+    if(!r.ok)throw new Error('HTTP '+r.status); const m=MOVBANCO.find(x=>x.id===id); if(m){m.categoria=val;m.tipo=val.startsWith('ingreso')?'ingreso':'egreso';} toast('Categoría actualizada');
+  }catch(e){ toast('No se pudo actualizar: '+e.message,true); }
+}
+
+// ============ FACTURACIÓN (ventas) ============
+function renderFacturacion(){
+  const host=document.getElementById('tab-facturacion');
+  host.innerHTML = facturacionControls() + '<div id="fact-body"></div>';
+  wireFacturacionControls();
+  renderFacturacionBody();
+}
+function facturacionControls(){
+  const clientes=[...new Set(VENTAS.map(v=>v.cliente).filter(Boolean))].sort();
+  return `<div class="note">Facturas emitidas en ARCA (Fase 3C), cargadas desde tus carpetas por cliente. Marcá cada factura como <b>cobrada</b> para llevar las cuentas por cobrar. Los ingresos por transferencia del banco se emparejan solos con el cliente que te pagó.</div>
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="btn" id="scanBtn" onclick="scanFacturas()">🔄 Buscar facturas nuevas en mis carpetas</button><span class="muted" style="font-size:12px">Elegí una vez tu carpeta “Facturación” y trae solo las facturas nuevas (las ya cargadas se saltan solas).</span></div>
+  <div class="controls">
+    <span class="lbl">Período</span>
+    <div class="seg" id="fPer">${['dia','semana','mes'].map(p=>`<button data-p="${p}" class="${p===fPeriodo?'on':''}">${p==='dia'?'Día':p==='semana'?'Semana':'Mes'}</button>`).join('')}</div>
+    <span class="lbl" style="margin-left:8px">Cobro</span>
+    <div class="seg" id="fCob">${[['todos','Todos'],['pendiente','Por cobrar'],['cobrado','Cobradas']].map(([v,t])=>`<button data-c="${v}" class="${v===cobroFilt?'on':''}">${t}</button>`).join('')}</div>
+    <span class="lbl" style="margin-left:8px">Cliente</span>
+    <select id="fCli"><option value="todos">Todos</option>${clientes.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${c===clienteFilt?'selected':''}>${c.length>34?c.slice(0,34)+'…':c}</option>`).join('')}</select>
+  </div>`;
+}
+function wireFacturacionControls(){
+  document.querySelectorAll('#fPer button').forEach(b=>b.onclick=()=>{fPeriodo=b.dataset.p;renderFacturacion();});
+  document.querySelectorAll('#fCob button').forEach(b=>b.onclick=()=>{cobroFilt=b.dataset.c;renderFacturacion();});
+  const cli=document.getElementById('fCli'); if(cli) cli.onchange=e=>{clienteFilt=e.target.value;renderFacturacion();};
+}
+function renderFacturacionBody(){
+  const body=document.getElementById('fact-body'); if(!body)return;
+  if(!VENTAS.length){ body.innerHTML='<div class="card"><div class="muted">Todavía no hay facturas emitidas cargadas.</div></div>'; return; }
+  const rows=VENTAS.filter(v=>{ if(!enRango(v.fecha))return false; if(cobroFilt==='cobrado'&&!esCobrada(v))return false; if(cobroFilt==='pendiente'&&esCobrada(v))return false; if(clienteFilt!=='todos'&&v.cliente!==clienteFilt)return false; return true; });
+  const sumTotal=rows.reduce((a,v)=>a+(+v.total||0),0), sumNeto=rows.reduce((a,v)=>a+(+v.neto||0),0), sumIva=rows.reduce((a,v)=>a+(+v.iva||0),0);
+  const cobr=rows.filter(esCobrada).reduce((a,v)=>a+(+v.total||0),0), pend=rows.filter(v=>!esCobrada(v)).reduce((a,v)=>a+(+v.total||0),0);
+  const nPend=rows.filter(v=>!esCobrada(v)).length;
+  const perMap={}; rows.forEach(v=>{const k=periodKey(v.fecha,fPeriodo);perMap[k]=(perMap[k]||0)+(+v.total||0);}); const pk=Object.keys(perMap).sort(), pmax=Math.max(1,...pk.map(k=>perMap[k]));
+  // por cliente (facturado) y cuentas por cobrar por cliente
+  const cliMap={}, cxcMap={};
+  rows.forEach(v=>{const c=v.cliente||'—'; cliMap[c]=(cliMap[c]||0)+(+v.total||0); if(!esCobrada(v)) cxcMap[c]=(cxcMap[c]||0)+(+v.total||0);});
+  const clis=Object.entries(cliMap).sort((a,b)=>b[1]-a[1]), climax=Math.max(1,...clis.map(x=>x[1]));
+  const cxc=Object.entries(cxcMap).sort((a,b)=>b[1]-a[1]), cxcmax=Math.max(1,...cxc.map(x=>x[1]));
+  const kpis=`<div class="kpis">
+    <div class="kpi"><div class="k">Total facturado</div><div class="v">${money(sumTotal)}</div><div class="s">${rows.length} facturas</div></div>
+    <div class="kpi good"><div class="k">Cobrado</div><div class="v pos">${money(cobr)}</div><div class="s">${rows.length-nPend} cobradas</div></div>
+    <div class="kpi hot"><div class="k">Por cobrar</div><div class="v">${money(pend)}</div><div class="s">${nPend} pendientes</div></div>
+    <div class="kpi"><div class="k">Neto (sin IVA)</div><div class="v">${money(sumNeto)}</div><div class="s">facturación real</div></div>
+    <div class="kpi"><div class="k">IVA débito</div><div class="v">${money(sumIva)}</div><div class="s">IVA facturado</div></div></div>`;
+  const evo=`<div class="card"><h3>Evolución de la facturación <span class="sub">· por ${fPeriodo}</span></h3><div class="cf-bars">${pk.length?pk.map(k=>`<div class="cf-col" title="${money(perMap[k])}"><div class="cf-in" style="height:${Math.round(perMap[k]/pmax*150)}px"></div><div class="cf-lab">${periodLabel(k,fPeriodo)}<br>${(perMap[k]/1000).toFixed(0)}k</div></div>`).join(''):'<div class="muted">Sin datos.</div>'}</div></div>`;
+  const cliCard=`<div class="card"><h3>Facturación por cliente</h3>${clis.length?clis.map(([n,v])=>`<div class="bar-row"><div class="nm" title="${n}">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/climax*100).toFixed(1)}%;background:linear-gradient(90deg,#3ad19b,#7be0bf)"></div></div><div class="amt">${money(v)}</div></div>`).join(''):'<div class="muted">Sin facturas.</div>'}</div>`;
+  const cxcCard=`<div class="card"><h3>Cuentas por cobrar <span class="sub">· por cliente</span></h3>${cxc.length?cxc.map(([n,v])=>`<div class="bar-row"><div class="nm" title="${n}">${n}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/cxcmax*100).toFixed(1)}%;background:linear-gradient(90deg,var(--warn),#ffd699)"></div></div><div class="amt">${money(v)}</div></div>`).join(''):'<div class="muted">Todo cobrado 🎉</div>'}</div>`;
+  const rs=[...rows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const tabla=`<div class="card"><h3>Facturas emitidas <span class="sub">· ${rows.length}</span></h3><div class="tbl-wrap"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Emisor</th><th>Nº</th><th class="num">Total</th><th>Cobro</th></tr></thead><tbody>${rs.map(v=>{
+    const cob=esCobrada(v); let cc;
+    if(cob){const rt=retTotal(v);const info=[v.fecha_cobro, rt>0.5?('ret '+money(rt)):''].filter(Boolean).join(' · ');cc=`<span class="badge pag">Cobrada</span>${info?`<span class="muted" style="font-size:11px"> ${info}</span>`:''} <button class="rev-btn" title="Cargar/editar retenciones" onclick="event.stopPropagation();openRet('${v.id}')">%</button><button class="rev-btn" onclick="event.stopPropagation();revertCobro('${v.id}')">↩</button>`;}
+    else cc=`<button class="pay-btn" onclick="event.stopPropagation();openCobro('${v.id}')">Marcar cobrada</button>`;
+    const emi=(v.emisor||'').replace('BRONSTEIN PABLO DAMIAN','Bronstein').replace('BAD KITCHEN S.R.L.','Bad Kitchen').replace('ALIMENTO COTIDIANO S.R.L.','Alim. Cotidiano');
+    return `<tr><td>${v.fecha||''}</td><td title="${v.cliente||''}">${(v.cliente||'—').slice(0,30)}</td><td class="muted">${emi}</td><td>${v.tipo||''} ${v.punto_venta||''}-${v.nro_comprobante||''}</td><td class="num">${money(v.total)}</td><td>${cc}</td></tr>`;
+  }).join('')}</tbody></table></div></div>`;
+  body.innerHTML=kpis+evo+`<div class="grid">${cliCard}${cxcCard}</div>`+tabla;
+}
+
+// ====== Importar facturas emitidas desde las carpetas del cliente (File System Access API) ======
+const EMISORES = {'20288038903':'BRONSTEIN PABLO DAMIAN','30719230934':'BAD KITCHEN S.R.L.','30714717733':'ALIMENTO COTIDIANO S.R.L.'};
+const EMISOR_NOMBRES = /BRONSTEIN PABLO|BAD KITCHEN|ALIMENTO COTIDIANO/i;
+let PDFJS_READY=false;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=()=>res();s.onerror=()=>rej(new Error('No se pudo cargar la librería de PDF'));document.head.appendChild(s);});}
+async function ensurePdfjs(){ if(PDFJS_READY)return; await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'); window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; PDFJS_READY=true; }
+async function pdfText(buf){
+  const doc=await window.pdfjsLib.getDocument({data:buf}).promise; let txt='';
+  for(let p=1;p<=doc.numPages;p++){ const page=await doc.getPage(p); const c=await page.getTextContent(); let last=null; for(const it of c.items){ const y=it.transform[5]; if(last!==null&&Math.abs(y-last)>3)txt+='\n'; txt+=it.str+' '; last=y; } txt+='\n'; }
+  return txt.replace(/[ \t]+/g,' ');
+}
+function numAR(s){ if(s==null)return null; s=String(s).replace(/\$/g,'').replace(/\s/g,'').replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?null:n; }
+function fechaISO(txt){ const m=txt.match(/(\d{2})\/(\d{2})\/(\d{4})/); return m?`${m[3]}-${m[2]}-${m[1]}`:null; }
+function parseFactura(txt, archivo){
+  const tipo=/NOTA DE CR[EÉ]DITO/i.test(txt)?'NC':(/FACTURA\s+A/i.test(txt)?'A':(/FACTURA\s+B/i.test(txt)?'B':'?'));
+  const cuits=[...txt.matchAll(/\b(\d{11})\b/g)].map(m=>m[1]);
+  const emisor=cuits.find(c=>EMISORES[c]);
+  let recep=null, cliente=null;
+  for(const ln of txt.split('\n')){ const mm=ln.trim().match(/^(\d{11})\s+([A-ZÁÉÍÓÚÑ].{2,60}?)\s*$/); if(mm && mm[1]!==emisor && !EMISOR_NOMBRES.test(mm[2])){ recep=mm[1]; cliente=mm[2].trim(); break; } }
+  const pv=txt.match(/Punto de Venta:\s*Comp\.\s*Nro:\s*(\d{4,5})\s+(\d{6,8})/)||[];
+  const punto=pv[1]||null, nro=pv[2]||null;
+  const neto=numAR((txt.match(/Importe Neto Gravado:\s*\$?\s*([\d.,]+)/)||[])[1]);
+  const total=numAR((txt.match(/Importe Total:\s*\$?\s*([\d.,]+)/)||[])[1]);
+  const otros=numAR((txt.match(/Importe Otros Tributos:\s*\$?\s*([\d.,]+)/)||[])[1])||0;
+  const iva=(neto!=null&&total!=null)?Math.round((total-neto-otros)*100)/100:null;
+  const cae=(txt.match(/\b([78]\d{13})\b/)||[])[1]||null;
+  const totStr=(total!=null)?(Number.isInteger(total)?total+'.0':''+total):null;
+  const hash=(recep&&punto&&nro&&totStr)?`${recep}|${punto}|${nro}|${totStr}`:null;
+  return { id:(crypto.randomUUID?crypto.randomUUID():'v-'+Date.now()+'-'+Math.random().toString(16).slice(2)), fecha:fechaISO(txt), cliente, cliente_cuit:recep, emisor:EMISORES[emisor]||'', tipo, punto_venta:punto, nro_comprobante:nro, neto, iva, total, cae, archivo, hash };
+}
+async function* walkDir(handle, prefix){
+  for await (const [name,h] of handle.entries()){
+    if(h.kind==='file'){ if(/\.pdf$/i.test(name)) yield {name, handle:h}; }
+    else if(h.kind==='directory'){ yield* walkDir(h, prefix+name+'/'); }
+  }
+}
+async function scanFacturas(){
+  if(!window.showDirectoryPicker){ toast('Esta función necesita Chrome o Edge de escritorio.',true); return; }
+  let dir; try{ dir=await window.showDirectoryPicker({id:'facturacion',mode:'read'}); }catch(e){ return; }
+  const btn=document.getElementById('scanBtn'); if(btn){btn.disabled=true;btn.textContent='Leyendo carpetas…';}
+  try{
+    await ensurePdfjs();
+    const existing=new Set(VENTAS.map(v=>v.hash));
+    const files=[]; for await (const f of walkDir(dir,'')) files.push(f);
+    const nuevos=[]; let errores=0, salteadas=0, i=0;
+    for(const f of files){
+      i++; if(btn && i%10===0) btn.textContent=`Procesando ${i}/${files.length}…`;
+      try{
+        const file=await f.handle.getFile();
+        const r=parseFactura(await pdfText(new Uint8Array(await file.arrayBuffer())), f.name);
+        if(!r.hash){ errores++; continue; }
+        if(existing.has(r.hash)){ salteadas++; continue; }
+        existing.add(r.hash); nuevos.push(r);
+      }catch(e){ errores++; }
+    }
+    if(!nuevos.length){ toast(`Sin novedades: ${files.length} PDF revisados, ${salteadas} ya estaban${errores?', '+errores+' no reconocidas':''}.`); if(btn){btn.disabled=false;btn.textContent='🔄 Buscar facturas nuevas en mis carpetas';} return; }
+    const rr=await fetch(`${SB_URL}/rest/v1/ventas?on_conflict=hash`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=ignore-duplicates,return=minimal'},body:JSON.stringify(nuevos)});
+    if(!rr.ok) throw new Error('HTTP '+rr.status+' '+(await rr.text()).slice(0,120));
+    await reloadVentas(); renderFacturacion();
+    toast(`✓ ${nuevos.length} factura(s) nueva(s) cargada(s)${errores?' · '+errores+' no reconocidas':''}`);
+  }catch(e){ toast('Error: '+e.message,true); if(btn){btn.disabled=false;btn.textContent='🔄 Buscar facturas nuevas en mis carpetas';} }
+}
+
+// ============ cobros ventas (marcado manual) ============
+function findVenta(id){return VENTAS.find(v=>v.id===id);}
+function openCobro(id){ const v=findVenta(id); if(!v)return; const hoy=new Date().toISOString().slice(0,10);
+  document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Marcar como cobrada</h3><p class="who">${esc(v.cliente||'—')} · ${esc(v.nro_comprobante||'')} · <b>${money(v.total)}</b></p><label>Fecha de cobro</label><input type="date" id="cf" value="${v.fecha_cobro||hoy}">${retInputs(v)}<div class="muted" style="font-size:11px;margin-top:4px">Las retenciones van a Impuestos en el Cash Flow.</div><div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="confirmCobro('${id}')">Confirmar</button></div></div></div>`;
+}
+function openRet(id){ const v=findVenta(id); if(!v)return;
+  document.getElementById('modalHost').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Retenciones de la factura</h3><p class="who">${esc(v.cliente||'—')} · ${esc(v.nro_comprobante||'')} · <b>${money(v.total)}</b></p>${retInputs(v)}<div class="modal-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" style="flex:1" onclick="confirmRet('${id}')">Guardar</button></div></div></div>`;
+}
+async function patchVenta(id,body){ const url=`${SB_URL}/rest/v1/ventas?id=eq.${encodeURIComponent(id)}`; let r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)}); if(!r.ok && /ret_/.test(JSON.stringify(body))){ const b2={...body}; ['ret_iva','ret_ganancias','ret_iibb','ret_suss','ret_otro'].forEach(k=>delete b2[k]); r=await fetch(url,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(b2)}); if(r.ok) throw new Error('SIN_RET'); } if(!r.ok) throw new Error('HTTP '+r.status+' '+(await r.text()).slice(0,100)); }
+async function confirmCobro(id){ const fecha=document.getElementById('cf').value||new Date().toISOString().slice(0,10); const ret=retVals(); const v=findVenta(id); try{ await patchVenta(id,{estado_cobro:'cobrado',fecha_cobro:fecha,...ret}); if(v){v.estado_cobro='cobrado';v.fecha_cobro=fecha;Object.assign(v,ret);} closeModal(); renderFacturacion(); toast('Marcada como cobrada ✓'); }catch(e){ if(e.message==='SIN_RET'){ if(v){v.estado_cobro='cobrado';v.fecha_cobro=fecha;} closeModal(); renderFacturacion(); toast('Cobrada ✓ (corré el SQL de retenciones para guardarlas)',true); } else toast('No se pudo guardar: '+e.message,true); } }
+async function confirmRet(id){ const ret=retVals(); const v=findVenta(id); try{ await patchVenta(id,{...ret}); if(v)Object.assign(v,ret); closeModal(); renderFacturacion(); toast('Retenciones guardadas ✓'); }catch(e){ if(e.message==='SIN_RET'){ toast('Falta correr el SQL de retenciones en Supabase.',true); } else toast('No se pudo: '+e.message,true); } }
+async function revertCobro(id){ try{ await patchVenta(id,{estado_cobro:'pendiente',fecha_cobro:null,movimiento_id:null}); const v=findVenta(id); if(v){v.estado_cobro='pendiente';v.fecha_cobro=null;v.movimiento_id=null;} renderFacturacion(); toast('Vuelta a pendiente'); }catch(e){ toast('No se pudo: '+e.message,true); } }
+
+// ============ CONCILIACIÓN (ingresos banco → ventas) ============
+function proponerCobros(){
+  const pend=VENTAS.filter(v=>!esCobrada(v));
+  const usadosMov=new Set(VENTAS.map(v=>v.movimiento_id).filter(Boolean));
+  const ingresos=MOVBANCO.filter(m=>(+m.importe)>0 && !usadosMov.has(m.id));
+  const usados=new Set(); const matches=[];
+  pend.forEach(v=>{
+    const cd=cuitDigits(v.cliente_cuit), total=+v.total||0; if(!total) return;
+    let best=null,bs=-1;
+    ingresos.forEach(m=>{
+      if(usados.has(m.id))return; const amt=+m.importe;
+      if(Math.abs(amt-total)>Math.max(50,total*0.015))return;
+      const dd=(new Date(m.fecha)-new Date(v.fecha))/86400000;
+      if(dd<-7||dd>75)return;
+      const cuitOk=cd&&cuitDigits(m.concepto).includes(cd);
+      const score=(cuitOk?100:0)+(Math.abs(amt-total)<0.5?15:(Math.abs(amt-total)<total*0.005?8:0))-Math.abs(dd)*0.05;
+      if(score>bs){bs=score;best={m,cuitOk};}
+    });
+    if(best){matches.push({venta:v,mov:best.m,cuitOk:best.cuitOk});usados.add(best.m.id);}
+  });
+  return matches;
+}
+function cobrosCard(){
+  if(!MOVBANCO.length||!VENTAS.length){ return `<div class="card"><h3>Cobros de clientes</h3><div class="muted" style="line-height:1.6">${!VENTAS.length?'Cargá tus facturas emitidas para emparejar los cobros.':'Subí el export de Macro para ver los cobros por transferencia.'}</div></div>`; }
+  const M=proponerCobros(); window.__COBROS=M;
+  const pendN=VENTAS.filter(v=>!esCobrada(v)).length;
+  if(!M.length) return `<div class="card"><h3>Cobros de clientes <span class="sub">· banco → facturas</span></h3><div class="muted">No encontré cobros nuevos para emparejar. ${pendN?pendN+' factura(s) siguen por cobrar (no apareció su ingreso en el banco).':'No hay facturas pendientes de cobro.'}</div></div>`;
+  return `<div class="card"><h3>Cobros de clientes <span class="sub">· ${M.length} coincidencia(s)</span></h3>
+    <div class="muted" style="margin-bottom:10px">Revisá y confirmá: marca la factura como cobrada y la vincula al ingreso del banco.</div>
+    <div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="vAll" checked onclick="document.querySelectorAll('.vChk').forEach(x=>x.checked=this.checked)"></th><th>Cliente</th><th class="num">Factura</th><th>Fecha</th><th>Cobro (banco)</th><th class="num">Importe</th><th>Match</th></tr></thead><tbody>
+    ${M.map((x,i)=>`<tr><td><input type="checkbox" class="vChk" data-i="${i}" checked></td><td title="${x.venta.cliente||''}">${(x.venta.cliente||'—').slice(0,26)}</td><td class="num">${money(x.venta.total)}</td><td>${x.venta.fecha||''}</td><td>${x.mov.fecha||''} · <span class="muted">${(x.mov.concepto||'').slice(0,24)}</span></td><td class="num pos">${money(x.mov.importe)}</td><td>${x.cuitOk?'<span class="badge fis">CUIT + monto</span>':'<span class="badge no">solo monto</span>'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <button class="btn" style="margin-top:12px" onclick="confirmCobros()">Confirmar seleccionadas</button></div>`;
+}
+async function confirmCobros(){
+  const M=window.__COBROS||[]; const sel=[...document.querySelectorAll('.vChk')].filter(x=>x.checked).map(x=>M[+x.dataset.i]).filter(Boolean);
+  if(!sel.length){ toast('No seleccionaste ninguna.',true); return; }
+  let ok=0;
+  for(const x of sel){
+    try{
+      await patchVenta(x.venta.id,{estado_cobro:'cobrado',fecha_cobro:x.mov.fecha,movimiento_id:x.mov.id});
+      const v=findVenta(x.venta.id); if(v){v.estado_cobro='cobrado';v.fecha_cobro=x.mov.fecha;v.movimiento_id=x.mov.id;}
+      ok++;
+    }catch(e){}
+  }
+  toast(`Conciliadas ${ok} de ${sel.length} ✓`);
+  renderBanco();
+}
+
+// ============ CASH FLOW / estructura de costos ============
+function cuitDe(m){ return ((m.concepto||'').match(/\b(\d{11})\b/)||[])[1]||null; }
+function normTxt(s){ return (s||'').toUpperCase().replace(/[0-9]/g,' ').replace(/[^A-ZÁÉÍÓÚÑ ]/g,' ').replace(/\s+/g,' ').trim(); }
+function autoRubro(m){
+  if(m.rubro) return m.rubro;
+  if(m.compra_id) return 'mercaderia';
+  const cat=m.categoria, con=(m.concepto||'').toUpperCase(), cuit=cuitDe(m);
+  if(cuit && RUBRO_MAP[cuit]) return RUBRO_MAP[cuit];
+  const nc=normTxt(m.concepto);
+  for(const rg of REGLAS){ const p=normTxt(rg.patron); if(p && nc.includes(p)) return rg.rubro; }
+  if(cat==='impuesto'){
+    if(/ING.*BRUT|IIBB|ARBA|AGIP|RENTAS|SIRCREB/.test(con)) return 'iibb';
+    if(/AUTONOMO|MONOTRIB/.test(con)) return 'autonomos';
+    if(/IVA/.test(con)) return 'iva';
+    if(/LEY\s*25413|DEB.*CRED|CRED.*DEB|IMP.*CHEQUE|DEBITOS Y CRED/.test(con)) return 'imp_cheque';
+    return 'impuestos';
+  }
+  if(cat==='servicio') return 'servicios';
+  if(cat==='comision_bancaria') return 'comisiones';
+  if(cat==='extraccion_efectivo') return 'retiros';
+  if(cat==='interno') return 'otros';
+  if(cat==='egreso_transferencia'){
+    if(/ALQ/.test(con)) return 'alquiler';
+    if(/HON/.test(con)) return 'honorarios';
+    if(/SUELDO|JORNAL|QUINCENA|SALARIO/.test(con)) return 'sueldos';
+    if(cuit==='20288038903') return 'retiros';
+    if(cuit && PROV_CUITS.has(cuit)) return 'mercaderia';
+    if(/FAC/.test(con)) return 'mercaderia';
+    return 'a_clasificar';
+  }
+  return 'a_clasificar';
+}
+async function setRubro(id,rubro){
+  const m=MOVBANCO.find(x=>x.id===id); if(!m)return; const prev=m.rubro; m.rubro=rubro;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/movimientos_banco?id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({rubro})});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const cuit=cuitDe(m);
+    if(cuit){ RUBRO_MAP[cuit]=rubro; fetch(`${SB_URL}/rest/v1/rubro_map?on_conflict=clave`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({clave:cuit,rubro})}).catch(()=>{}); }
+    renderCashflow(); toast('Rubro: '+(RUBROS[rubro]?RUBROS[rubro].l:rubro));
+  }catch(e){ m.rubro=prev; toast('No se pudo guardar (¿corriste el SQL de rubros?): '+e.message,true); }
+}
+function rubroSelect(m){ const cur=autoRubro(m); return `<select class="catsel" onchange="setRubro('${m.id}',this.value)">${RUBRO_KEYS.map(k=>`<option value="${k}" ${k===cur?'selected':''}>${RUBROS[k].l}</option>`).join('')}</select>`; }
+function grupoKey(m){ const c=cuitDe(m); return c?('C|'+c):('T|'+normTxt(m.concepto).slice(0,40)); }
+function grupoSelect(key,cur){ return `<select class="catsel" onchange="setGrupoRubro(this.getAttribute('data-k'),this.value)" data-k="${(key||'').replace(/"/g,'')}">${RUBRO_KEYS.map(k=>`<option value="${k}" ${k===cur?'selected':''}>${RUBROS[k].l}</option>`).join('')}</select>`; }
+async function setGrupoRubro(key,rubro){
+  try{
+    if(key.slice(0,2)==='C|'){ const cuit=key.slice(2); RUBRO_MAP[cuit]=rubro;
+      await fetch(`${SB_URL}/rest/v1/rubro_map?on_conflict=clave`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({clave:cuit,rubro})});
+    } else { const patron=key.slice(2); REGLAS=REGLAS.filter(r=>r.patron!==patron); if(rubro!=='a_clasificar') REGLAS.push({patron,rubro});
+      if(rubro==='a_clasificar'){ await fetch(`${SB_URL}/rest/v1/regla_rubro?patron=eq.${encodeURIComponent(patron)}`,{method:'DELETE',headers:H}); }
+      else await fetch(`${SB_URL}/rest/v1/regla_rubro?on_conflict=patron`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({patron,rubro})});
+    }
+    renderCashflow(); toast('Grupo clasificado ✓');
+  }catch(e){ toast('No se pudo guardar (¿corriste el SQL de reglas?): '+e.message,true); }
+}
+async function addRegla(){
+  const raw=document.getElementById('regInput')?.value||''; const rubro=document.getElementById('regRubro')?.value||'';
+  const patron=normTxt(raw); if(!patron){ toast('Escribí una palabra clave.',true); return; }
+  try{
+    await fetch(`${SB_URL}/rest/v1/regla_rubro?on_conflict=patron`,{method:'POST',headers:{...H,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({patron,rubro})});
+    REGLAS=REGLAS.filter(r=>r.patron!==patron); REGLAS.push({patron,rubro}); renderCashflow(); toast('Regla: '+patron+' → '+(RUBROS[rubro]?RUBROS[rubro].l:rubro));
+  }catch(e){ toast('No se pudo guardar (¿corriste el SQL de reglas?): '+e.message,true); }
+}
+async function delRegla(patron){
+  try{ await fetch(`${SB_URL}/rest/v1/regla_rubro?patron=eq.${encodeURIComponent(patron)}`,{method:'DELETE',headers:H}); REGLAS=REGLAS.filter(r=>r.patron!==patron); renderCashflow(); toast('Regla eliminada'); }catch(e){ toast('No se pudo: '+e.message,true); }
+}
+function renderCashflow(){
+  const host=document.getElementById('tab-cashflow');
+  if(!MOVBANCO.length){ host.innerHTML='<div class="note">Cash Flow y estructura de costos. Subí el export de Macro en la pestaña Banco para ver los números.</div>'; return; }
+  const MBF=MOVBANCO.filter(m=>enRango(m.fecha));
+  const egresos=MBF.filter(m=>+m.importe<0);
+  let ingresos=MBF.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0);
+  const porRubro={}; egresos.forEach(m=>{const r=autoRubro(m); porRubro[r]=(porRubro[r]||0)+(-+m.importe);});
+  // Retenciones de impuestos sobre ventas cobradas → suman a impuestos (y a ingresos brutos, para no distorsionar la caja)
+  const RET_RUBRO={ret_iva:'iva',ret_ganancias:'ganancias',ret_iibb:'iibb',ret_suss:'impuestos',ret_otro:'impuestos'};
+  let retTot=0;
+  VENTAS.filter(v=>esCobrada(v) && enRango(v.fecha_cobro||v.fecha)).forEach(v=>{ Object.keys(RET_RUBRO).forEach(k=>{ const val=+v[k]||0; if(val>0.005){ porRubro[RET_RUBRO[k]]=(porRubro[RET_RUBRO[k]]||0)+val; retTot+=val; } }); });
+  ingresos+=retTot;
+  const porTipo={variable:0,indirecto:0,fijo:0,impuesto:0,financiero:0,otro:0,pendiente:0};
+  Object.entries(porRubro).forEach(([r,v])=>{ const t=RUBROS[r]?RUBROS[r].t:'otro'; porTipo[t]+=v; });
+  const variable=porTipo.variable, indir=porTipo.indirecto, fijo=porTipo.fijo, imp=porTipo.impuesto, pend=porTipo.pendiente;
+  const estructura=fijo+indir;
+  const margen=ingresos-variable, resultado=margen-indir-fijo-imp;
+  const mPct=ingresos?margen/ingresos*100:0, peq=mPct>0?estructura/(mPct/100):null;
+  const pct=v=>ingresos?((v/ingresos*100).toFixed(1)+'%'):'—';
+  const nPend=egresos.filter(m=>autoRubro(m)==='a_clasificar').length;
+  const kpis=`<div class="kpis">
+    <div class="kpi good"><div class="k">Ingresos (cobros)</div><div class="v pos">${money(ingresos)}</div><div class="s">entra al banco</div></div>
+    <div class="kpi"><div class="k">Costos variables</div><div class="v">${money(variable)}</div><div class="s">${pct(variable)} de ventas</div></div>
+    <div class="kpi"><div class="k">Margen de contribución</div><div class="v ${margen>=0?'pos':'neg'}">${money(margen)}</div><div class="s">${mPct.toFixed(1)}%</div></div>
+    <div class="kpi"><div class="k">Costos indirectos</div><div class="v">${money(indir)}</div><div class="s">${pct(indir)} de ventas</div></div>
+    <div class="kpi"><div class="k">Costos fijos</div><div class="v">${money(fijo)}</div><div class="s">${pct(fijo)} de ventas</div></div>
+    <div class="kpi"><div class="k">Impuestos</div><div class="v">${money(imp)}</div><div class="s">${pct(imp)} de ventas</div></div>
+    <div class="kpi ${resultado>=0?'good':'hot'}"><div class="k">Resultado</div><div class="v ${resultado>=0?'pos':'neg'}">${money(resultado)}</div><div class="s">ingresos − costos − imp.</div></div>
+  </div>`;
+  const tiposOrden=['variable','indirecto','fijo','impuesto','financiero','otro','pendiente'];
+  const tipoColor={variable:'linear-gradient(90deg,#4f9dff,#7bb8ff)',indirecto:'linear-gradient(90deg,#b98cff,#d4bcff)',fijo:'linear-gradient(90deg,#3ad19b,#7be0bf)',impuesto:'linear-gradient(90deg,#ffb84d,#ffd699)',financiero:'linear-gradient(90deg,#ff8fa3,#ffc2cd)'};
+  const maxv=Math.max(1,...Object.values(porRubro));
+  const estr=tiposOrden.filter(t=>porTipo[t]>0).map(t=>{
+    const rubrosT=Object.entries(porRubro).filter(([r])=>(RUBROS[r]?RUBROS[r].t:'otro')===t).sort((a,b)=>b[1]-a[1]);
+    return `<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:5px"><span>${TIPO_LABEL[t]}</span><span class="muted">${money(porTipo[t])} · ${pct(porTipo[t])}</span></div>${rubrosT.map(([r,v])=>`<div class="bar-row"><div class="nm">${RUBROS[r]?RUBROS[r].l:r}</div><div class="bar-track"><div class="bar-fill" style="width:${(v/maxv*100).toFixed(1)}%;background:${tipoColor[t]||'linear-gradient(90deg,#9aa3b2,#c3c9d4)'}"></div></div><div class="amt">${money(v)}</div></div>`).join('')}</div>`;
+  }).join('');
+  const estrCard=`<div class="card"><h3>Estructura de costos <span class="sub">· por tipo y rubro</span></h3>${estr}${peq?`<div class="note" style="margin-top:6px">Punto de equilibrio: hay que facturar <b>${money(peq)}</b> por período para cubrir los costos fijos e indirectos (margen ${mPct.toFixed(1)}%).</div>`:''}</div>`;
+  const reglasList = REGLAS.length?REGLAS.map(r=>`<span class="chip" style="margin:0 4px 4px 0;display:inline-block">${r.patron} → ${RUBROS[r.rubro]?RUBROS[r.rubro].l:r.rubro} <span onclick="delRegla('${r.patron}')" style="cursor:pointer;color:var(--bad)">✕</span></span>`).join(''):'<span class="muted">Sin reglas todavía. Ej: escribí YAGUAR y elegí Mercadería.</span>';
+  const reglasCard=`<div class="card"><h3>Reglas por palabra <span class="sub">· automatizá por texto</span></h3><div style="margin-bottom:10px">${reglasList}</div><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="regInput" placeholder="Palabra (ej: SUPER, YAGUAR, CARNES)" style="flex:1;min-width:150px"><select id="regRubro">${RUBRO_KEYS.filter(k=>k!=='a_clasificar').map(k=>`<option value="${k}">${RUBROS[k].l}</option>`).join('')}</select><button class="btn" onclick="addRegla()">Agregar</button></div><div class="muted" style="font-size:12px;margin-top:6px">Cualquier egreso cuyo concepto contenga esa palabra se clasifica solo, ahora y en el futuro.</div></div>`;
+  const grupos={}; egresos.forEach(m=>{ const k=grupoKey(m); if(!grupos[k]) grupos[k]={key:k,s:0,n:0,ej:m.concepto||'',cur:autoRubro(m)}; grupos[k].s+=-+m.importe; grupos[k].n++; });
+  const gArr=Object.values(grupos).sort((a,b)=>b.s-a.s);
+  const gruposCard=`<div class="card"><h3>Egresos por beneficiario <span class="sub">· ${gArr.length} grupos · asigná el rubro a todo el grupo de una</span></h3><div class="tbl-wrap"><table><thead><tr><th>Beneficiario / concepto</th><th class="num">Total</th><th class="num">#</th><th>Rubro</th></tr></thead><tbody>${gArr.map(g=>`<tr style="${g.cur==='a_clasificar'?'background:#241d0e':''}"><td title="${(g.ej||'').replace(/"/g,'&quot;')}">${(g.ej||'').slice(0,40)}</td><td class="num neg">${money(-g.s)}</td><td class="num muted">${g.n}</td><td>${grupoSelect(g.key,g.cur)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const perMap={}; MBF.forEach(m=>{const k=periodKey(m.fecha,cfPeriodo); perMap[k]=perMap[k]||{in:0,out:0}; if(+m.importe>=0)perMap[k].in+=+m.importe; else perMap[k].out+=+m.importe;});
+  const pk=Object.keys(perMap).sort(); const pmax=Math.max(1,...pk.map(k=>Math.max(perMap[k].in,-perMap[k].out)));
+  const cf=`<div class="card"><h3>Flujo de caja <span class="sub">· por ${cfPeriodo} · verde entra / rojo sale</span></h3><div class="cf-bars">${pk.map(k=>`<div class="cf-col" title="entra ${money(perMap[k].in)} / sale ${money(perMap[k].out)}"><div class="cf-in" style="height:${Math.round(perMap[k].in/pmax*80)}px"></div><div class="cf-out" style="height:${Math.round(-perMap[k].out/pmax*80)}px"></div><div class="cf-lab">${periodLabel(k,cfPeriodo)}</div></div>`).join('')}</div></div>`;
+  const nota=`<div class="note">Cash Flow y estructura de costos a partir del banco. Clasificá los egresos por <b>beneficiario</b> (abajo) o con <b>reglas por palabra</b>.${nPend?` Quedan <b>${nPend} sin clasificar</b> — el resultado es parcial hasta terminarlos.`:' Todo clasificado ✓'}</div>`;
+  host.innerHTML=nota+kpis+estrCard+cf+reglasCard+gruposCard;
+}
+
+// ============ RESUMEN ============
+function renderResumen(){
+  const host=document.getElementById('tab-resumen');
+  const saldo=saldoActual(MOVBANCO);
+  const mesAct=new Date().toISOString().slice(0,7);
+  const useR=!!(FDESDE||FHASTA);
+  const inR=f=>useR?enRango(f):((f||'').slice(0,7)===mesAct);
+  const periodoLbl=useR?((FDESDE||'inicio')+' → '+(FHASTA||'hoy')):mesAct;
+  const mMes=MOVBANCO.filter(m=>inR(m.fecha));
+  const ingMes=mMes.filter(m=>+m.importe>0).reduce((a,m)=>a+ +m.importe,0), egrMes=mMes.filter(m=>+m.importe<0).reduce((a,m)=>a+ +m.importe,0);
+  const pend=COMPRAS.filter(c=>!esPagada(c)).reduce((a,c)=>a+saldoCompra(c),0), nPend=COMPRAS.filter(c=>!esPagada(c)).length;
+  const comprasMes=COMPRAS.filter(c=>inR(c.fecha)).reduce((a,c)=>a+(+c.total||0),0);
+  const porCobrar=VENTAS.filter(v=>!esCobrada(v)).reduce((a,v)=>a+(+v.total||0),0), nCobrar=VENTAS.filter(v=>!esCobrada(v)).length;
+  const factMes=VENTAS.filter(v=>inR(v.fecha)).reduce((a,v)=>a+(+v.total||0),0);
+  host.innerHTML=`
+    <div class="note">Vista rápida del negocio. La <b>caja</b> sale del banco (Macro); las <b>cuentas por pagar</b> salen de las compras cargadas por foto.</div>
+    <div class="kpis">
+      <div class="kpi good"><div class="k">Saldo en el banco</div><div class="v">${saldo!=null?money(saldo):'—'}</div><div class="s">último movimiento</div></div>
+      <div class="kpi"><div class="k">Ingresos del mes</div><div class="v pos">${money(ingMes)}</div><div class="s">${periodoLbl}</div></div>
+      <div class="kpi"><div class="k">Egresos del mes</div><div class="v neg">${money(egrMes)}</div><div class="s">${periodoLbl}</div></div>
+      <div class="kpi ${ingMes+egrMes>=0?'good':'hot'}"><div class="k">Resultado de caja del mes</div><div class="v ${ingMes+egrMes>=0?'pos':'neg'}">${money(ingMes+egrMes)}</div><div class="s">entradas − salidas</div></div>
+    </div>
+    <div class="kpis">
+      <div class="kpi good"><div class="k">Por cobrar (clientes)</div><div class="v pos">${money(porCobrar)}</div><div class="s">${nCobrar} facturas emitidas</div></div>
+      <div class="kpi hot"><div class="k">Pendiente de pago</div><div class="v">${money(pend)}</div><div class="s">${nPend} facturas de compra</div></div>
+      <div class="kpi"><div class="k">Facturado del mes</div><div class="v">${money(factMes)}</div><div class="s">${periodoLbl} (con IVA)</div></div>
+      <div class="kpi"><div class="k">Compras del mes</div><div class="v">${money(comprasMes)}</div><div class="s">${periodoLbl} (con IVA)</div></div>
+    </div>
+    ${!MOVBANCO.length?'<div class="card"><div class="muted">Subí un export de Macro en la pestaña Banco para ver la caja real.</div></div>':''}`;
+}
+
+let toastT=null;
+function toast(msg,isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(isErr?' err':''); clearTimeout(toastT); toastT=setTimeout(()=>t.className='toast'+(isErr?' err':''),3000); }
+
+gate();
+</script>
+</body>
+</html>
