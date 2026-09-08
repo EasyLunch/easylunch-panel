@@ -210,7 +210,7 @@
 
 <script>
 // ─── Versión visible (para saber qué build corre el celu) ──────────────────
-const BUILD = 'v8.1 · 08-09'
+const BUILD = 'v8.2 · 08-09'
 // ─── Config Supabase (misma base que Producción / Recetario) ───────────────
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
@@ -509,6 +509,22 @@ function onCatSel(idx, val){
   updN(idx, 'categoria', val)
 }
 
+// Importe de una línea. Usa lo que trajo el OCR; si falta (ítems SIN VINCULAR o editados a mano),
+// lo calcula cantidad × precio_unit para que TODOS los productos entren en el total de la factura.
+function rowNeto(r){
+  const sn=Number(r.it.subtotal_neto); if(!isNaN(sn)&&sn>0) return sn
+  const c=Number(r.it.cantidad), p=Number(r.it.precio_unit)
+  return (!isNaN(c)&&!isNaN(p)) ? c*p : 0
+}
+function rowTotal(r){
+  const t=Number(r.it.total); if(!isNaN(t)&&t>0) return t
+  const c=Number(r.it.cantidad), p=Number(r.it.precio_unit)
+  if(isNaN(c)||isNaN(p)) return 0
+  const bruto=c*p
+  const fis=document.getElementById('c-fiscal')&&document.getElementById('c-fiscal').checked
+  if(fis){ const iv=Number(r.it.iva_pct); return bruto*(1+((!isNaN(iv)&&iv>0?iv:21)/100)) }  // precio_unit es s/IVA → sumo IVA
+  return bruto
+}
 function calcRow(r){
   const precioUnit=Number(r.it.precio_unit)||0          // por unidad de compra, s/IVA si fiscal
   const unidad=(r.it.unidad||'').toLowerCase()
@@ -603,7 +619,7 @@ function upd(idx,campo,val){
   }
   else if(campo==='factor'){ r.factorManual=val===''?null:Number(val) }
   else if(campo==='actualizar'){ r.actualizar=val }
-  else { r.it[campo]= (campo==='cantidad'||campo==='precio_unit')? (val===''?null:Number(val)) : val; if(campo==='unidad') r.factorManual=null }
+  else { r.it[campo]= (campo==='cantidad'||campo==='precio_unit')? (val===''?null:Number(val)) : val; if(campo==='cantidad'||campo==='precio_unit'){ r.it.total=null; r.it.subtotal_neto=null } if(campo==='unidad') r.factorManual=null }
   renderItems()
 }
 function nuevoDraft(r){
@@ -648,7 +664,7 @@ function renderPickerList(q){
 function renderResumen(){
   const umbral=Number(document.getElementById('umbral').value)||0
   let upd=0,alerts=0,altas=0,sinVinc=0,totalGasto=0
-  rows.forEach(r=>{ const k=calcRow(r); if(k.esNuevo){ if(k.costoBase!=null) altas++ } else if(!k.ins){ sinVinc++ } else if(r.actualizar&&k.costoBase!=null){ upd++ } if(k.pct!=null&&Math.abs(k.pct)>=umbral) alerts++; totalGasto+=Number(r.it.total)||0 })
+  rows.forEach(r=>{ const k=calcRow(r); if(k.esNuevo){ if(k.costoBase!=null) altas++ } else if(!k.ins){ sinVinc++ } else if(r.actualizar&&k.costoBase!=null){ upd++ } if(k.pct!=null&&Math.abs(k.pct)>=umbral) alerts++; totalGasto+=rowTotal(r) })
   document.getElementById('resumen').innerHTML=`
     <div class="s"><b>${upd}</b><span>costos a actualizar</span></div>
     <div class="s"><b>${altas}</b><span>insumos nuevos</span></div>
@@ -674,7 +690,7 @@ async function confirmar(){
     const umbral=Number(document.getElementById('umbral').value)||0
     const usuario=localStorage.getItem('el_user')||''
     let sNeto=0,sTot=0
-    rows.forEach(r=>{ const sn=Number(r.it.subtotal_neto)||0, tt=Number(r.it.total)||0; sNeto+=sn; sTot+=tt })
+    rows.forEach(r=>{ sNeto+=rowNeto(r); sTot+=rowTotal(r) })
     const neto = Number(comprobante.total_neto) || (fiscal? sNeto : sTot)
     const total = Number(comprobante.total) || sTot
     const iva = Number(comprobante.total_iva) || (fiscal? Math.max(0,total-neto) : 0)
@@ -710,9 +726,9 @@ async function confirmar(){
       const creado = r._creado!=null
       const k=calcRow(r)
       const aplicar = !creado && r.actualizar && k.ins && k.costoBase!=null
-      const snRow=Number(r.it.subtotal_neto)|| (fiscal?null:Number(r.it.total))||null
-      const ivaRow=fiscal? Math.max(0,(Number(r.it.total)||0)-(Number(r.it.subtotal_neto)||0)) : 0
-      items.push({ compra_id:compraId, descripcion:r.it.descripcion, insumo_id:r.insumoId||null, cantidad:Number(r.it.cantidad)||null, unidad:r.it.unidad, precio_unit:Number(r.it.precio_unit)||null, iva_pct:Number(r.it.iva_pct)||0, subtotal_neto:snRow, iva:ivaRow, subtotal_total:Number(r.it.total)||null, factor_conversion:creado?null:k.factor, costo_base_aplicado:creado?r._creado:(aplicar?k.costoBase:null), actualizo_costo:!!(creado||aplicar) })
+      const snRow=rowNeto(r)
+      const ivaRow=fiscal? Math.max(0, rowTotal(r)-rowNeto(r)) : 0
+      items.push({ compra_id:compraId, descripcion:r.it.descripcion, insumo_id:r.insumoId||null, cantidad:Number(r.it.cantidad)||null, unidad:r.it.unidad, precio_unit:Number(r.it.precio_unit)||null, iva_pct:Number(r.it.iva_pct)||0, subtotal_neto:snRow, iva:ivaRow, subtotal_total:rowTotal(r), factor_conversion:creado?null:k.factor, costo_base_aplicado:creado?r._creado:(aplicar?k.costoBase:null), actualizo_costo:!!(creado||aplicar) })
       if(k.pct!=null && Math.abs(k.pct)>=umbral) alertas++
       // memoria global: recordar la asociación de este texto con el insumo elegido (incluye altas)
       const dnorm=norm(r.it.descripcion)
