@@ -224,9 +224,18 @@ async function fetchT(url, opts={}, ms=20000){
   finally{ clearTimeout(to) }
 }
 async function sbGet(q){ const r = await fetchT(`${SB}/${q}`, { headers:H }); if(!r.ok) throw new Error(await r.text()); return r.json() }
-async function sbInsert(t, rows, ret){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer: ret?'return=representation':'return=minimal' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()); return ret? r.json():null }
+// Normaliza un lote para POST masivo: PostgREST exige que TODOS los objetos tengan
+// exactamente las mismas claves (si no, tira PGRST102 "All object keys must match").
+// Además JSON.stringify descarta las claves con valor undefined, así que las unificamos a null.
+function sbRows(rows){
+  if(!Array.isArray(rows) || rows.length < 2) return rows
+  const keys = new Set()
+  rows.forEach(o=>{ if(o && typeof o === 'object') Object.keys(o).forEach(k=>keys.add(k)) })
+  return rows.map(o=>{ const out={}; keys.forEach(k=>{ const v = o ? o[k] : undefined; out[k] = (v===undefined ? null : v) }); return out })
+}
+async function sbInsert(t, rows, ret){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer: ret?'return=representation':'return=minimal' }, body:JSON.stringify(sbRows(rows)) }); if(!r.ok) throw new Error(await r.text()); return ret? r.json():null }
 async function sbPatch(t, filtro, body){ const r = await fetchT(`${SB}/${t}?${filtro}`, { method:'PATCH', headers:H, body:JSON.stringify(body) }); if(!r.ok) throw new Error(await r.text()) }
-async function sbUpsert(t, rows){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body:JSON.stringify(rows) }); if(!r.ok) throw new Error(await r.text()) }
+async function sbUpsert(t, rows){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body:JSON.stringify(sbRows(rows)) }); if(!r.ok) throw new Error(await r.text()) }
 
 // ─── Auth (mismo esquema que el panel) ─────────────────────────────────────
 const USERS = {
@@ -457,6 +466,48 @@ function insumoOptions(sel){
   return o
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+// ── Categorías de insumo (mismas de la plataforma de producción) ──
+// Emoji + nombre lindo por slug. El VALUE guardado siempre es el slug real (el que ya usa la base).
+const CAT_META = {
+  carne_vacuna:['🥩','Carne Vacuna'], vacuno:['🥩','Vacuno'], vacuna:['🥩','Carne Vacuna'],
+  cerdo:['🐷','Cerdo'],
+  ave:['🍗','Ave'], pollo:['🍗','Pollo'],
+  cordero:['🐑','Cordero'],
+  pescado:['🐟','Pescado'], pescado_y_mariscos:['🐟','Pescado y Mariscos'], mariscos:['🐟','Pescado y Mariscos'],
+  verduras:['🥦','Verduras'], verdura:['🥦','Verduras'],
+  lacteos:['🧀','Lácteos'],
+  harinas_y_pastas:['🌾','Harinas y Pastas'], harinas:['🌾','Harinas y Pastas'], pastas:['🌾','Harinas y Pastas'],
+  aderezos:['🧴','Aderezos'],
+  condimentos:['🧂','Condimentos'],
+  descartables:['📦','Descartables'],
+  productos_terminados:['🛒','Productos Terminados'], producto_terminado:['🛒','Productos Terminados'],
+  almacen:['🏪','Almacén'],
+  otros:['📋','Otros'], otra:['📋','Otros'], otro:['📋','Otros'],
+}
+function catMeta(slug){
+  const m = CAT_META[String(slug||'').toLowerCase().trim()]
+  if(m) return m
+  const label = String(slug||'').replace(/_/g,' ').replace(/\b\w/g, c=>c.toUpperCase())
+  return ['🏷️', label || String(slug||'')]
+}
+// Opciones del select: todas las categorías reales de la base + el valor actual (por si es una nueva) + "Otra…"
+function catOptions(selected){
+  const cur = String(selected||'')
+  const src = [...new Set([...categorias, ...(cur?[cur]:[])].filter(Boolean))]
+  src.sort((a,b)=> catMeta(a)[1].localeCompare(catMeta(b)[1], 'es'))
+  let html = `<option value="" ${cur===''?'selected':''} disabled>— Elegí categoría —</option>`
+  html += src.map(c=>{ const m=catMeta(c); return `<option value="${esc(c)}" ${c===cur?'selected':''}>${m[0]} ${esc(m[1])}</option>` }).join('')
+  html += `<option value="__otra__">➕ Otra…</option>`
+  return html
+}
+function onCatSel(idx, val){
+  if(val === '__otra__'){
+    const c = (window.prompt('Nueva categoría (se guarda tal cual, en minúscula y con guión bajo):','')||'').trim()
+    updN(idx, 'categoria', c)   // updN vuelve a renderizar; la nueva queda seleccionada
+    return
+  }
+  updN(idx, 'categoria', val)
+}
 
 function calcRow(r){
   const precioUnit=Number(r.it.precio_unit)||0          // por unidad de compra, s/IVA si fiscal
@@ -499,7 +550,7 @@ function renderItems(){
         <div style="font-size:12px;font-weight:700;color:#15803d;margin-bottom:8px">Nuevo insumo para la base</div>
         <div style="margin-bottom:8px"><label>Nombre</label><input value="${esc(n.nombre)}" onchange="updN(${idx},'nombre',this.value)"></div>
         <div class="grid2">
-          <div><label>Categoría</label><input list="cats-list" placeholder="ej. vacuno, pescado, sin tacc…" value="${esc(n.categoria)}" onchange="updN(${idx},'categoria',this.value)"></div>
+          <div><label>Categoría</label><select onchange="onCatSel(${idx}, this.value)">${catOptions(n.categoria)}</select></div>
           <div><label>Unidad base</label><select onchange="updN(${idx},'unidad',this.value)">${uniOpts}</select></div>
         </div>
         <div class="grid2" style="margin-top:8px">
