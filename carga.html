@@ -210,7 +210,7 @@
 
 <script>
 // ─── Versión visible (para saber qué build corre el celu) ──────────────────
-const BUILD = 'v8 · 08-09'
+const BUILD = 'v8.1 · 08-09'
 // ─── Config Supabase (misma base que Producción / Recetario) ───────────────
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
@@ -712,7 +712,7 @@ async function confirmar(){
       const aplicar = !creado && r.actualizar && k.ins && k.costoBase!=null
       const snRow=Number(r.it.subtotal_neto)|| (fiscal?null:Number(r.it.total))||null
       const ivaRow=fiscal? Math.max(0,(Number(r.it.total)||0)-(Number(r.it.subtotal_neto)||0)) : 0
-      items.push({ compra_id:compraId, descripcion:r.it.descripcion, insumo_id:r.insumoId||null, cantidad:Number(r.it.cantidad)||null, unidad:r.it.unidad, precio_unit:Number(r.it.precio_unit)||null, iva_pct:Number(r.it.iva_pct)||0, subtotal_neto:snRow, iva:ivaRow, subtotal_total:Number(r.it.total)||null, factor_conversion:creado?null:k.factor, costo_base_aplicado:creado?r._creado:(aplicar?k.costoBase:null), actualizo_costo:creado||aplicar })
+      items.push({ compra_id:compraId, descripcion:r.it.descripcion, insumo_id:r.insumoId||null, cantidad:Number(r.it.cantidad)||null, unidad:r.it.unidad, precio_unit:Number(r.it.precio_unit)||null, iva_pct:Number(r.it.iva_pct)||0, subtotal_neto:snRow, iva:ivaRow, subtotal_total:Number(r.it.total)||null, factor_conversion:creado?null:k.factor, costo_base_aplicado:creado?r._creado:(aplicar?k.costoBase:null), actualizo_costo:!!(creado||aplicar) })
       if(k.pct!=null && Math.abs(k.pct)>=umbral) alertas++
       // memoria global: recordar la asociación de este texto con el insumo elegido (incluye altas)
       const dnorm=norm(r.it.descripcion)
