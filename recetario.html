@@ -1193,7 +1193,7 @@ function renderPickList(){
     const parecido = otrasClaves.includes(claveDe(p))
     const veces = cuenta[p.id] || 0
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer" onclick="elegirPlato('${p.id}')">
-      ${badge(pd, pd.e)} <b style="flex:1;font-size:13.5px">${esc(p.nombre)}</b>
+      <span class="badge" style="background:${pd.c};color:${pd.t};cursor:pointer;user-select:none" title="Tocá para cambiar el tipo" onclick="event.stopPropagation();abrirMenuProt(event,'${p.id}')">${pd.e} ${pd.l} ▾</span> <b style="flex:1;font-size:13.5px">${esc(p.nombre)}</b>
       ${!aptoRotacion(p) ? '<span style="font-size:11px;color:#94a3b8">⏸ fuera de rotación</span>' : ''}
       ${conflicto ? '<span style="font-size:11px;color:#b45309">⚠️ proteína repetida ese día</span>' : ''}
       ${parecido ? '<span style="font-size:11px;color:#b45309">⚠️ parecido a otro plato del día</span>' : ''}
@@ -1231,8 +1231,46 @@ async function crearRapidoYAsignar(){
   catch(e){ toast('Error al crear: ' + String(e.message).slice(0, 60)); return }
   const h = { ...row, historico: true, tipo: prot === 'vegetariano' ? 'vegetariano' : 'clasico', porciones: 1, ingredientes: [] }
   historicos.push(h); platoMap[h.id] = h
-  toast(`Plato creado — proteína ${protDef(prot).l} (editable en su ficha) ✅`)
-  elegirPlato(h.id)
+  $('pick-nuevo').value = ''
+  $('pick-busca').value = nombre
+  toast(`Creado ✅ — tocá el ${protDef(prot).e} para corregir el tipo, y el nombre para asignarlo`)
+  renderPickList()
+}
+
+// ─── Cambiar el tipo/proteína desde el modal "Elegir plato" (click en el ícono) ──
+function abrirMenuProt(ev, id){
+  ev.stopPropagation()
+  cerrarMenuProt()
+  const p = platoMap[id]; if(!p) return
+  const actual = protDe(p)
+  const m = document.createElement('div')
+  m.id = 'menu-prot'
+  m.style.cssText = 'position:fixed;z-index:99999;background:#fff;border:1px solid var(--borde);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;min-width:170px'
+  m.innerHTML = PROTEINAS.map(pp => `<div style="display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:7px;cursor:pointer;font-size:13.5px;${pp.v === actual ? 'background:#f1f5f9;font-weight:700' : ''}" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='${pp.v === actual ? '#f1f5f9' : 'transparent'}'" onclick="cambiarProtPicker('${id}','${pp.v}')"><span style="font-size:16px">${pp.e}</span> ${pp.l}${pp.v === actual ? ' ✓' : ''}</div>`).join('')
+  document.body.appendChild(m)
+  const mw = 180, mh = PROTEINAS.length * 40 + 8
+  let x = ev.clientX, y = ev.clientY
+  if(x + mw > innerWidth)  x = innerWidth  - mw - 8
+  if(y + mh > innerHeight) y = innerHeight - mh - 8
+  m.style.left = Math.max(8, x) + 'px'
+  m.style.top  = Math.max(8, y) + 'px'
+  setTimeout(() => document.addEventListener('click', cerrarMenuProt, { once: true }), 0)
+}
+function cerrarMenuProt(){ const m = document.getElementById('menu-prot'); if(m) m.remove() }
+async function cambiarProtPicker(id, v){
+  cerrarMenuProt()
+  const p = platoMap[id]; if(!p) return
+  try{
+    if(p.historico){
+      await sbPatch('platos_historicos', 'id=eq.' + encodeURIComponent(id), { proteina: v, vegetariano: v === 'vegetariano' })
+      Object.assign(p, { proteina: v, vegetariano: v === 'vegetariano' })
+    } else {
+      if(!dbListo){ toast('Primero ejecutá el SQL en Supabase'); return }
+      await sbPatch('platos', 'id=eq.' + encodeURIComponent(id), { proteina: v })
+      Object.assign(p, { proteina: v })
+    }
+    toast('Tipo actualizado ✅'); renderPickList()
+  }catch(e){ toast('Error al cambiar el tipo: ' + String(e.message).slice(0, 60)) }
 }
 
 // ─── Generar propuesta automática ────────────────────────────────────────────
