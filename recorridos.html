@@ -189,7 +189,7 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
 const DAYS=[["lun","Lun","Lunes"],["mar","Mar","Martes"],["mie","Mié","Miércoles"],["jue","Jue","Jueves"],["vie","Vie","Viernes"]];
 const COLORS=["#1F7A4D","#D9622B","#2F6FB3","#A63D8F","#138A8A","#8A6D1F","#C23B5A","#5A5FC8"];
 const ROAD_FACTOR=1.3;
-const DEFAULT_CONFIG={depotName:"Cocina Easy Lunch",depotAddress:"José C. Paz",depotLat:-34.5160,depotLng:-58.7640,vans:1,capacity:200,startTime:"10:30",speed:30,serviceMin:6,traffic:35,returnToBase:true,useAllVans:false};
+const DEFAULT_CONFIG={depotName:"Cocina Easy Lunch",depotAddress:"José C. Paz",depotLat:-34.5160,depotLng:-58.7640,vans:1,capacity:200,startTime:"10:30",speed:30,serviceMin:6,traffic:35,useGoogle:true,returnToBase:true,useAllVans:false};
 
 const S={config:{...DEFAULT_CONFIG},clients:{},routes:{},day:todayKey(),tab:"rutas",sel:null,pick:false,db:null,sample:null,dirty:{},readOnly:false,confirmDel:false,importOpen:false,q:""};
 function todayKey(){const d=new Date().getDay();return ["lun","lun","mar","mie","jue","vie","lun"][d];}
@@ -249,10 +249,11 @@ function twoOpt(seq){
 function bestInsert(seq,id){let bi=seq.length,bc=Infinity;for(let i=0;i<=seq.length;i++){const c=seq.slice();c.splice(i,0,id);const v=seqCost(c);if(v<bc){bc=v;bi=i;}}const r=seq.slice();r.splice(bi,0,id);return r;}
 function tripStats(stops,day){
   const C=S.clients,cfg=S.config,tf=1+(Math.max(0,+cfg.traffic||0)/100);
-  const real=LEGS[stopsSig(stops)];let t=hm2min(cfg.startTime),dist=0,load=0,prev=DK;const etas=[];let exact=!!real;
-  stops.forEach((id,i)=>{const l=real?real[i]:leg(prev,id);dist+=l.m;t+=l.s/60*tf;etas.push(t);t+=+cfg.serviceMin||0;load+=qty(C[id],day);prev=id;});
-  if(cfg.returnToBase&&stops.length){const l=real?real[stops.length]:leg(prev,DK);if(l){dist+=l.m;t+=l.s/60*tf;}}
-  return {km:dist/1000,load,etas,end:t,dur:t-hm2min(cfg.startTime),exact};
+  const sg=stopsSig(stops),g=GOOG[sg];let tfx=tf;let real=LEGS[sg];if(g&&g.legs.length>=stops.length+(cfg.returnToBase?1:0)){real=g.legs;tfx=1;}
+  let t=hm2min(cfg.startTime),dist=0,load=0,prev=DK;const etas=[];let exact=!!real;
+  stops.forEach((id,i)=>{const l=real?real[i]:leg(prev,id);dist+=l.m;t+=l.s/60*tfx;etas.push(t);t+=+cfg.serviceMin||0;load+=qty(C[id],day);prev=id;});
+  if(cfg.returnToBase&&stops.length){const l=real?real[stops.length]:leg(prev,DK);if(l){dist+=l.m;t+=l.s/60*tfx;}}
+  return {km:dist/1000,load,etas,end:t,dur:t-hm2min(cfg.startTime),exact,google:tfx===1&&!!g,gAt:g?g.at:null};
 }
 /* geometría por calles de cada viaje */
 const GEO={};let geoBusy=false;
@@ -274,7 +275,36 @@ async function ensureGeometry(day){
   try{for(const t of todo)await fetchTripRoute(t.stops);setSync("Sincronizado");}catch(e){console.error(e);setSync("Sin datos de calles");}
   geoBusy=false;if(S.day===day&&S.tab==="rutas")render();
 }
-function tripGeo(t){return GEO[stopsSig(t.stops)]||null;}
+function tripGeo(t){const sg=stopsSig(t.stops);return (GOOG[sg]&&GOOG[sg].geo)||GEO[sg]||null;}
+/* ---------- Google Routes con tránsito (vía /api/ruta-google) ---------- */
+const GOOG={};let googleMissing=false;
+function decodePoly(str){if(!str)return null;let i=0,lat=0,lng=0;const out=[];
+  while(i<str.length){let b,sh=0,res=0;do{b=str.charCodeAt(i++)-63;res|=(b&31)<<sh;sh+=5;}while(b>=32);lat+=(res&1)?~(res>>1):(res>>1);
+    sh=0;res=0;do{b=str.charCodeAt(i++)-63;res|=(b&31)<<sh;sh+=5;}while(b>=32);lng+=(res&1)?~(res>>1):(res>>1);out.push([lat/1e5,lng/1e5]);}
+  return out;}
+function nextDeparture(day){const wd={lun:1,mar:2,mie:3,jue:4,vie:5}[day]||1;const [h,m]=String(S.config.startTime||"08:30").split(":").map(Number);
+  const d=new Date();d.setHours(h||0,m||0,0,0);let add=(wd-d.getDay()+7)%7;d.setDate(d.getDate()+add);if(d.getTime()<Date.now()+60000)d.setDate(d.getDate()+7);return d;}
+function loadGoogleFromRoute(r){(r&&r.trips||[]).forEach(t=>{if(t.g&&t.g.sig&&t.g.legs)GOOG[t.g.sig]={legs:t.g.legs,geo:decodePoly(t.g.poly),at:t.g.at};});}
+async function googleTrip(t,day){
+  const C=S.clients;
+  const r=await fetch("/api/ruta-google",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+    origin:depot(),stops:t.stops.map(id=>({lat:C[id].lat,lng:C[id].lng})),returnToBase:!!S.config.returnToBase,departureTime:nextDeparture(day).toISOString()})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const e=new Error(j.message||j.error||"google");e.code=j.error;throw e;}
+  const stops=j.order.map(i=>t.stops[i]);t.stops=stops;const sig=stopsSig(stops);const at=new Date().toISOString();
+  GOOG[sig]={legs:j.legs,geo:decodePoly(j.polyline),at};t.g={sig,legs:j.legs,poly:j.polyline,at};
+}
+async function googleDay(day,only){
+  if(S.config.useGoogle===false)return false;
+  const r=currentRoute(day);if(!r)return false;let ok=0;
+  setSync("Consultando tránsito en Google…");
+  for(let i=0;i<r.trips.length;i++){if(only!==undefined&&i!==only)continue;const t=r.trips[i];if(!t.stops.length)continue;
+    if(t.stops.length>25){toast(vanName(t.van)+": más de 25 paradas, Google no puede ordenarlo");continue;}
+    try{await googleTrip(t,day);ok++;}catch(e){console.error(e);
+      if(e.code==="sin_clave"){googleMissing=true;setSync("Sincronizado");render();return false;}
+      toast("Google no respondió: "+e.message);}}
+  S.routes[day]=r;saveRoute(day);setSync("Sincronizado");render();return ok>0;
+}
 function hm2min(s){const m=String(s||"").match(/(\d{1,2}):(\d{2})/);return m?+m[1]*60+ +m[2]:630;}
 function min2hm(m){m=Math.round(m);const h=Math.floor(m/60)%24,mm=m%60;return String(h).padStart(2,"0")+":"+String(mm).padStart(2,"0");}
 function durTxt(m){m=Math.round(m);const h=Math.floor(m/60);return h?h+" h "+String(m%60).padStart(2,"0")+" min":m+" min";}
@@ -311,7 +341,7 @@ async function optimize(day){
 /* ---------- data layer ---------- */
 function currentRoute(day){
   const r=S.routes[day];if(!r)return null;const C=S.clients;
-  const trips=(r.trips||[]).map(t=>({van:t.van|0,trip:t.trip|0||1,stops:(t.stops||[]).filter(id=>C[id]&&hasLoc(C[id])&&qty(C[id],day)>0)}));
+  const trips=(r.trips||[]).map(t=>({van:t.van|0,trip:t.trip|0||1,g:t.g||null,stops:(t.stops||[]).filter(id=>C[id]&&hasLoc(C[id])&&qty(C[id],day)>0)}));
   return {...r,trips};
 }
 /* Supabase (misma base que el recetario) */
@@ -338,7 +368,7 @@ async function loadAll(first){
   const [cfg,cli,rut]=await Promise.all([sbGet("rutas_config?select=data&id=eq.main"),sbGet("rutas_clientes?select=id,data"),sbGet("rutas_recorridos?select=dia,data")]);
   if(cfg[0])S.config={...DEFAULT_CONFIG,...cfg[0].data};
   const o={};cli.forEach(r=>o[r.id]={...r.data,id:r.id});S.clients=o;
-  rut.forEach(r=>{if(!S.dirty[r.dia])S.routes[r.dia]=r.data;});
+  rut.forEach(r=>{if(!S.dirty[r.dia]){S.routes[r.dia]=r.data;loadGoogleFromRoute(r.data);}});
   renderSafe();if(first)fitAll();
 }
 async function initDb(){
@@ -458,6 +488,7 @@ function renderRutas(){
   const totalQ=wanted.reduce((a,c)=>a+qty(c,day),0);const Q=+S.config.capacity,K=+S.config.vans;
   let h=`<div class="row"><h2>${dn}</h2><span class="spacer"></span>
     <button class="btn primary" id="optBtn" ${S.readOnly?"disabled":""}>${r?"Recalcular recorridos":"Armar recorridos"}</button></div>`;
+  if(googleMissing&&S.config.useGoogle!==false)h+=`<div class="note warn">Falta conectar Google (clave GOOGLE_ROUTES_KEY en Vercel). Mientras tanto se usa el cálculo por calles sin tránsito real.</div>`;
   if(r&&r.edited)h+=`<div class="hint">Editado a mano · “Recalcular” vuelve a optimizar desde cero y pisa los cambios.</div>`;
   if(r){let kmT=0,maxEnd=0;r.trips.forEach(t=>{const s=tripStats(t.stops,day);kmT+=s.km;maxEnd=Math.max(maxEnd,s.end);});
     h+=`<div class="stats"><div class="stat"><b class="num">${totalQ}</b><span>viandas</span></div><div class="stat"><b class="num">${wanted.length}</b><span>clientes</span></div><div class="stat"><b class="num">${kmT.toFixed(0)}</b><span>km</span></div><div class="stat"><b class="num">${r.trips.length?min2hm(maxEnd):"—"}</b><span>fin estimado</span></div></div>`;}
@@ -471,7 +502,7 @@ function renderRutas(){
   r.trips.forEach((t,ti)=>{const st=tripStats(t.stops,day);const col=tripColor(t);const pct=Math.min(100,st.load/Q*100);
     h+=`<article class="trip" data-trip="${ti}"><div class="trip-h"><span class="swatch" style="background:${col}"></span>
       <span class="t">${vanName(t.van)}${t.trip>1?` · viaje ${t.trip}`:""}</span>
-      <span class="m num">${t.stops.length} paradas · ${st.km.toFixed(1)} km · ${durTxt(st.dur)}${st.exact?"":" (aprox.)"}</span><span class="spacer"></span>
+      <span class="m num">${t.stops.length} paradas · ${st.km.toFixed(1)} km · ${durTxt(st.dur)}${st.exact?"":" (aprox.)"}</span>${st.google?`<span class="chip ok" title="Calculado con el tránsito previsto para el ${esc(DAYS.find(d=>d[0]===day)[2].toLowerCase())} ${esc(S.config.startTime)}">con tránsito</span>`:(S.config.useGoogle!==false&&!googleMissing&&t.stops.length?`<button class="btn small" data-gtrip="${ti}" title="Reordena y calcula horarios con el tránsito de Google">Actualizar con tránsito</button>`:"")}<span class="spacer"></span>
       <span class="chip ${st.load>Q?"late":"ok"} num">${st.load}/${Q}</span>
       <div class="load"><i style="width:${pct}%;background:${st.load>Q?"var(--bad-ink)":col}"></i></div>
       <div class="row" style="flex-basis:100%">
@@ -504,7 +535,8 @@ function renderRutas(){
 function mutate(fn){const r=currentRoute(S.day);if(!r)return;fn(r);r.edited=true;S.routes[S.day]=r;saveRoute(S.day);render();clearTimeout(mutate._t);const d=S.day;mutate._t=setTimeout(()=>ensureGeometry(d),700);}
 function bindRutas(){
   const P=$("#panel"),day=S.day,C=S.clients;
-  const ob=$("#optBtn");if(ob)ob.onclick=async()=>{ob.disabled=true;ob.textContent="Calculando por calles…";const r=await optimize(day);S.routes[day]=r;saveRoute(day);render();ensureGeometry(day);fitClients();toast(`Recorrido armado: ${r.trips.length} viaje${r.trips.length>1?"s":""}`);};
+  const ob=$("#optBtn");if(ob)ob.onclick=async()=>{ob.disabled=true;ob.textContent="Calculando por calles…";const r=await optimize(day);S.routes[day]=r;saveRoute(day);render();fitClients();
+    const g=await googleDay(day);ensureGeometry(day);toast(`Recorrido armado: ${r.trips.length} viaje${r.trips.length>1?"s":""}${g?" con tránsito de Google":""}`);};
   P.querySelectorAll("[data-goclient]").forEach(a=>a.onclick=e=>{e.preventDefault();S.tab="clientes";S.sel=a.dataset.goclient;render();});
   const ia=$("#insertAll");if(ia)ia.onclick=()=>mutate(r=>{const inT=new Set();r.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));
     Object.values(C).filter(c=>qty(c,day)>0&&hasLoc(c)&&!inT.has(c.id)).forEach(c=>{if(!r.trips.length)r.trips.push({van:0,trip:1,stops:[]});
@@ -513,6 +545,7 @@ function bindRutas(){
   P.onclick=e=>{const b=e.target.closest("button");if(!b||b.disabled)return;const d=b.dataset;
     if(d.up||d.down){const [t,i]=(d.up||d.down).split(":").map(Number);const dir=d.up?-1:1;mutate(r=>{const s=r.trips[t].stops;const j=i+dir;[s[i],s[j]]=[s[j],s[i]];});}
     else if(d.rm){const [t,i]=d.rm.split(":").map(Number);mutate(r=>r.trips[t].stops.splice(i,1));}
+    else if(d.gtrip!==undefined){b.disabled=true;b.textContent="Consultando…";googleDay(day,+d.gtrip).then(()=>ensureGeometry(day));}
     else if(d.reopt){const t=+d.reopt;mutate(r=>r.trips[t].stops=twoOpt(r.trips[t].stops,C));toast("Paradas reordenadas");}
     else if(d.deltrip){const t=+d.deltrip;mutate(r=>r.trips.splice(t,1));}
     else if(d.copy){const r=currentRoute(day);const txt=tripText(r.trips[+d.copy],day);copyText(txt);}
@@ -648,15 +681,16 @@ function renderConfig(){
   </form>
   <form class="card" id="cfg3"><h3>Tiempos</h3>
     <div class="grid2"><div class="field"><label for="c-start">Hora de salida</label><input id="c-start" type="time" value="${esc(c.startTime)}"></div>
-      <div class="field"><label for="c-traffic">Demora extra por tránsito (%)</label><input id="c-traffic" type="number" min="0" max="300" value="${esc(c.traffic??35)}"></div>
+      <div class="field"><label for="c-traffic">Demora extra por tránsito sin Google (%)</label><input id="c-traffic" type="number" min="0" max="300" value="${esc(c.traffic??35)}"></div>
       <div class="field"><label for="c-speed">Velocidad si no hay datos de calles (km/h)</label><input id="c-speed" type="number" min="5" max="90" value="${esc(c.speed)}"></div>
       <div class="field"><label for="c-svc">Minutos por entrega</label><input id="c-svc" type="number" min="0" max="60" value="${esc(c.serviceMin)}"></div></div>
+    <label class="check"><input type="checkbox" id="c-google" ${c.useGoogle!==false?"checked":""}><span><b>Usar Google con tránsito</b><br><span class="hint">Al armar recorridos, Google reordena cada camioneta con el tránsito previsto para el día y hora de salida. Usa 1 consulta por camioneta (entra en la cuota gratis).</span></span></label>
     <label class="check"><input type="checkbox" id="c-ret" ${c.returnToBase?"checked":""}><span><b>Vuelve a la base al terminar</b><br><span class="hint">Si está apagado, el recorrido termina en la última entrega.</span></span></label>
-    <p class="hint" style="margin:0">Los recorridos se calculan por calles reales respetando los sentidos de circulación (OpenStreetMap). El tránsito no está en tiempo real: se suma la demora que pongas arriba. Para manejar con tránsito en vivo, el chofer usa “Abrir en Google Maps”.</p>
+    <p class="hint" style="margin:0">Los recorridos van por calles reales respetando los sentidos de circulación. Con Google activo, el orden y los horarios usan el tránsito previsto para el día y la hora de salida. Si Google no está disponible o editás a mano, se usa el cálculo por calles más la demora por tránsito de arriba.</p>
   </form>
   <div class="note info">Los cambios se guardan solos. Después de cambiar camionetas o capacidad, entrá a cada día y tocá “Recalcular recorridos”.</div>`;
   const upd=()=>{const loc=parseLoc($("#c-loc").value);Object.assign(S.config,{depotName:$("#c-name").value,depotAddress:$("#c-addr").value,
-      vans:Math.max(1,Math.min(8,parseInt($("#c-vans").value,10)||1)),capacity:Math.max(1,parseInt($("#c-cap").value,10)||1),useAllVans:$("#c-all").checked,
+      vans:Math.max(1,Math.min(8,parseInt($("#c-vans").value,10)||1)),capacity:Math.max(1,parseInt($("#c-cap").value,10)||1),useAllVans:$("#c-all").checked,useGoogle:$("#c-google").checked,
       startTime:$("#c-start").value||"10:30",speed:Math.max(5,+$("#c-speed").value||30),serviceMin:Math.max(0,+$("#c-svc").value||0),traffic:Math.max(0,+$("#c-traffic").value||0),returnToBase:$("#c-ret").checked});
     if(loc){S.config.depotLat=loc.lat;S.config.depotLng=loc.lng;}saveConfig();renderMap();renderHeader();};
   $("#panel").querySelectorAll("input").forEach(i=>i.addEventListener("change",upd));
