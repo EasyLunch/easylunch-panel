@@ -42,7 +42,7 @@ html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.45}
 button,input,select,textarea{font:inherit;color:inherit}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:.92em}
-.app{display:flex;flex-direction:column;min-height:100%}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh}
 header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:1000;background:var(--panel);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
 .brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
 .brand h1{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.01em;margin:0}
@@ -56,8 +56,9 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:1000;backgro
 .day[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:var(--shadow)}
 .day small{display:block;font-family:var(--mono);font-size:10px;font-weight:500;color:var(--muted)}
 main.split{flex:1;display:grid;grid-template-columns:minmax(360px,440px) 1fr;min-height:0}
-.panel{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px;height:calc(100vh - 60px)}
-.mapwrap{position:relative;height:calc(100vh - 60px)}
+.panel>*{flex-shrink:0}
+.panel{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px;height:100%;min-height:0}
+.mapwrap{position:relative;height:100%;min-height:0}
 #map{position:absolute;inset:0;background:var(--land)}
 .leaflet-container{background:var(--land);font-family:var(--body)}
 .tiles-dark{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
@@ -65,6 +66,7 @@ main.split{flex:1;display:grid;grid-template-columns:minmax(360px,440px) 1fr;min
 .mapnote{position:absolute;left:12px;bottom:10px;z-index:500;font-size:11px;color:var(--muted);background:color-mix(in srgb,var(--panel) 85%,transparent);padding:3px 8px;border-radius:6px}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
 @media (max-width:900px){
+  .app{height:auto;min-height:100%}
   main.split{grid-template-columns:1fr}
   .mapwrap{height:52vh;order:-1}
   .panel{height:auto;border-right:0}
