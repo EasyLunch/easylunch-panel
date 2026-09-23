@@ -305,7 +305,7 @@ async function initDb(){
 /* ---------- geocoding (Photon + Nominatim) ---------- */
 function photonLabel(p){
   const street=p.street?(p.street+(p.housenumber?" "+p.housenumber:"")):(p.name||"");
-  const place=[p.district||p.locality,p.city&&p.city!==p.district?p.city:null].filter(Boolean).join(", ");
+  const city=(p.city||"").replace(/Ciudad Autónoma de Buenos Aires/i,"CABA");const place=[p.district||p.locality,city&&city!==p.district?city:null].filter(Boolean).join(", ");
   const title=(p.street&&p.name&&p.name!==p.street&&p.type!=="house")?p.name:street;
   const sub=(title===street?"":street+" · ")+place;
   return {title:title||place,sub:sub||p.state||""};
@@ -316,7 +316,9 @@ async function suggest(q){
   const r=await fetch(u);if(!r.ok)throw new Error("geo");const j=await r.json();
   return (j.features||[]).map(f=>{const p=f.properties||{};const l=photonLabel(p);
     return {lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],title:l.title,sub:l.sub,exact:!!p.housenumber};})
-    .filter(x=>x.lat<-34.0&&x.lat>-35.3&&x.lng<-57.8&&x.lng>-59.4);
+    .filter(x=>x.lat<-34.0&&x.lat>-35.3&&x.lng<-57.8&&x.lng>-59.4)
+    .map((x,i)=>({...x,_d:hav(x,{lat:-34.555,lng:-58.46})+i*0.5}))
+    .sort((a,b)=>(b.exact-a.exact)||(a._d-b._d));
 }
 let lastGeo=0;
 async function nominatim(address){
