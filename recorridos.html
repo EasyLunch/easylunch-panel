@@ -175,7 +175,7 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
         <button class="btn small" id="fitBtn" type="button">Encuadrar</button>
         <button class="btn small" id="fitClientsBtn" type="button">Solo clientes</button>
       </div>
-      <div class="mapnote">© colaboradores de OpenStreetMap · distancias aproximadas</div>
+      <div class="mapnote">© colaboradores de OpenStreetMap · recorridos por calles (OSRM)</div>
       <div class="pickbanner" id="pickBanner" hidden>Tocá el mapa para ubicar al cliente · <button class="btn small" id="pickCancel" type="button">Cancelar</button></div>
     </section>
   </main>
@@ -189,7 +189,7 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
 const DAYS=[["lun","Lun","Lunes"],["mar","Mar","Martes"],["mie","Mié","Miércoles"],["jue","Jue","Jueves"],["vie","Vie","Viernes"]];
 const COLORS=["#1F7A4D","#D9622B","#2F6FB3","#A63D8F","#138A8A","#8A6D1F","#C23B5A","#5A5FC8"];
 const ROAD_FACTOR=1.3;
-const DEFAULT_CONFIG={depotName:"Cocina Easy Lunch",depotAddress:"José C. Paz",depotLat:-34.5160,depotLng:-58.7640,vans:1,capacity:200,startTime:"10:30",speed:30,serviceMin:6,returnToBase:true,useAllVans:false};
+const DEFAULT_CONFIG={depotName:"Cocina Easy Lunch",depotAddress:"José C. Paz",depotLat:-34.5160,depotLng:-58.7640,vans:1,capacity:200,startTime:"10:30",speed:30,serviceMin:6,traffic:35,returnToBase:true,useAllVans:false};
 
 const S={config:{...DEFAULT_CONFIG},clients:{},routes:{},day:todayKey(),tab:"rutas",sel:null,pick:false,db:null,sample:null,dirty:{},readOnly:false,confirmDel:false,importOpen:false,q:""};
 function todayKey(){const d=new Date().getDay();return ["lun","lun","mar","mie","jue","vie","lun"][d];}
@@ -211,35 +211,81 @@ function parseLoc(txt){
   if(lat<-56||lat>-21||lng<-74||lng>-53)return null;return {lat,lng};
 }
 
-/* ---------- route math ---------- */
-function seqCost(seq,C){const ret=S.config.returnToBase;if(!seq.length)return 0;let d=km(depot(),C[seq[0]]);for(let i=1;i<seq.length;i++)d+=km(C[seq[i-1]],C[seq[i]]);if(ret)d+=km(C[seq[seq.length-1]],depot());return d;}
-function twoOpt(seq,C){
-  if(seq.length<3)return seq.slice();let best=seq.slice(),bc=seqCost(best,C),imp=true,guard=0;
+/* ---------- route math (calles reales vía OSRM) ---------- */
+const OSRM="https://router.project-osrm.org";
+let MAT=null;                 // {idx:{key:i}, coords:{key:"lat,lng"}, dur:[[s]], dist:[[m]]}
+const LEGS={};                // firma del recorrido -> [{s,m}] tramos reales
+const DK="__depot";
+function P(key){return key===DK?depot():S.clients[key];}
+function cstr(o){return (+o.lat).toFixed(5)+","+(+o.lng).toFixed(5);}
+function fallbackLeg(a,b){const m=hav(a,b)*ROAD_FACTOR*1000;return {s:m/1000/Math.max(5,+S.config.speed||30)*3600,m};}
+function leg(ka,kb){const a=P(ka),b=P(kb);
+  if(MAT){const i=MAT.idx[ka],j=MAT.idx[kb];
+    if(i!==undefined&&j!==undefined&&MAT.coords[ka]===cstr(a)&&MAT.coords[kb]===cstr(b)&&MAT.dur[i][j]!=null)return {s:MAT.dur[i][j],m:MAT.dist[i][j]};}
+  return fallbackLeg(a,b);}
+async function ensureMatrix(ids){
+  const keys=[DK,...ids];
+  if(MAT&&keys.every(k=>MAT.idx[k]!==undefined&&MAT.coords[k]===cstr(P(k))))return true;
+  if(keys.length>100){setSync("Muchos clientes: distancias aproximadas");return false;}
+  try{setSync("Calculando calles…");
+    const r=await fetch(OSRM+"/table/v1/driving/"+keys.map(k=>{const o=P(k);return (+o.lng).toFixed(6)+","+(+o.lat).toFixed(6);}).join(";")+"?annotations=duration,distance");
+    const j=await r.json();if(j.code!=="Ok")throw new Error(j.code);
+    const idx={},coords={};keys.forEach((k,i)=>{idx[k]=i;coords[k]=cstr(P(k));});
+    MAT={idx,coords,dur:j.durations,dist:j.distances};setSync("Sincronizado");return true;
+  }catch(e){console.error(e);toast("No pude calcular por calles; uso distancias aproximadas");return false;}
+}
+function stopsSig(stops){return cstr(depot())+"|"+stops.map(id=>id+"@"+cstr(S.clients[id])).join(";")+"|"+(S.config.returnToBase?1:0);}
+function seqCost(seq){if(!seq.length)return 0;let d=leg(DK,seq[0]).s;for(let i=1;i<seq.length;i++)d+=leg(seq[i-1],seq[i]).s;if(S.config.returnToBase)d+=leg(seq[seq.length-1],DK).s;return d;}
+function twoOpt(seq){
+  if(seq.length<2)return seq.slice();let best=seq.slice(),bc=seqCost(best),imp=true,guard=0;
   while(imp&&guard++<200){imp=false;
     for(let i=0;i<best.length-1;i++)for(let k=i+1;k<best.length;k++){
-      const cand=best.slice(0,i).concat(best.slice(i,k+1).reverse(),best.slice(k+1));const cc=seqCost(cand,C);
+      const cand=best.slice(0,i).concat(best.slice(i,k+1).reverse(),best.slice(k+1));const cc=seqCost(cand);
       if(cc<bc-1e-9){best=cand;bc=cc;imp=true;}}
     for(let i=0;i<best.length;i++)for(let j=0;j<best.length;j++){if(i===j)continue;
-      const cand=best.slice();const [x]=cand.splice(i,1);cand.splice(j,0,x);const cc=seqCost(cand,C);
+      const cand=best.slice();const [x]=cand.splice(i,1);cand.splice(j,0,x);const cc=seqCost(cand);
       if(cc<bc-1e-9){best=cand;bc=cc;imp=true;}}
   }return best;}
-function bestInsert(seq,id,C){let bi=seq.length,bc=Infinity;for(let i=0;i<=seq.length;i++){const c=seq.slice();c.splice(i,0,id);const v=seqCost(c,C);if(v<bc){bc=v;bi=i;}}const r=seq.slice();r.splice(bi,0,id);return r;}
+function bestInsert(seq,id){let bi=seq.length,bc=Infinity;for(let i=0;i<=seq.length;i++){const c=seq.slice();c.splice(i,0,id);const v=seqCost(c);if(v<bc){bc=v;bi=i;}}const r=seq.slice();r.splice(bi,0,id);return r;}
 function tripStats(stops,day){
-  const C=S.clients,cfg=S.config;let t=hm2min(cfg.startTime),dist=0,prev=depot(),load=0;const etas=[];
-  for(const id of stops){const c=C[id];const d=km(prev,c);dist+=d;t+=d/Math.max(5,+cfg.speed||30)*60;etas.push(t);t+=+cfg.serviceMin||0;load+=qty(c,day);prev=c;}
-  if(cfg.returnToBase&&stops.length){const d=km(prev,depot());dist+=d;t+=d/Math.max(5,+cfg.speed||30)*60;}
-  return {km:dist,load,etas,end:t,dur:t-hm2min(cfg.startTime)};
+  const C=S.clients,cfg=S.config,tf=1+(Math.max(0,+cfg.traffic||0)/100);
+  const real=LEGS[stopsSig(stops)];let t=hm2min(cfg.startTime),dist=0,load=0,prev=DK;const etas=[];let exact=!!real;
+  stops.forEach((id,i)=>{const l=real?real[i]:leg(prev,id);dist+=l.m;t+=l.s/60*tf;etas.push(t);t+=+cfg.serviceMin||0;load+=qty(C[id],day);prev=id;});
+  if(cfg.returnToBase&&stops.length){const l=real?real[stops.length]:leg(prev,DK);if(l){dist+=l.m;t+=l.s/60*tf;}}
+  return {km:dist/1000,load,etas,end:t,dur:t-hm2min(cfg.startTime),exact};
 }
+/* geometría por calles de cada viaje */
+const GEO={};let geoBusy=false;
+async function fetchTripRoute(stops){
+  const sig=stopsSig(stops);if(GEO[sig]&&LEGS[sig])return;
+  const keys=[DK,...stops];if(S.config.returnToBase)keys.push(DK);
+  const r=await fetch(OSRM+"/route/v1/driving/"+keys.map(k=>{const o=P(k);return (+o.lng).toFixed(6)+","+(+o.lat).toFixed(6);}).join(";")+"?overview=full&geometries=geojson&continue_straight=false");
+  const j=await r.json();if(j.code!=="Ok")throw new Error(j.code);
+  const rt=j.routes[0];GEO[sig]=rt.geometry.coordinates.map(([x,y])=>[+y.toFixed(5),+x.toFixed(5)]);
+  LEGS[sig]=rt.legs.map(l=>({s:l.duration,m:l.distance}));
+}
+async function ensureGeometry(day){
+  if(geoBusy)return;const r=currentRoute(day);if(!r)return;
+  const ids=Object.keys(S.clients).filter(id=>qty(S.clients[id],day)>0&&hasLoc(S.clients[id]));
+  const needM=!(MAT&&[DK,...ids].every(k=>MAT.idx[k]!==undefined&&MAT.coords[k]===cstr(P(k))));
+  if(needM){geoBusy=true;await ensureMatrix(ids);geoBusy=false;}
+  const todo=r.trips.filter(t=>t.stops.length&&!(GEO[stopsSig(t.stops)]&&LEGS[stopsSig(t.stops)]));if(!todo.length)return;
+  geoBusy=true;setSync("Trazando por calles…");
+  try{for(const t of todo)await fetchTripRoute(t.stops);setSync("Sincronizado");}catch(e){console.error(e);setSync("Sin datos de calles");}
+  geoBusy=false;if(S.day===day&&S.tab==="rutas")render();
+}
+function tripGeo(t){return GEO[stopsSig(t.stops)]||null;}
 function hm2min(s){const m=String(s||"").match(/(\d{1,2}):(\d{2})/);return m?+m[1]*60+ +m[2]:630;}
 function min2hm(m){m=Math.round(m);const h=Math.floor(m/60)%24,mm=m%60;return String(h).padStart(2,"0")+":"+String(mm).padStart(2,"0");}
 function durTxt(m){m=Math.round(m);const h=Math.floor(m/60);return h?h+" h "+String(m%60).padStart(2,"0")+" min":m+" min";}
 
-function optimize(day){
+async function optimize(day){
   const C=S.clients,Q=Math.max(1,+S.config.capacity||1),K=Math.max(1,+S.config.vans||1);
   const ids=Object.keys(C).filter(id=>qty(C[id],day)>0&&hasLoc(C[id]));
-  const load=id=>qty(C[id],day);const D=depot();
+  const load=id=>qty(C[id],day);await ensureMatrix(ids);
+  const sd=(a,b)=>(leg(a,b).s+leg(b,a).s)/2;
   let routes=ids.map(id=>[id]);const rOf={};routes.forEach((r,i)=>rOf[r[0]]=r);
-  const sav=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=ids[i],b=ids[j];sav.push([km(D,C[a])+km(D,C[b])-km(C[a],C[b]),a,b]);}
+  const sav=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=ids[i],b=ids[j];sav.push([sd(DK,a)+sd(DK,b)-sd(a,b),a,b]);}
   sav.sort((x,y)=>y[0]-x[0]);
   const rl=r=>r.reduce((s,id)=>s+load(id),0);
   for(const [s,a,b] of sav){const ra=rOf[a],rb=rOf[b];if(ra===rb)continue;if(rl(ra)+rl(rb)>Q)continue;
@@ -249,12 +295,12 @@ function optimize(day){
   // merge further while more trips than vans (capacity permitting)
   let guard=0;while(routes.length>K&&guard++<500){let best=null;
     for(let i=0;i<routes.length;i++)for(let j=0;j<routes.length;j++){if(i===j)continue;if(rl(routes[i])+rl(routes[j])>Q)continue;
-      const m=twoOpt(routes[i].concat(routes[j]),C);const add=seqCost(m,C)-seqCost(routes[i],C)-seqCost(routes[j],C);if(!best||add<best[0])best=[add,i,j,m];}
+      const m=twoOpt(routes[i].concat(routes[j]));const add=seqCost(m)-seqCost(routes[i])-seqCost(routes[j]);if(!best||add<best[0])best=[add,i,j,m];}
     if(!best)break;routes=routes.filter((_,k)=>k!==best[1]&&k!==best[2]);routes.push(best[3]);}
-  routes=routes.map(r=>twoOpt(r,C));
+  routes=routes.map(r=>twoOpt(r));
   // split to use all vans
-  if(S.config.useAllVans){let g=0;while(routes.length<K&&g++<50){routes.sort((a,b)=>seqCost(b,C)-seqCost(a,C));const r=routes[0];if(r.length<2)break;
-      let bs=null;for(let k=1;k<r.length;k++){const A=twoOpt(r.slice(0,k),C),B=twoOpt(r.slice(k),C);const v=Math.max(seqCost(A,C),seqCost(B,C));if(!bs||v<bs[0])bs=[v,A,B];}
+  if(S.config.useAllVans){let g=0;while(routes.length<K&&g++<50){routes.sort((a,b)=>seqCost(b)-seqCost(a));const r=routes[0];if(r.length<2)break;
+      let bs=null;for(let k=1;k<r.length;k++){const A=twoOpt(r.slice(0,k)),B=twoOpt(r.slice(k));const v=Math.max(seqCost(A),seqCost(B));if(!bs||v<bs[0])bs=[v,A,B];}
       routes.splice(0,1,bs[1],bs[2]);}}
   routes.sort((a,b)=>rl(b)-rl(a));
   const trips=routes.map((stops,i)=>({van:i%K,trip:Math.floor(i/K)+1,stops}));
@@ -363,7 +409,9 @@ function renderMap(){
     const r=currentRoute(day);const inTrip=new Set();
     if(r)r.trips.forEach((t,ti)=>{const col=tripColor(t);const st=tripStats(t.stops,day);
       const pts=[[S.config.depotLat,S.config.depotLng]].concat(t.stops.map(id=>[C[id].lat,C[id].lng]));if(S.config.returnToBase&&t.stops.length)pts.push([S.config.depotLat,S.config.depotLng]);
-      L.polyline(pts,{color:col,weight:4,opacity:.85,dashArray:t.trip>1?"8 7":null}).addTo(dyn);
+      const g=tripGeo(t);
+      if(g)L.polyline(g,{color:col,weight:5,opacity:.85,dashArray:t.trip>1?"8 7":null}).addTo(dyn);
+      else L.polyline(pts,{color:col,weight:2,opacity:.5,dashArray:"2 6"}).addTo(dyn);
       t.stops.forEach((id,i)=>{inTrip.add(id);const c=C[id];L.marker([c.lat,c.lng],{icon:mkIcon(i+1,col),zIndexOffset:500}).bindTooltip(`<b>${esc(c.name)}</b><br>${esc(c.address||"")}<br>${qty(c,day)} viandas · llega ~${min2hm(st.etas[i])}<br>${vanName(t.van)}${t.trip>1?" · viaje "+t.trip:""}`).addTo(dyn);});});
     Object.values(C).forEach(c=>{if(!hasLoc(c)||inTrip.has(c.id))return;const q=qty(c,day);
       L.marker([c.lat,c.lng],{icon:mkIcon(q?"?":"",q?"#8B8F8C":"#B8BDB9",q?20:10),opacity:q?1:.6}).bindTooltip(`<b>${esc(c.name)}</b><br>${q?q+" viandas · sin recorrido":"No recibe este día"}`).addTo(dyn);});
@@ -412,7 +460,7 @@ function renderRutas(){
     <button class="btn primary" id="optBtn" ${S.readOnly?"disabled":""}>${r?"Recalcular recorridos":"Armar recorridos"}</button></div>`;
   if(r&&r.edited)h+=`<div class="hint">Editado a mano · “Recalcular” vuelve a optimizar desde cero y pisa los cambios.</div>`;
   if(r){let kmT=0,maxEnd=0;r.trips.forEach(t=>{const s=tripStats(t.stops,day);kmT+=s.km;maxEnd=Math.max(maxEnd,s.end);});
-    h+=`<div class="stats"><div class="stat"><b class="num">${totalQ}</b><span>viandas</span></div><div class="stat"><b class="num">${wanted.length}</b><span>clientes</span></div><div class="stat"><b class="num">${kmT.toFixed(0)}</b><span>km aprox.</span></div><div class="stat"><b class="num">${r.trips.length?min2hm(maxEnd):"—"}</b><span>fin estimado</span></div></div>`;}
+    h+=`<div class="stats"><div class="stat"><b class="num">${totalQ}</b><span>viandas</span></div><div class="stat"><b class="num">${wanted.length}</b><span>clientes</span></div><div class="stat"><b class="num">${kmT.toFixed(0)}</b><span>km</span></div><div class="stat"><b class="num">${r.trips.length?min2hm(maxEnd):"—"}</b><span>fin estimado</span></div></div>`;}
   if(totalQ>Q*K)h+=`<div class="note warn">Hay ${totalQ} viandas y ${K} camioneta${K>1?"s":""} de ${Q}: no entra todo en un viaje. Se arma un segundo viaje (línea punteada en el mapa).</div>`;
   if(noLoc.length)h+=`<div class="note bad">${noLoc.length} cliente${noLoc.length>1?"s":""} sin ubicación no entra${noLoc.length>1?"n":""} en el recorrido: ${noLoc.map(c=>`<a href="#" data-goclient="${c.id}">${esc(c.name)}</a>`).join(", ")}.</div>`;
   if(!r){h+=wanted.length?`<div class="empty">Todavía no hay recorrido para el ${dn.toLowerCase()}. Tocá “Armar recorridos”.</div>`:`<div class="empty">Ningún cliente recibe viandas el ${dn.toLowerCase()}. Cargá cantidades en la pestaña Clientes.</div>`;$("#panel").innerHTML=h;bindRutas();return;}
@@ -423,7 +471,7 @@ function renderRutas(){
   r.trips.forEach((t,ti)=>{const st=tripStats(t.stops,day);const col=tripColor(t);const pct=Math.min(100,st.load/Q*100);
     h+=`<article class="trip" data-trip="${ti}"><div class="trip-h"><span class="swatch" style="background:${col}"></span>
       <span class="t">${vanName(t.van)}${t.trip>1?` · viaje ${t.trip}`:""}</span>
-      <span class="m num">${t.stops.length} paradas · ${st.km.toFixed(1)} km · ${durTxt(st.dur)}</span><span class="spacer"></span>
+      <span class="m num">${t.stops.length} paradas · ${st.km.toFixed(1)} km · ${durTxt(st.dur)}${st.exact?"":" (aprox.)"}</span><span class="spacer"></span>
       <span class="chip ${st.load>Q?"late":"ok"} num">${st.load}/${Q}</span>
       <div class="load"><i style="width:${pct}%;background:${st.load>Q?"var(--bad-ink)":col}"></i></div>
       <div class="row" style="flex-basis:100%">
@@ -451,11 +499,12 @@ function renderRutas(){
   if(pending.length){h+=`<h3>Sin recorrido</h3><div class="clist">`+pending.map(c=>`<div class="crow" style="cursor:default"><div><div class="nm" style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} · ${qty(c,day)} viandas</div></div>
       <div class="row"><select data-assign="${c.id}" aria-label="Asignar a"><option value="">Asignar a…</option>${tripOpts(-1)}</select></div></div>`).join("")+`</div>`;}
   $("#panel").innerHTML=h;bindRutas();
+  setTimeout(()=>ensureGeometry(day),0);
 }
-function mutate(fn){const r=currentRoute(S.day);if(!r)return;fn(r);r.edited=true;S.routes[S.day]=r;saveRoute(S.day);render();}
+function mutate(fn){const r=currentRoute(S.day);if(!r)return;fn(r);r.edited=true;S.routes[S.day]=r;saveRoute(S.day);render();clearTimeout(mutate._t);const d=S.day;mutate._t=setTimeout(()=>ensureGeometry(d),700);}
 function bindRutas(){
   const P=$("#panel"),day=S.day,C=S.clients;
-  const ob=$("#optBtn");if(ob)ob.onclick=()=>{const r=optimize(day);S.routes[day]=r;saveRoute(day);render();fitClients();toast(`Recorrido armado: ${r.trips.length} viaje${r.trips.length>1?"s":""}`);};
+  const ob=$("#optBtn");if(ob)ob.onclick=async()=>{ob.disabled=true;ob.textContent="Calculando por calles…";const r=await optimize(day);S.routes[day]=r;saveRoute(day);render();ensureGeometry(day);fitClients();toast(`Recorrido armado: ${r.trips.length} viaje${r.trips.length>1?"s":""}`);};
   P.querySelectorAll("[data-goclient]").forEach(a=>a.onclick=e=>{e.preventDefault();S.tab="clientes";S.sel=a.dataset.goclient;render();});
   const ia=$("#insertAll");if(ia)ia.onclick=()=>mutate(r=>{const inT=new Set();r.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));
     Object.values(C).filter(c=>qty(c,day)>0&&hasLoc(c)&&!inT.has(c.id)).forEach(c=>{if(!r.trips.length)r.trips.push({van:0,trip:1,stops:[]});
@@ -599,15 +648,16 @@ function renderConfig(){
   </form>
   <form class="card" id="cfg3"><h3>Tiempos</h3>
     <div class="grid2"><div class="field"><label for="c-start">Hora de salida</label><input id="c-start" type="time" value="${esc(c.startTime)}"></div>
-      <div class="field"><label for="c-speed">Velocidad promedio (km/h)</label><input id="c-speed" type="number" min="5" max="90" value="${esc(c.speed)}"></div>
+      <div class="field"><label for="c-traffic">Demora extra por tránsito (%)</label><input id="c-traffic" type="number" min="0" max="300" value="${esc(c.traffic??35)}"></div>
+      <div class="field"><label for="c-speed">Velocidad si no hay datos de calles (km/h)</label><input id="c-speed" type="number" min="5" max="90" value="${esc(c.speed)}"></div>
       <div class="field"><label for="c-svc">Minutos por entrega</label><input id="c-svc" type="number" min="0" max="60" value="${esc(c.serviceMin)}"></div></div>
     <label class="check"><input type="checkbox" id="c-ret" ${c.returnToBase?"checked":""}><span><b>Vuelve a la base al terminar</b><br><span class="hint">Si está apagado, el recorrido termina en la última entrega.</span></span></label>
-    <p class="hint" style="margin:0">Las distancias son en línea recta × 1,3 para aproximar calles. Sirven para ordenar y comparar; el tiempo real lo da Google Maps.</p>
+    <p class="hint" style="margin:0">Los recorridos se calculan por calles reales respetando los sentidos de circulación (OpenStreetMap). El tránsito no está en tiempo real: se suma la demora que pongas arriba. Para manejar con tránsito en vivo, el chofer usa “Abrir en Google Maps”.</p>
   </form>
   <div class="note info">Los cambios se guardan solos. Después de cambiar camionetas o capacidad, entrá a cada día y tocá “Recalcular recorridos”.</div>`;
   const upd=()=>{const loc=parseLoc($("#c-loc").value);Object.assign(S.config,{depotName:$("#c-name").value,depotAddress:$("#c-addr").value,
       vans:Math.max(1,Math.min(8,parseInt($("#c-vans").value,10)||1)),capacity:Math.max(1,parseInt($("#c-cap").value,10)||1),useAllVans:$("#c-all").checked,
-      startTime:$("#c-start").value||"10:30",speed:Math.max(5,+$("#c-speed").value||30),serviceMin:Math.max(0,+$("#c-svc").value||0),returnToBase:$("#c-ret").checked});
+      startTime:$("#c-start").value||"10:30",speed:Math.max(5,+$("#c-speed").value||30),serviceMin:Math.max(0,+$("#c-svc").value||0),traffic:Math.max(0,+$("#c-traffic").value||0),returnToBase:$("#c-ret").checked});
     if(loc){S.config.depotLat=loc.lat;S.config.depotLng=loc.lng;}saveConfig();renderMap();renderHeader();};
   $("#panel").querySelectorAll("input").forEach(i=>i.addEventListener("change",upd));
   $("#panel").querySelectorAll("form").forEach(f=>f.onsubmit=e=>{e.preventDefault();upd();});
