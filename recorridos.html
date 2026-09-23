@@ -134,6 +134,14 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
 .crow .q span{font-family:var(--mono);font-size:11px;min-width:24px;text-align:center;padding:2px 0;border-radius:4px;background:var(--panel2);color:var(--muted)}
 .crow .q span.on{background:var(--accent);color:var(--accent-ink)}
 .card{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;background:var(--panel)}
+.addrwrap{position:relative}
+.sugg{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);z-index:1500;overflow:hidden}
+.sugg button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:9px 12px;cursor:pointer;border-top:1px solid var(--line)}
+.sugg button:first-child{border-top:0}
+.sugg button:hover,.sugg button.act{background:var(--accent-soft)}
+.sugg b{font-weight:600}.sugg small{display:block;color:var(--muted);font-size:12px}
+.locstate{font-size:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.locstate.ok{color:var(--ok-ink)}.locstate.no{color:var(--warn-ink)}
 .search{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel);width:100%}
 .lbl-barrio{font-size:11px;color:var(--roadlabel);font-weight:600;white-space:nowrap;letter-spacing:.03em;text-transform:uppercase}
 .lbl-road{font-size:10px;color:var(--roadlabel);white-space:nowrap;font-style:italic}
@@ -294,22 +302,46 @@ async function initDb(){
   setInterval(refresh,30000);document.addEventListener("visibilitychange",refresh);
 }
 
-/* ---------- AI geocode ---------- */
+/* ---------- geocoding (Photon + Nominatim) ---------- */
+function photonLabel(p){
+  const street=p.street?(p.street+(p.housenumber?" "+p.housenumber:"")):(p.name||"");
+  const place=[p.district||p.locality,p.city&&p.city!==p.district?p.city:null].filter(Boolean).join(", ");
+  const title=(p.street&&p.name&&p.name!==p.street&&p.type!=="house")?p.name:street;
+  const sub=(title===street?"":street+" · ")+place;
+  return {title:title||place,sub:sub||p.state||""};
+}
+async function suggest(q){
+  const qq=/buenos aires|caba|capital|provincia|argentina/i.test(q)?q:q+", Buenos Aires";
+  const u="https://photon.komoot.io/api/?limit=5&lat=-34.555&lon=-58.46&bbox=-59.2,-35.0,-57.9,-34.2&q="+encodeURIComponent(qq);
+  const r=await fetch(u);if(!r.ok)throw new Error("geo");const j=await r.json();
+  return (j.features||[]).map(f=>{const p=f.properties||{};const l=photonLabel(p);
+    return {lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0],title:l.title,sub:l.sub,exact:!!p.housenumber};})
+    .filter(x=>x.lat<-34.0&&x.lat>-35.3&&x.lng<-57.8&&x.lng>-59.4);
+}
 let lastGeo=0;
-async function aiLocate(address){
+async function nominatim(address){
   const wait=Math.max(0,lastGeo+1100-Date.now());if(wait)await new Promise(r=>setTimeout(r,wait));lastGeo=Date.now();
   const q=/buenos aires|caba|capital|provincia|argentina/i.test(address)?address:address+", Buenos Aires";
   const u="https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=ar&accept-language=es&viewbox=-59.2,-34.2,-57.9,-35.0&bounded=1&q="+encodeURIComponent(q);
   const r=await fetch(u,{headers:{Accept:"application/json"}});if(!r.ok)throw new Error("geo");
-  const j=await r.json();if(!j.length)throw new Error("No encontrada");
-  const lat=+j[0].lat,lng=+j[0].lon;const conf=/house|building|office|commercial/.test(j[0].type||j[0].addresstype||"")?"alta":"media";
-  return {lat,lng,conf};
+  const j=await r.json();if(!j.length)throw new Error("No encontrada");return {lat:+j[0].lat,lng:+j[0].lon};
+}
+async function aiLocate(address){
+  try{const s=await suggest(address);if(s.length)return {lat:s[0].lat,lng:s[0].lng,conf:s[0].exact?"alta":"media"};}catch(_){}
+  const n=await nominatim(address);return {...n,conf:"media"};
 }
 
 /* ---------- map ---------- */
 const map=L.map("map",{zoomControl:true,attributionControl:false,minZoom:9,maxZoom:18,zoomSnap:.5}).setView([-34.53,-58.55],11);
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const dyn=L.layerGroup().addTo(map);
+const prevLayer=L.layerGroup().addTo(map);
+function setPreview(lat,lng,zoom){prevLayer.clearLayers();
+  const m=L.marker([lat,lng],{draggable:true,autoPan:true,zIndexOffset:2000,icon:L.divIcon({className:"",html:`<div class="mk" style="width:28px;height:28px;background:#C98A0B;font-size:14px">★</div>`,iconSize:[28,28],iconAnchor:[14,14]})}).addTo(prevLayer);
+  m.bindTooltip("Arrastrame si no quedó justo").openTooltip();
+  m.on("dragend",()=>{const ll=m.getLatLng();const f=$("#f-loc");if(f){f.value=ll.lat.toFixed(6)+", "+ll.lng.toFixed(6);f.dataset.geo="manual";}locState(true,"Ubicación ajustada a mano");});
+  if(zoom)map.setView([lat,lng],Math.max(map.getZoom(),16));}
+function clearPreview(){prevLayer.clearLayers();}
 let tiles=null;
 function setTiles(){const dark=document.documentElement.dataset.theme==="dark"||(document.documentElement.dataset.theme!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);
   if(tiles)map.removeLayer(tiles);
@@ -402,7 +434,7 @@ function renderRutas(){
       h+=`<li class="stop" draggable="${!S.readOnly}" data-t="${ti}" data-i="${i}">
         <span class="n" style="background:${col}">${i+1}</span>
         <div><div class="nm">${esc(c.name)}</div><div class="ad">${esc(c.address||"")}</div>
-          <div class="meta"><span class="num">${qty(c,day)} viandas</span><span class="num">~${min2hm(eta)}</span>${late?`<span class="chip late">llega tarde (antes de ${esc(c.before)})</span>`:c.before?`<span class="chip">antes de ${esc(c.before)}</span>`:""}${c.geo==="ia"?`<span class="chip aprox">ubic. automática</span>`:""}</div></div>
+          <div class="meta"><span class="num">${qty(c,day)} viandas</span><span class="num">~${min2hm(eta)}</span>${late?`<span class="chip late">llega tarde (antes de ${esc(c.before)})</span>`:c.before?`<span class="chip">antes de ${esc(c.before)}</span>`:""}${(c.geo==="ia"||c.geo==="auto")&&false?`<span class="chip aprox">ubic. automática</span>`:""}</div></div>
         <div class="acts">
           <button class="btn ghost icon" data-up="${ti}:${i}" aria-label="Subir" ${i===0?"disabled":""}>↑</button>
           <button class="btn ghost icon" data-down="${ti}:${i}" aria-label="Bajar" ${i===t.stops.length-1?"disabled":""}>↓</button>
@@ -465,13 +497,13 @@ function renderClientes(){
     <button class="btn small" id="importBtn">Importar lista</button>
     <button class="btn primary small" id="newBtn" ${S.readOnly?"disabled":""}>+ Nuevo cliente</button></div>`;
   if(S.importOpen)h+=`<div class="card"><h3>Importar desde planilla</h3>
-    <p class="hint" style="margin:0">Pegá filas copiadas de Excel/Sheets con estas columnas: <b>Nombre · Dirección · Lun · Mar · Mié · Jue · Vie · Ubicación (opcional)</b>. La ubicación puede ser “-34.55, -58.45” o un link de Google Maps.</p>
+    <p class="hint" style="margin:0">Pegá filas copiadas de Excel/Sheets con estas columnas: <b>Nombre · Dirección · Lun · Mar · Mié · Jue · Vie · Ubicación (opcional)</b>. La ubicación es opcional: si no la ponés, se busca sola por la dirección.</p>
     <div class="field"><label for="impTxt">Filas</label><textarea id="impTxt" placeholder="Oficinas Norte	Av. del Libertador 7000, CABA	20	20	20	20	15	-34.545, -58.456"></textarea></div>
     <div class="row"><button class="btn primary small" id="impGo">Importar</button><button class="btn small" id="impX">Cancelar</button></div></div>`;
   if(noLoc.length)h+=`<div class="note warn"><span>${noLoc.length} sin ubicación en el mapa.</span>${S.sample?`<button class="btn small" id="aiAll">Ubicar automáticamente</button>`:""}</div>`;
   if(S.sel!==null)h+=clientForm(S.sel==="new"?{id:"new",name:"",address:"",qty:{},before:"",notes:""}:C[S.sel]);
   h+=`<input class="search" id="q" type="search" placeholder="Buscar por nombre o dirección" value="${esc(S.q)}">`;
-  h+=shown.length?`<div class="clist">`+shown.map(c=>`<div class="crow ${c.id===S.sel?"sel":""}" data-cid="${c.id}"><div><div style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} ${hasLoc(c)?(c.geo==="ia"?'<span class="chip aprox">automática</span>':""):'<span class="chip late">sin ubicación</span>'}</div></div>
+  h+=shown.length?`<div class="clist">`+shown.map(c=>`<div class="crow ${c.id===S.sel?"sel":""}" data-cid="${c.id}"><div><div style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} ${hasLoc(c)?((c.geo==="ia"||c.geo==="auto")&&false?'<span class="chip aprox">automática</span>':""):'<span class="chip late">sin ubicación</span>'}</div></div>
       <div class="q">${DAYS.map(([k,s])=>`<span class="${qty(c,k)?"on":""}" title="${s}">${qty(c,k)||"·"}</span>`).join("")}</div></div>`).join("")+`</div>`:`<div class="empty">${list.length?"Nada coincide con la búsqueda.":"Todavía no hay clientes. Cargá el primero o importá una lista."}</div>`;
   $("#panel").innerHTML=h;bindClientes();
 }
@@ -479,14 +511,15 @@ function clientForm(c){
   if(!c)return"";const loc=hasLoc(c)?`${(+c.lat).toFixed(6)}, ${(+c.lng).toFixed(6)}`:"";
   return `<form class="card" id="cform" autocomplete="off"><div class="row"><h3>${c.id==="new"?"Nuevo cliente":"Editar cliente"}</h3><span class="spacer"></span><button type="button" class="btn ghost small" id="closeForm">Cerrar</button></div>
     <div class="field"><label for="f-name">Empresa / nombre</label><input id="f-name" required value="${esc(c.name)}"></div>
-    <div class="field"><label for="f-addr">Dirección de entrega</label><input id="f-addr" value="${esc(c.address)}" placeholder="Av. del Libertador 7000, Núñez, CABA"></div>
-    <div class="field"><label for="f-loc">Ubicación (coordenadas o link de Google Maps)</label><input id="f-loc" value="${esc(loc)}" placeholder="-34.5450, -58.4560"></div>
+    <div class="field addrwrap"><label for="f-addr">Dirección de entrega</label><input id="f-addr" value="${esc(c.address)}" placeholder="Empezá a escribir: Libertador 7000…" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="addrSugg"><div class="sugg" id="addrSugg" role="listbox" hidden></div></div>
+    <div class="locstate ${loc?"ok":"no"}" id="locState">${loc?"✓ Ubicado en el mapa":"Escribí la dirección y elegila de la lista"}</div>
+    <details${loc?"":""}><summary class="hint" style="cursor:pointer">Ajustar ubicación a mano</summary>
+    <div class="field" style="margin-top:8px"><label for="f-loc">Coordenadas o link de Google Maps</label><input id="f-loc" value="${esc(loc)}" placeholder="-34.5450, -58.4560"></div>
     <div class="row">
       <button type="button" class="btn small" id="pickMap">Marcar en el mapa</button>
       <a class="btn small" id="gmSearch" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address||"")}" target="_blank" rel="noopener">Buscar en Google Maps</a>
-      ${S.sample?`<button type="button" class="btn small" id="aiOne">Buscar dirección</button>`:""}
     </div>
-    <p class="hint" style="margin:0">En Google Maps: clic derecho sobre el lugar → copiá las coordenadas y pegalas arriba. También sirve pegar el link completo.</p>
+    <p class="hint" style="margin:0">En Google Maps: clic derecho sobre el lugar → copiá las coordenadas y pegalas arriba. También sirve pegar el link completo.</p></details>
     <div><div class="field" style="margin-bottom:6px"><label>Viandas aproximadas por día (0 = no recibe)</label></div>
       <div class="qty5">${DAYS.map(([k,s])=>`<div class="field"><label for="f-q-${k}" style="text-align:center">${s}</label><input id="f-q-${k}" type="number" min="0" step="1" inputmode="numeric" value="${qty(c,k)||""}" placeholder="0"></div>`).join("")}</div>
       <div class="row" style="margin-top:6px"><button type="button" class="btn ghost small" id="copyMon">Copiar lunes a toda la semana</button></div></div>
@@ -507,22 +540,38 @@ function bindClientes(){
       const c={id:uid(),name:p[0],address:p[1]||"",qty:{},before:"",notes:"",geo:null,lat:null,lng:null};
       DAYS.forEach(([k],i)=>{const v=parseInt(p[2+i],10);if(v>0)c.qty[k]=v;});
       const loc=parseLoc(p.slice(7).join(","));if(loc){c.lat=loc.lat;c.lng=loc.lng;c.geo="manual";}
+      else if(c.address){$("#impGo").textContent=`Ubicando ${n+1}…`;try{const g=await aiLocate(c.address);c.lat=g.lat;c.lng=g.lng;c.geo="auto";}catch(_){}}
       await saveClient(c);n++;}
     S.importOpen=false;render();toast(`${n} cliente${n!==1?"s":""} importado${n!==1?"s":""}`);};
   if($("#aiAll"))$("#aiAll").onclick=async e=>{const b=e.target;b.disabled=true;const pend=Object.values(C).filter(c=>!hasLoc(c)&&c.address);let ok=0;
     for(const c of pend){b.textContent=`Ubicando ${ok+1}/${pend.length}…`;try{const r=await aiLocate(c.address);await saveClient({...c,lat:r.lat,lng:r.lng,geo:"ia"});ok++;}catch(err){}}
     toast(`${ok} de ${pend.length} ubicado${ok!==1?"s":""} — revisalos en el mapa`);render();};
   const f=$("#cform");if(!f)return;
-  $("#closeForm").onclick=()=>{S.sel=null;render();};
-  $("#f-addr").oninput=()=>{$("#gmSearch").href="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent($("#f-addr").value);};
+  $("#closeForm").onclick=()=>{S.sel=null;clearPreview();render();};
+  const addr=$("#f-addr"),box=$("#addrSugg"),locIn=$("#f-loc");let sugg=[],act=-1,tmr=null,seq=0,chosen=!!locIn.value;
+  const gm=()=>{$("#gmSearch").href="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(addr.value);};
+  const hide=()=>{box.hidden=true;act=-1;addr.setAttribute("aria-expanded","false");};
+  const choose=i=>{const x=sugg[i];if(!x)return;locIn.value=x.lat.toFixed(6)+", "+x.lng.toFixed(6);locIn.dataset.geo="auto";chosen=true;
+    if(!/\d/.test(addr.value)||addr.value.length<x.title.length)addr.value=x.title+(x.sub?", "+x.sub.replace(/^.*· /,""):"");
+    hide();setPreview(x.lat,x.lng,true);locState(true,x.exact?"✓ Ubicado en el mapa":"✓ Ubicado (aproximado: revisá la estrella en el mapa)");gm();};
+  const show=()=>{if(!sugg.length){box.innerHTML=`<div class="hint" style="padding:9px 12px">No encuentro esa dirección. Probá con calle y altura, o marcala en el mapa.</div>`;box.hidden=false;return;}
+    box.innerHTML=sugg.map((x,i)=>`<button type="button" role="option" data-i="${i}" class="${i===act?"act":""}"><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></button>`).join("");box.hidden=false;addr.setAttribute("aria-expanded","true");};
+  box.onmousedown=e=>{const b=e.target.closest("button[data-i]");if(!b)return;e.preventDefault();choose(+b.dataset.i);};
+  addr.oninput=()=>{gm();chosen=false;locIn.value="";clearPreview();locState(false,"Buscando…");clearTimeout(tmr);const q=addr.value.trim();
+    if(q.length<5){hide();locState(false,"Escribí la dirección y elegila de la lista");return;}
+    tmr=setTimeout(async()=>{const my=++seq;try{const r=await suggest(q);if(my!==seq)return;sugg=r;act=r.length?0:-1;show();locState(false,r.length?"Elegí la dirección correcta de la lista":"No encontrada");}catch(_){locState(false,"No pude buscar. Revisá la conexión.");}},450);};
+  addr.onkeydown=e=>{if(box.hidden)return;if(e.key==="ArrowDown"){e.preventDefault();act=Math.min(sugg.length-1,act+1);show();}
+    else if(e.key==="ArrowUp"){e.preventDefault();act=Math.max(0,act-1);show();}
+    else if(e.key==="Enter"){if(act>=0){e.preventDefault();choose(act);}}else if(e.key==="Escape")hide();};
+  addr.onblur=()=>setTimeout(()=>{if(!box.hidden&&!chosen&&sugg.length)choose(0);else hide();},150);
+  if(locIn.value){const l=parseLoc(locIn.value);if(l)setPreview(l.lat,l.lng,false);}
+  locIn.onchange=()=>{const l=parseLoc(locIn.value);if(l){locIn.dataset.geo="manual";setPreview(l.lat,l.lng,true);locState(true,"✓ Ubicado en el mapa");}};
   $("#copyMon").onclick=()=>{const v=$("#f-q-lun").value;DAYS.forEach(([k])=>$("#f-q-"+k).value=v);};
-  $("#pickMap").onclick=()=>{S.pick=ll=>{$("#f-loc").value=ll.lat.toFixed(6)+", "+ll.lng.toFixed(6);$("#f-loc").dataset.geo="manual";toast("Ubicación marcada");};$("#pickBanner").hidden=false;if(matchMedia("(max-width:900px)").matches)window.scrollTo({top:0,behavior:"smooth"});};
-  if($("#aiOne"))$("#aiOne").onclick=async e=>{const a=$("#f-addr").value.trim();if(!a){toast("Escribí la dirección primero");return;}const b=e.target;b.disabled=true;b.textContent="Buscando…";
-    try{const r=await aiLocate(a);$("#f-loc").value=r.lat.toFixed(6)+", "+r.lng.toFixed(6);$("#f-loc").dataset.geo="ia";map.setView([r.lat,r.lng],15);toast(`Ubicación encontrada (precisión ${r.conf}). Verificala en el mapa.`);}
-    catch(err){toast("No encontré esa dirección. Probá “Marcar en el mapa” o pegá el link de Google Maps.");}b.disabled=false;b.textContent="Buscar dirección";};
+  $("#pickMap").onclick=()=>{S.pick=ll=>{$("#f-loc").value=ll.lat.toFixed(6)+", "+ll.lng.toFixed(6);$("#f-loc").dataset.geo="manual";setPreview(ll.lat,ll.lng,false);locState(true,"✓ Marcado en el mapa");};$("#pickBanner").hidden=false;if(matchMedia("(max-width:900px)").matches)window.scrollTo({top:0,behavior:"smooth"});};
   const del=$("#delBtn");if(del)del.onclick=()=>{if(!S.confirmDel){S.confirmDel=true;del.textContent="¿Seguro? Eliminar";return;}const id=S.sel;S.sel=null;S.confirmDel=false;deleteClient(id);toast("Cliente eliminado");};
   f.onsubmit=async e=>{e.preventDefault();const old=S.sel==="new"?null:C[S.sel];const id=old?old.id:uid();
-    const locTxt=$("#f-loc").value.trim();const loc=parseLoc(locTxt);if(locTxt&&!loc){toast("No entiendo esa ubicación. Pegá coordenadas o un link de Google Maps.");return;}
+    const locTxt=$("#f-loc").value.trim();let loc=parseLoc(locTxt);if(locTxt&&!loc){toast("No entiendo esa ubicación. Pegá coordenadas o un link de Google Maps.");return;}
+    const adr=$("#f-addr").value.trim();if(!loc&&adr){try{const g=await aiLocate(adr);loc={lat:g.lat,lng:g.lng};$("#f-loc").dataset.geo="auto";}catch(_){toast("Guardado sin ubicación: no encontré la dirección");}}
     const qd={};DAYS.forEach(([k])=>{const v=parseInt($("#f-q-"+k).value,10);if(v>0)qd[k]=v;});
     let geo=old?old.geo:null;if(loc&&(!old||!hasLoc(old)||Math.abs(old.lat-loc.lat)>1e-6||Math.abs(old.lng-loc.lng)>1e-6))geo=$("#f-loc").dataset.geo||"manual";if(!loc)geo=null;
     const c={id,name:$("#f-name").value.trim()||"Sin nombre",address:$("#f-addr").value.trim(),lat:loc?loc.lat:null,lng:loc?loc.lng:null,geo,qty:qd,before:$("#f-before").value,notes:$("#f-notes").value.trim()};
@@ -537,7 +586,7 @@ function renderConfig(){
     <div class="field"><label for="c-name">Nombre</label><input id="c-name" value="${esc(c.depotName)}"></div>
     <div class="field"><label for="c-addr">Dirección</label><input id="c-addr" value="${esc(c.depotAddress)}"></div>
     <div class="field"><label for="c-loc">Ubicación (coordenadas o link de Google Maps)</label><input id="c-loc" value="${(+c.depotLat).toFixed(6)}, ${(+c.depotLng).toFixed(6)}"></div>
-    <div class="row"><button type="button" class="btn small" id="c-pick">Marcar en el mapa</button></div>
+    <div class="row"><button type="button" class="btn small" id="c-geo">Ubicar por la dirección</button><button type="button" class="btn small" id="c-pick">Marcar en el mapa</button></div>
   </form>
   <form class="card" id="cfg2"><h3>Flota</h3>
     <div class="grid2"><div class="field"><label for="c-vans">Cantidad de camionetas</label><input id="c-vans" type="number" min="1" max="8" value="${esc(c.vans)}"></div>
@@ -558,10 +607,12 @@ function renderConfig(){
     if(loc){S.config.depotLat=loc.lat;S.config.depotLng=loc.lng;}saveConfig();renderMap();renderHeader();};
   $("#panel").querySelectorAll("input").forEach(i=>i.addEventListener("change",upd));
   $("#panel").querySelectorAll("form").forEach(f=>f.onsubmit=e=>{e.preventDefault();upd();});
+  $("#c-geo").onclick=async e=>{const b=e.target;b.disabled=true;b.textContent="Buscando…";try{const g=await aiLocate($("#c-addr").value);$("#c-loc").value=g.lat.toFixed(6)+", "+g.lng.toFixed(6);upd();map.setView([g.lat,g.lng],16);toast("Base ubicada. Si no quedó justa, usá “Marcar en el mapa”.");}catch(_){toast("No encontré esa dirección");}b.disabled=false;b.textContent="Ubicar por la dirección";};
   $("#c-pick").onclick=()=>{S.pick=ll=>{$("#c-loc").value=ll.lat.toFixed(6)+", "+ll.lng.toFixed(6);upd();toast("Base ubicada");};$("#pickBanner").hidden=false;};
 }
 
-function render(){const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else renderConfig();renderMap();}
+function locState(ok,t){const el=$("#locState");if(!el)return;el.className="locstate "+(ok?"ok":"no");el.textContent=t;}
+function render(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else renderConfig();renderMap();}
 function renderSafe(){const a=document.activeElement;if(a&&a.closest&&a.closest("#panel form")){renderHeader();renderMap();return;}render();}
 render();setTimeout(()=>map.invalidateSize(),50);window.addEventListener("resize",()=>map.invalidateSize());
 initDb();
