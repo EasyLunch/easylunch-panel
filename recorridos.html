@@ -124,6 +124,15 @@ table.sh tfoot td{font-weight:700;border-bottom:0;padding-top:3mm}
 .crow .q span.tchip{min-width:auto;padding:2px 6px;font-family:var(--body);font-weight:700;margin-right:4px}
 .crow .q span.t-moto{background:#DCE7F7;color:#2F4F86}
 .crow .q span.t-indistinto{background:var(--warn-bg);color:var(--warn-ink)}
+.tripfilter{position:absolute;left:56px;top:12px;z-index:550;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:8px 10px;font-size:13px;max-width:min(280px,calc(100% - 180px));max-height:calc(100% - 90px);overflow:auto}
+.tripfilter b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.tripfilter .tf{display:flex;align-items:center;gap:6px;padding:3px 0}
+.tripfilter .tf label{display:flex;align-items:center;gap:6px;cursor:pointer;flex:1;min-width:0}
+.tripfilter .tf .swatch{width:12px;height:12px}
+.tripfilter .tf small{color:var(--muted)}
+.tripfilter .solo{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:12px;cursor:pointer;padding:2px 4px}
+.tripfilter .all{border-bottom:1px solid var(--line);margin-bottom:3px;padding-bottom:5px}
+.trip.dim{opacity:.5}
 .legend{position:absolute;left:12px;bottom:34px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .legend i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:4px;vertical-align:middle}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
@@ -240,6 +249,7 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
       </div>
       <div class="legend" id="trafficLegend" hidden><b>Tránsito previsto</b><span><i style="background:#F29E1F"></i>lento</span><span><i style="background:#D7263D"></i>pesado</span></div>
       <div class="mapnote">© colaboradores de OpenStreetMap · recorridos por calles (OSRM)</div>
+      <div class="tripfilter" id="tripFilter" hidden></div>
       <div class="sheets" id="sheets" hidden></div>
       <div class="pickbanner" id="pickBanner" hidden>Tocá el mapa para ubicar al cliente · <button class="btn small" id="pickCancel" type="button">Cancelar</button></div>
     </section>
@@ -536,6 +546,7 @@ function veh(i){return vehicles()[i]||{idx:i,type:"camioneta",name:"Vehículo "+
 function dayVehicles(day){const all=vehicles();const sel=(S.config.dayVeh||{})[day];const f=Array.isArray(sel)?all.filter(v=>sel.includes(v.idx)):all;return f.length?f:all;}
 function vanName(i){return veh(i).name;}
 const TRANS={camioneta:"Camioneta",moto:"Moto",indistinto:"Indistinto"};
+const HIDE=new Set();const tkey=(day,t)=>day+":"+t.van+":"+(t.trip||1);const tripVisible=(day,t)=>!HIDE.has(tkey(day,t));
 function ctrans(c){return (c&&TRANS[c.transport])?c.transport:"camioneta";}
 function transOk(c,v){const t=ctrans(c);return t==="indistinto"||t===v.type;}
 function tripColor(t){return COLORS[t.van%COLORS.length];}
@@ -544,8 +555,8 @@ function renderMap(){
   L.marker([S.config.depotLat,S.config.depotLng],{icon:mkIcon("B","#17231C",26,"depot"),zIndexOffset:1000}).bindTooltip(`<b>${esc(S.config.depotName)}</b><br>${esc(S.config.depotAddress||"")}`).addTo(dyn);
   if(S.tab==="rutas"){
     const r=currentRoute(day);const inTrip=new Set();
-    const ps=planStats(r,day);let anyTraffic=false;
-    if(r)r.trips.forEach((t,ti)=>{const col=tripColor(t);const st=ps[ti];
+    const ps=planStats(r,day);let anyTraffic=false;renderTripFilter(r,day);const filtered=r&&r.trips.some(t=>!tripVisible(day,t));
+    if(r)r.trips.forEach((t,ti)=>{t.stops.forEach(id=>inTrip.add(id));if(!tripVisible(day,t))return;const col=tripColor(t);const st=ps[ti];
       const pts=[[S.config.depotLat,S.config.depotLng]].concat(t.stops.map(id=>[C[id].lat,C[id].lng]));if(S.config.returnToBase&&t.stops.length)pts.push([S.config.depotLat,S.config.depotLng]);
       const g=tripGeo(t);
       if(g){L.polyline(g,{color:col,weight:5,opacity:.85,dashArray:t.trip>1?"8 7":null}).addTo(dyn);
@@ -554,16 +565,30 @@ function renderMap(){
       else L.polyline(pts,{color:col,weight:2,opacity:.5,dashArray:"2 6"}).addTo(dyn);
       t.stops.forEach((id,i)=>{inTrip.add(id);const c=C[id];L.marker([c.lat,c.lng],{icon:mkIcon(i+1,col),zIndexOffset:500}).bindTooltip(`<b>${esc(c.name)}</b><br>${esc(c.address||"")}<br>${qty(c,day)} viandas · llega ~${min2hm(st.etas[i])}<br>${vanName(t.van)}${t.trip>1?" · viaje "+t.trip:""}`).addTo(dyn);});});
     $("#trafficLegend").hidden=!anyTraffic;
-    Object.values(C).forEach(c=>{if(!hasLoc(c)||inTrip.has(c.id))return;const q=qty(c,day);
+    Object.values(C).forEach(c=>{if(!hasLoc(c)||inTrip.has(c.id))return;const q=qty(c,day);if(filtered)return;
       L.marker([c.lat,c.lng],{icon:mkIcon(q?"?":"",q?"#8B8F8C":"#B8BDB9",q?20:10),opacity:q?1:.6}).bindTooltip(`<b>${esc(c.name)}</b><br>${q?q+" viandas · sin recorrido":"No recibe este día"}`).addTo(dyn);});
   }else{
-    $("#trafficLegend").hidden=true;
+    $("#trafficLegend").hidden=true;$("#tripFilter").hidden=true;
     Object.values(C).forEach(c=>{if(!hasLoc(c))return;const sel=c.id===S.sel;
       L.marker([c.lat,c.lng],{icon:mkIcon("",sel?css("--gold")||"#C98A0B":"#1F7A4D",sel?20:14),zIndexOffset:sel?900:0}).bindTooltip(`<b>${esc(c.name)}</b><br>${esc(c.address||"")}`).on("click",()=>{S.sel=c.id;S.tab="clientes";render();}).addTo(dyn);});
   }
 }
 function fitAll(){const pts=[[S.config.depotLat,S.config.depotLng]];Object.values(S.clients).forEach(c=>{if(hasLoc(c))pts.push([c.lat,c.lng]);});if(pts.length>1)map.fitBounds(pts,{padding:[40,40]});}
-function fitClients(){const pts=[];Object.values(S.clients).forEach(c=>{if(hasLoc(c)&&(S.tab!=="rutas"||qty(c,S.day)>0))pts.push([c.lat,c.lng]);});if(pts.length)map.fitBounds(pts,{padding:[50,50],maxZoom:16});}
+function renderTripFilter(r,day){const box=$("#tripFilter");
+  const trips=r?r.trips.filter(t=>t.stops.length):[];if(trips.length<2){box.hidden=true;return;}
+  const allOn=trips.every(t=>tripVisible(day,t));
+  box.innerHTML=`<b>Ver recorridos</b><div class="tf all"><label><input type="checkbox" id="tfAll" ${allOn?"checked":""}>Todos</label></div>`+
+    trips.map(t=>{const k=tkey(day,t);return `<div class="tf"><label><input type="checkbox" data-tk="${k}" ${tripVisible(day,t)?"checked":""}><span class="swatch" style="background:${tripColor(t)}"></span>${esc(vanName(t.van))}${t.trip>1?` <small>v${t.trip}</small>`:""} <small class="num">${t.stops.length}</small></label><button class="solo" data-solo="${k}" title="Ver solo este">solo</button></div>`;}).join("");
+  box.hidden=false;
+  box.onchange=e=>{const el=e.target;if(el.id==="tfAll"){trips.forEach(t=>{el.checked?HIDE.delete(tkey(day,t)):HIDE.add(tkey(day,t));});}
+    else if(el.dataset.tk){el.checked?HIDE.delete(el.dataset.tk):HIDE.add(el.dataset.tk);}
+    renderMap();syncDim();};
+  box.onclick=e=>{const b=e.target.closest("[data-solo]");if(!b)return;trips.forEach(t=>{const k=tkey(day,t);k===b.dataset.solo?HIDE.delete(k):HIDE.add(k);});renderMap();syncDim();fitClients();};
+}
+function syncDim(){const r=currentRoute(S.day);if(!r)return;document.querySelectorAll(".trip[data-trip]").forEach(a=>{const t=r.trips[+a.dataset.trip];if(t)a.classList.toggle("dim",!tripVisible(S.day,t));});}
+function fitClients(){const pts=[];
+  if(S.tab==="rutas"){const r=currentRoute(S.day);if(r&&r.trips.some(t=>!tripVisible(S.day,t))){r.trips.forEach(t=>{if(tripVisible(S.day,t))t.stops.forEach(id=>{const c=S.clients[id];if(c&&hasLoc(c))pts.push([c.lat,c.lng]);});});if(pts.length){map.fitBounds(pts,{padding:[50,50],maxZoom:16});return;}}}
+  Object.values(S.clients).forEach(c=>{if(hasLoc(c)&&(S.tab!=="rutas"||qty(c,S.day)>0))pts.push([c.lat,c.lng]);});if(pts.length)map.fitBounds(pts,{padding:[50,50],maxZoom:16});}
 $("#fitBtn").onclick=fitAll;$("#fitClientsBtn").onclick=fitClients;
 map.on("click",e=>{if(!S.pick)return;const f=S.pick;S.pick=false;$("#pickBanner").hidden=true;f(e.latlng);});
 $("#pickCancel").onclick=e=>{e.stopPropagation();S.pick=false;$("#pickBanner").hidden=true;};
@@ -655,7 +680,7 @@ function renderRutas(){
   h+=`<div class="row"><button class="btn small" id="addTrip">+ Agregar viaje / vehículo</button></div>`;
   if(pending.length){h+=`<h3>Sin recorrido</h3><div class="clist">`+pending.map(c=>`<div class="crow" style="cursor:default"><div><div class="nm" style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} · ${qty(c,day)} viandas</div></div>
       <div class="row"><select data-assign="${c.id}" aria-label="Asignar a"><option value="">Asignar a…</option>${tripOpts(-1)}</select></div></div>`).join("")+`</div>`;}
-  $("#panel").innerHTML=h;bindRutas();
+  $("#panel").innerHTML=h;bindRutas();syncDim();
   setTimeout(()=>ensureGeometry(day),0);
 }
 function mutate(fn){const r=currentRoute(S.day);if(!r)return;fn(r);normalizeTrips(r);r.edited=true;S.routes[S.day]=r;saveRoute(S.day);render();clearTimeout(mutate._t);const d=S.day;mutate._t=setTimeout(()=>ensureGeometry(d),700);}
@@ -920,7 +945,7 @@ function renderHojas(){
 window.addEventListener("afterprint",()=>{$("#printRoot").innerHTML="";});
 function locState(ok,t){const el=$("#locState");if(!el)return;el.className="locstate "+(ok?"ok":"no");el.textContent=t;}
 function render(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else if(S.tab==="hojas")renderHojas();else renderConfig();
-  const sh=S.tab==="hojas";$("#sheets").hidden=!sh;$("#map").style.visibility=sh?"hidden":"visible";document.querySelector(".mapctl").hidden=sh;document.querySelector(".mapnote").hidden=sh;if(sh)$("#trafficLegend").hidden=true;
+  const sh=S.tab==="hojas";$("#sheets").hidden=!sh;$("#map").style.visibility=sh?"hidden":"visible";document.querySelector(".mapctl").hidden=sh;document.querySelector(".mapnote").hidden=sh;if(sh){$("#trafficLegend").hidden=true;$("#tripFilter").hidden=true;}
   if(!sh)renderMap();}
 function renderSafe(){const a=document.activeElement;if(a&&a.closest&&a.closest("#panel form")){renderHeader();renderMap();return;}render();}
 render();setTimeout(()=>map.invalidateSize(),50);window.addEventListener("resize",()=>map.invalidateSize());
