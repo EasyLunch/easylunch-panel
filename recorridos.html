@@ -36,6 +36,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.3);
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0}
 :root{color-scheme:light}
 html,body{height:100%}
@@ -118,6 +119,11 @@ table.sh tfoot td{font-weight:700;border-bottom:0;padding-top:3mm}
   #printRoot .sheet{box-shadow:none;margin:0;page-break-after:always;break-after:page}
   #printRoot .sheet:last-child{page-break-after:auto;break-after:auto}
 }
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg input{margin:0}
+.crow .q span.tchip{min-width:auto;padding:2px 6px;font-family:var(--body);font-weight:700;margin-right:4px}
+.crow .q span.t-moto{background:#DCE7F7;color:#2F4F86}
+.crow .q span.t-indistinto{background:var(--warn-bg);color:var(--warn-ink)}
 .legend{position:absolute;left:12px;bottom:34px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .legend i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:4px;vertical-align:middle}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
@@ -384,23 +390,28 @@ async function optimize(day){
   const load=id=>qty(C[id],day);await ensureMatrix(ids);
   const sd=(a,b)=>(leg(a,b).s+leg(b,a).s)/2;const rl=r=>r.reduce((s,id)=>s+load(id),0);
   const svc=(+S.config.serviceMin||0)*60;const rtime=seq=>seq.length?seqCost(seq)+svc*seq.length:0;
+  // qué tipo de vehículo pide cada cliente (si ese día no sale ninguno de ese tipo, se ignora la preferencia)
+  const types=new Set(V.map(v=>v.type));const reqWarn=new Set();
+  const req=id=>{const t=ctrans(C[id]);if(t==="indistinto")return null;if(!types.has(t)){reqWarn.add(t);return null;}return t;};
+  const rreq=r=>{let q=null;for(const id of r){const x=req(id);if(x){if(q&&q!==x)return "X";q=x;}}return q;};
+  const capFor=q=>Math.max(...V.filter(v=>!q||v.type===q).map(v=>v.cap));
   const capMax=Math.max(...V.map(v=>v.cap));
-  // 1) agrupar (ahorros de Clarke-Wright) con la capacidad del vehículo más grande
+  // 1) agrupar (ahorros de Clarke-Wright) respetando el tipo de vehículo y su capacidad
   let routes=ids.map(id=>[id]);const rOf={};routes.forEach(r=>rOf[r[0]]=r);
   const sav=[];for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){const a=ids[i],b=ids[j];sav.push([sd(DK,a)+sd(DK,b)-sd(a,b),a,b]);}
   sav.sort((x,y)=>y[0]-x[0]);
-  for(const [sv,a,b] of sav){const ra=rOf[a],rb=rOf[b];if(ra===rb)continue;if(rl(ra)+rl(rb)>capMax)continue;
+  for(const [sv,a,b] of sav){const ra=rOf[a],rb=rOf[b];if(ra===rb)continue;const q=rreq(ra.concat(rb));if(q==="X")continue;if(rl(ra)+rl(rb)>capFor(q))continue;
     let m=null;const aS=ra[0]===a,aE=ra[ra.length-1]===a,bS=rb[0]===b,bE=rb[rb.length-1]===b;
     if(aE&&bS)m=ra.concat(rb);else if(bE&&aS)m=rb.concat(ra);else if(aS&&bS)m=ra.slice().reverse().concat(rb);else if(aE&&bE)m=ra.concat(rb.slice().reverse());
     if(!m)continue;routes=routes.filter(r=>r!==ra&&r!==rb);routes.push(m);m.forEach(id=>rOf[id]=m);}
   routes=routes.map(r=>twoOpt(r)).sort((a,b)=>rl(b)-rl(a));
   // 2) asignar a vehículos: el grupo grande al vehículo grande, lo que sobra al más chico que alcance
   const trips=[];const used=new Set();const vtime={};
-  for(const r of routes){const L=rl(r);
-    let cand=V.filter(v=>!used.has(v.idx)&&v.cap>=L).sort((a,b)=>a.cap-b.cap);
+  for(const r of routes){const L=rl(r);const q=rreq(r);const VV=V.filter(v=>!q||v.type===q);
+    let cand=VV.filter(v=>!used.has(v.idx)&&v.cap>=L).sort((a,b)=>a.cap-b.cap);
     let v=cand[0];
-    if(!v){const fits=V.filter(v=>v.cap>=L).sort((a,b)=>(vtime[a.idx]||0)-(vtime[b.idx]||0));v=fits[0];}
-    if(!v){v=V.slice().sort((a,b)=>b.cap-a.cap)[0];}
+    if(!v){const fits=VV.filter(v=>v.cap>=L).sort((a,b)=>(vtime[a.idx]||0)-(vtime[b.idx]||0));v=fits[0];}
+    if(!v){v=(VV.length?VV:V).slice().sort((a,b)=>b.cap-a.cap)[0];}
     used.add(v.idx);vtime[v.idx]=(vtime[v.idx]||0)+rtime(r);trips.push({van:v.idx,stops:r});}
   // 3) modo "tiempos parejos": todos los vehículos del día salen y se reparten paradas hasta igualar tiempos
   if(strat==="balance"){
@@ -412,7 +423,7 @@ async function optimize(day){
       const tot={};trips.forEach(t=>{tot[t.van]=(tot[t.van]||0)+rtime(t.stops);});
       const vmax=V.reduce((a,b)=>(tot[b.idx]||0)>(tot[a.idx]||0)?b:a).idx;
       trips.forEach((src,si)=>{if(src.van!==vmax)return;src.stops.forEach((id,k)=>{
-        trips.forEach((dst,di)=>{if(di===si)return;if(rl(dst.stops)+load(id)>capOf(dst))return;
+        trips.forEach((dst,di)=>{if(di===si)return;if(rl(dst.stops)+load(id)>capOf(dst))return;const q=req(id);if(q&&veh(dst.van).type!==q)return;
           const oldS=src.stops,oldD=dst.stops;const ns=oldS.filter((_,x)=>x!==k),nd=bestInsert(oldD,id);
           src.stops=ns;dst.stops=nd;const o=obj();src.stops=oldS;dst.stops=oldD;
           if(o[0]<cur[0]-1||(Math.abs(o[0]-cur[0])<=1&&o[1]<cur[1]-1)){if(!best||o[0]<best.o[0]-1||(Math.abs(o[0]-best.o[0])<=1&&o[1]<best.o[1]))best={o,si,di,ns,nd};}
@@ -421,6 +432,7 @@ async function optimize(day){
   }
   const out=trips.filter(t=>t.stops.length).map(t=>({van:t.van,stops:twoOpt(t.stops)}));
   out.sort((a,b)=>a.van-b.van);
+  if(reqWarn.size)toast("Hay clientes que piden "+[...reqWarn].map(t=>TRANS[t].toLowerCase()).join(" y ")+" pero ese día no sale ninguna: se asignaron a otro vehículo");
   return normalizeTrips({trips:out,generatedAt:new Date().toISOString(),edited:false,strategy:strat});
 }
 
@@ -523,6 +535,9 @@ function vehicles(){const c=S.config,V=[];const nv=Math.max(0,Math.min(8,parseIn
 function veh(i){return vehicles()[i]||{idx:i,type:"camioneta",name:"Vehículo "+(i+1),cap:Math.max(1,+S.config.capacity||1)};}
 function dayVehicles(day){const all=vehicles();const sel=(S.config.dayVeh||{})[day];const f=Array.isArray(sel)?all.filter(v=>sel.includes(v.idx)):all;return f.length?f:all;}
 function vanName(i){return veh(i).name;}
+const TRANS={camioneta:"Camioneta",moto:"Moto",indistinto:"Indistinto"};
+function ctrans(c){return (c&&TRANS[c.transport])?c.transport:"camioneta";}
+function transOk(c,v){const t=ctrans(c);return t==="indistinto"||t===v.type;}
 function tripColor(t){return COLORS[t.van%COLORS.length];}
 function renderMap(){
   dyn.clearLayers();const C=S.clients,day=S.day;
@@ -628,7 +643,7 @@ function renderRutas(){
       h+=`<li class="stop" draggable="${!S.readOnly}" data-t="${ti}" data-i="${i}">
         <span class="n" style="background:${col}">${i+1}</span>
         <div><div class="nm">${esc(c.name)}</div><div class="ad">${esc(c.address||"")}</div>
-          <div class="meta"><span class="num">${qty(c,day)} viandas</span><span class="num">~${min2hm(eta)}</span>${late?`<span class="chip late">llega tarde (antes de ${esc(c.before)})</span>`:c.before?`<span class="chip">antes de ${esc(c.before)}</span>`:""}</div></div>
+          <div class="meta"><span class="num">${qty(c,day)} viandas</span><span class="num">~${min2hm(eta)}</span>${transOk(c,V)?"":`<span class="chip aprox">pide ${TRANS[ctrans(c)].toLowerCase()}</span>`}${late?`<span class="chip late">llega tarde (antes de ${esc(c.before)})</span>`:c.before?`<span class="chip">antes de ${esc(c.before)}</span>`:""}</div></div>
         <div class="acts">
           <button class="btn ghost icon" data-up="${ti}:${i}" aria-label="Subir" ${i===0?"disabled":""}>↑</button>
           <button class="btn ghost icon" data-down="${ti}:${i}" aria-label="Bajar" ${i===t.stops.length-1?"disabled":""}>↓</button>
@@ -655,7 +670,7 @@ function bindRutas(){
     S.config.dayVeh={...(S.config.dayVeh||{}),[day]:[...cur].sort((a,b)=>a-b)};saveConfig();render();});
   const ia=$("#insertAll");if(ia)ia.onclick=()=>mutate(r=>{const inT=new Set();r.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));
     Object.values(C).filter(c=>qty(c,day)>0&&hasLoc(c)&&!inT.has(c.id)).forEach(c=>{if(!r.trips.length)r.trips.push({van:0,trip:1,stops:[]});
-      let best=null;r.trips.forEach((t,i)=>{const n=bestInsert(t.stops,c.id,C);const add=seqCost(n,C)-seqCost(t.stops,C);const over=tripStats(n,day).load>veh(t.van).cap;const score=add+(over?1e6:0);if(!best||score<best[0])best=[score,i,n];});
+      let best=null;r.trips.forEach((t,i)=>{const n=bestInsert(t.stops,c.id,C);const add=seqCost(n,C)-seqCost(t.stops,C);const over=tripStats(n,day).load>veh(t.van).cap;const score=add+(over?1e6:0)+(transOk(c,veh(t.van))?0:5e5);if(!best||score<best[0])best=[score,i,n];});
       r.trips[best[1]].stops=best[2];});});
   P.onclick=e=>{const b=e.target.closest("button");if(!b||b.disabled)return;const d=b.dataset;
     if(d.up||d.down){const [t,i]=(d.up||d.down).split(":").map(Number);const dir=d.up?-1:1;mutate(r=>{const s=r.trips[t].stops;const j=i+dir;[s[i],s[j]]=[s[j],s[i]];});}
@@ -706,7 +721,7 @@ function renderClientes(){
   if(S.sel!==null)h+=clientForm(S.sel==="new"?{id:"new",name:"",address:"",qty:{},before:"",notes:""}:C[S.sel]);
   h+=`<input class="search" id="q" type="search" placeholder="Buscar por nombre o dirección" value="${esc(S.q)}">`;
   h+=shown.length?`<div class="clist">`+shown.map(c=>`<div class="crow ${c.id===S.sel?"sel":""}" data-cid="${c.id}"><div><div style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} ${hasLoc(c)?((c.geo==="ia"||c.geo==="auto")&&false?'<span class="chip aprox">automática</span>':""):'<span class="chip late">sin ubicación</span>'}</div></div>
-      <div class="q">${DAYS.map(([k,s])=>`<span class="${qty(c,k)?"on":""}" title="${s}">${qty(c,k)||"·"}</span>`).join("")}</div></div>`).join("")+`</div>`:`<div class="empty">${list.length?"Nada coincide con la búsqueda.":"Todavía no hay clientes. Cargá el primero o importá una lista."}</div>`;
+      <div class="q"><span class="tchip t-${ctrans(c)}" title="Se entrega en ${TRANS[ctrans(c)].toLowerCase()}">${ctrans(c)==="moto"?"Moto":ctrans(c)==="indistinto"?"Indist.":"Cam."}</span>${DAYS.map(([k,s])=>`<span class="${qty(c,k)?"on":""}" title="${s}">${qty(c,k)||"·"}</span>`).join("")}</div></div>`).join("")+`</div>`:`<div class="empty">${list.length?"Nada coincide con la búsqueda.":"Todavía no hay clientes. Cargá el primero o importá una lista."}</div>`;
   $("#panel").innerHTML=h;bindClientes();
 }
 function clientForm(c){
@@ -725,6 +740,9 @@ function clientForm(c){
     <div><div class="field" style="margin-bottom:6px"><label>Viandas aproximadas por día (0 = no recibe)</label></div>
       <div class="qty5">${DAYS.map(([k,s])=>`<div class="field"><label for="f-q-${k}" style="text-align:center">${s}</label><input id="f-q-${k}" type="number" min="0" step="1" inputmode="numeric" value="${qty(c,k)||""}" placeholder="0"></div>`).join("")}</div>
       <div class="row" style="margin-top:6px"><button type="button" class="btn ghost small" id="copyMon">Copiar lunes a toda la semana</button></div></div>
+    <div class="field"><label>Se entrega en</label><div class="seg" role="radiogroup" aria-label="Vehículo de entrega">
+      ${Object.entries(TRANS).map(([k,l])=>`<label class="vchip ${ctrans(c)===k?"on":""}"><input type="radio" name="f-trans" value="${k}" ${ctrans(c)===k?"checked":""}>${l}</label>`).join("")}</div>
+      <span class="hint">Por defecto camioneta. Al armar recorridos se respeta; después podés cambiarlo a mano en Recorridos.</span></div>
     <div class="grid2"><div class="field"><label for="f-before">Entregar antes de (opcional)</label><input id="f-before" type="time" value="${esc(c.before||"")}"></div>
       <div class="field"><label for="f-notes">Instrucciones de entrega</label><input id="f-notes" value="${esc(c.notes||"")}" placeholder="Recepción piso 3"></div></div>
     <div class="row"><button class="btn primary" type="submit" ${S.readOnly?"disabled":""}>Guardar</button><span class="spacer"></span>
@@ -768,6 +786,7 @@ function bindClientes(){
   addr.onblur=()=>setTimeout(()=>{if(!box.hidden&&!chosen&&sugg.length)choose(0);else hide();},150);
   if(locIn.value){const l=parseLoc(locIn.value);if(l)setPreview(l.lat,l.lng,false);}
   locIn.onchange=()=>{const l=parseLoc(locIn.value);if(l){locIn.dataset.geo="manual";setPreview(l.lat,l.lng,true);locState(true,"✓ Ubicado en el mapa");}};
+  document.querySelectorAll('input[name="f-trans"]').forEach(rb=>rb.onchange=()=>{document.querySelectorAll('input[name="f-trans"]').forEach(x=>x.closest("label").classList.toggle("on",x.checked));});
   $("#copyMon").onclick=()=>{const v=$("#f-q-lun").value;DAYS.forEach(([k])=>$("#f-q-"+k).value=v);};
   $("#pickMap").onclick=()=>{S.pick=ll=>{$("#f-loc").value=ll.lat.toFixed(6)+", "+ll.lng.toFixed(6);$("#f-loc").dataset.geo="manual";setPreview(ll.lat,ll.lng,false);locState(true,"✓ Marcado en el mapa");};$("#pickBanner").hidden=false;if(matchMedia("(max-width:900px)").matches)window.scrollTo({top:0,behavior:"smooth"});};
   const del=$("#delBtn");if(del)del.onclick=()=>{if(!S.confirmDel){S.confirmDel=true;del.textContent="¿Seguro? Eliminar";return;}const id=S.sel;S.sel=null;S.confirmDel=false;deleteClient(id);toast("Cliente eliminado");};
@@ -776,7 +795,7 @@ function bindClientes(){
     const adr=$("#f-addr").value.trim();if(!loc&&adr){try{const g=await aiLocate(adr);loc={lat:g.lat,lng:g.lng};$("#f-loc").dataset.geo="auto";}catch(_){toast("Guardado sin ubicación: no encontré la dirección");}}
     const qd={};DAYS.forEach(([k])=>{const v=parseInt($("#f-q-"+k).value,10);if(v>0)qd[k]=v;});
     let geo=old?old.geo:null;if(loc&&(!old||!hasLoc(old)||Math.abs(old.lat-loc.lat)>1e-6||Math.abs(old.lng-loc.lng)>1e-6))geo=$("#f-loc").dataset.geo||"manual";if(!loc)geo=null;
-    const c={id,name:$("#f-name").value.trim()||"Sin nombre",address:$("#f-addr").value.trim(),lat:loc?loc.lat:null,lng:loc?loc.lng:null,geo,qty:qd,before:$("#f-before").value,notes:$("#f-notes").value.trim()};
+    const c={id,name:$("#f-name").value.trim()||"Sin nombre",address:$("#f-addr").value.trim(),lat:loc?loc.lat:null,lng:loc?loc.lng:null,geo,qty:qd,before:$("#f-before").value,notes:$("#f-notes").value.trim(),transport:(document.querySelector('input[name="f-trans"]:checked')||{}).value||"camioneta"};
     S.sel=id;await saveClient(c);toast("Cliente guardado");};
 }
 
