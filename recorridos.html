@@ -71,6 +71,53 @@ main.split{flex:1;display:grid;grid-template-columns:minmax(360px,440px) 1fr;min
 .vtimes{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
 .vtimes .swatch{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:middle}
 .vsel{font-weight:700;border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:var(--panel)}
+.sheets{position:absolute;inset:0;overflow:auto;background:#d9ddd8;padding:20px 16px;z-index:700}
+.sheets .empty{background:#fff;max-width:600px;margin:40px auto}
+.sheet{width:210mm;min-height:297mm;margin:0 auto 20px;background:#fff;color:#1b1b1b;padding:12mm 12mm 14mm;box-shadow:0 2px 10px rgba(0,0,0,.18);font-family:var(--body);font-size:10.5pt;line-height:1.35;display:flex;flex-direction:column;gap:5mm}
+.sheet.half{min-height:auto}
+.sh-head{display:flex;align-items:center;gap:6mm;border-bottom:2px solid #1F5A3D;padding-bottom:4mm}
+.sh-head img{height:16mm;width:auto}
+.sh-head .brand2{font-family:var(--display);font-weight:800;font-size:18pt;color:#1F5A3D}
+.sh-title{margin-left:auto;text-align:right}
+.sh-title b{display:block;font-family:var(--display);font-size:15pt;color:#1b1b1b}
+.sh-title span{font-size:10pt;color:#555}
+.sh-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;font-size:9.5pt}
+.sh-meta div{border:1px solid #cfd6d0;border-radius:2mm;padding:2mm 3mm}
+.sh-meta small{display:block;color:#666;font-size:8pt;text-transform:uppercase;letter-spacing:.04em}
+.sh-meta b{font-size:11pt}
+table.sh{width:100%;border-collapse:collapse;font-size:9.5pt}
+table.sh th{background:#1F5A3D;color:#fff;text-align:left;padding:2mm;font-weight:600;font-size:8.5pt;text-transform:uppercase;letter-spacing:.03em}
+table.sh td{border-bottom:1px solid #cfd6d0;padding:2.4mm 2mm;vertical-align:top}
+table.sh tr{page-break-inside:avoid;break-inside:avoid}
+table.sh td.n{width:7mm;font-weight:700;color:#1F5A3D}
+table.sh td.q{width:14mm;text-align:center;font-weight:700;font-size:11pt}
+table.sh td.h{width:13mm;white-space:nowrap}
+table.sh td.ins{width:44mm}
+table.sh td.ins .pre{color:#333}
+table.sh td.ins .lines{border-bottom:1px dotted #999;height:6mm}
+table.sh td.f{width:24mm}
+table.sh tfoot td{font-weight:700;border-bottom:0;padding-top:3mm}
+.sh-foot{margin-top:auto;display:flex;justify-content:space-between;font-size:8.5pt;color:#666;border-top:1px solid #cfd6d0;padding-top:2mm}
+.remito{border:1.5px solid #1F5A3D;border-radius:3mm;padding:6mm;display:flex;flex-direction:column;gap:4mm;height:128mm;page-break-inside:avoid;break-inside:avoid}
+.remito .rm-grid{display:grid;grid-template-columns:1fr 1fr;gap:3mm 6mm}
+.remito .rm-grid div small{display:block;color:#666;font-size:8pt;text-transform:uppercase;letter-spacing:.04em}
+.remito .rm-grid div b{font-size:11.5pt}
+.remito .rm-q{font-family:var(--display);font-size:24pt;font-weight:800;color:#1F5A3D}
+.remito .rm-ins{border:1px solid #cfd6d0;border-radius:2mm;padding:3mm;min-height:22mm;flex:1}
+.remito .rm-ins small{display:block;color:#666;font-size:8pt;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1mm}
+.remito .rm-sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6mm;font-size:8.5pt;color:#555}
+.remito .rm-sign div{border-top:1px solid #777;padding-top:1.5mm;margin-top:10mm}
+.cut{border-top:1px dashed #aaa;margin:4mm 0}
+.pcheck{display:flex;flex-wrap:wrap;gap:6px}
+#printRoot{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  html,body{height:auto!important;background:#fff!important}
+  body>*:not(#printRoot){display:none!important}
+  #printRoot{display:block!important}
+  #printRoot .sheet{box-shadow:none;margin:0;page-break-after:always;break-after:page}
+  #printRoot .sheet:last-child{page-break-after:auto;break-after:auto}
+}
 .legend{position:absolute;left:12px;bottom:34px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .legend i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:4px;vertical-align:middle}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
@@ -172,6 +219,7 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
     <nav class="tabs" role="tablist" aria-label="Secciones">
       <button class="tab" role="tab" data-tab="rutas" id="tab-rutas">Recorridos</button>
       <button class="tab" role="tab" data-tab="clientes" id="tab-clientes">Clientes</button>
+      <button class="tab" role="tab" data-tab="hojas" id="tab-hojas">Hojas de ruta</button>
       <button class="tab" role="tab" data-tab="config" id="tab-config">Base y camionetas</button>
     </nav>
     <div class="days" id="days" role="tablist" aria-label="Día de la semana"></div>
@@ -186,13 +234,16 @@ h3{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:v
       </div>
       <div class="legend" id="trafficLegend" hidden><b>Tránsito previsto</b><span><i style="background:#F29E1F"></i>lento</span><span><i style="background:#D7263D"></i>pesado</span></div>
       <div class="mapnote">© colaboradores de OpenStreetMap · recorridos por calles (OSRM)</div>
+      <div class="sheets" id="sheets" hidden></div>
       <div class="pickbanner" id="pickBanner" hidden>Tocá el mapa para ubicar al cliente · <button class="btn small" id="pickCancel" type="button">Cancelar</button></div>
     </section>
   </main>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div id="printRoot"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
 <script>
 (function(){
 "use strict";
@@ -507,7 +558,7 @@ function renderHeader(){
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
   const C=Object.values(S.clients);
   $("#days").innerHTML=DAYS.map(([k,s])=>{const tot=C.reduce((a,c)=>a+qty(c,k),0);return `<button class="day" role="tab" data-day="${k}" aria-selected="${k===S.day}">${s}<small>${tot}</small></button>`;}).join("");
-  $("#days").style.visibility=S.tab==="config"?"hidden":"visible";
+  $("#days").style.visibility=(S.tab==="config"||S.tab==="hojas")?"hidden":"visible";
 }
 document.querySelector(".tabs").onclick=e=>{const b=e.target.closest(".tab");if(!b)return;S.tab=b.dataset.tab;S.confirmDel=false;render();};
 $("#days").onclick=e=>{const b=e.target.closest(".day");if(!b)return;S.day=b.dataset.day;render();};
@@ -675,7 +726,7 @@ function clientForm(c){
       <div class="qty5">${DAYS.map(([k,s])=>`<div class="field"><label for="f-q-${k}" style="text-align:center">${s}</label><input id="f-q-${k}" type="number" min="0" step="1" inputmode="numeric" value="${qty(c,k)||""}" placeholder="0"></div>`).join("")}</div>
       <div class="row" style="margin-top:6px"><button type="button" class="btn ghost small" id="copyMon">Copiar lunes a toda la semana</button></div></div>
     <div class="grid2"><div class="field"><label for="f-before">Entregar antes de (opcional)</label><input id="f-before" type="time" value="${esc(c.before||"")}"></div>
-      <div class="field"><label for="f-notes">Nota para el chofer</label><input id="f-notes" value="${esc(c.notes||"")}" placeholder="Recepción piso 3"></div></div>
+      <div class="field"><label for="f-notes">Instrucciones de entrega</label><input id="f-notes" value="${esc(c.notes||"")}" placeholder="Recepción piso 3"></div></div>
     <div class="row"><button class="btn primary" type="submit" ${S.readOnly?"disabled":""}>Guardar</button><span class="spacer"></span>
       ${c.id!=="new"?`<button type="button" class="btn small danger" id="delBtn">${S.confirmDel?"¿Seguro? Eliminar":"Eliminar"}</button>`:""}</div></form>`;
 }
@@ -769,8 +820,89 @@ function renderConfig(){
   $("#c-pick").onclick=()=>{S.pick=ll=>{$("#c-loc").value=ll.lat.toFixed(6)+", "+ll.lng.toFixed(6);upd();toast("Base ubicada");};$("#pickBanner").hidden=false;};
 }
 
+/* ---------- hojas de ruta / remitos ---------- */
+const P0={days:null,veh:null,format:"hoja",week:null,eta:true,sign:true};
+function mondayOf(d){const x=new Date(d);x.setHours(12,0,0,0);const wd=x.getDay();if(wd===6)x.setDate(x.getDate()+2);else if(wd===0)x.setDate(x.getDate()+1);else x.setDate(x.getDate()-(wd-1));return x;}
+function isoDate(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function dayDate(day){const base=new Date((S.print.week||isoDate(mondayOf(new Date())))+"T12:00:00");const off={lun:0,mar:1,mie:2,jue:3,vie:4}[day]||0;base.setDate(base.getDate()+off);return base;}
+function fmtDate(d){return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();}
+let LOGO=null;
+async function ensureLogo(){if(LOGO!==null)return LOGO;try{const r=await fetch("https://easy-lunch-eight.vercel.app/logo.png");const b=await r.blob();LOGO=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(b);});}catch(_){LOGO="";}return LOGO;}
+function sheetHead(title,sub){return `<div class="sh-head">${LOGO?`<img src="${LOGO}" alt="Easy Lunch">`:`<span class="brand2">Easy Lunch</span>`}<div class="sh-title"><b>${esc(title)}</b><span>${esc(sub)}</span></div></div>`;}
+function buildSheets(){
+  const pr=S.print,C=S.clients,ALL=vehicles();const days=pr.days||DAYS.map(d=>d[0]);const vsel=new Set(pr.veh||ALL.map(v=>v.idx));
+  const pages=[];const missing=[];
+  DAYS.forEach(([k,,dn])=>{if(!days.includes(k))return;const r=currentRoute(k);if(!r){missing.push(dn);return;}const ps=planStats(r,k);const date=fmtDate(dayDate(k));
+    r.trips.forEach((t,ti)=>{if(!vsel.has(t.van)||!t.stops.length)return;const st=ps[ti];const V=veh(t.van);const vname=V.name+(t.trip>1?" · viaje "+t.trip:"");
+      if(pr.format==="remito"){
+        const items=t.stops.map((id,i)=>{const c=C[id];return `<div class="remito">${sheetHead("Remito de entrega",dn+" "+date)}
+          <div class="rm-grid"><div><small>Cliente</small><b>${esc(c.name)}</b></div><div><small>Fecha</small><b>${date}</b></div>
+          <div><small>Dirección</small><b>${esc(c.address||"")}</b></div><div><small>Cantidad de viandas</small><span class="rm-q">${qty(c,k)}</span></div>
+          <div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Parada</small><b>${i+1} de ${t.stops.length}${pr.eta?" · ~"+min2hm(st.etas[i]):""}</b></div></div>
+          <div class="rm-ins"><small>Aclaraciones / instrucciones de entrega</small>${esc(c.notes||"")}</div>
+          <div class="rm-sign"><div>Recibí conforme (firma)</div><div>Aclaración</div><div>Hora de entrega</div></div></div>`;});
+        for(let i=0;i<items.length;i+=2)pages.push(`<section class="sheet half">${items[i]}${items[i+1]?`<div class="cut"></div>${items[i+1]}`:""}</section>`);
+      }else{
+        const rows=t.stops.map((id,i)=>{const c=C[id];return `<tr><td class="n">${i+1}</td><td><b>${esc(c.name)}</b></td><td>${esc(c.address||"")}</td><td class="q">${qty(c,k)}</td>${pr.eta?`<td class="h">~${min2hm(st.etas[i])}</td>`:""}<td class="ins"><div class="pre">${esc(c.notes||"")}</div>${c.notes?"":`<div class="lines"></div>`}</td>${pr.sign?`<td class="f"></td>`:""}</tr>`;}).join("");
+        pages.push(`<section class="sheet">${sheetHead("Hoja de ruta",dn+" "+date)}
+          <div class="sh-meta"><div><small>Fecha</small><b>${dn} ${date}</b></div><div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Salida</small><b>${min2hm(st.start)} · ${esc(S.config.depotName)}</b></div><div><small>Total</small><b>${st.load} viandas · ${t.stops.length} entregas</b></div></div>
+          <table class="sh"><thead><tr><th>#</th><th>Cliente</th><th>Dirección</th><th>Viandas</th>${pr.eta?"<th>Hora aprox.</th>":""}<th>Aclaraciones / instrucciones</th>${pr.sign?"<th>Firma recibí</th>":""}</tr></thead>
+          <tbody>${rows}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="q">${st.load}</td>${pr.eta?"<td></td>":""}<td></td>${pr.sign?"<td></td>":""}</tr></tfoot></table>
+          <div class="sh-foot"><span>Chofer: ______________________</span><span>Easy Lunch · ${esc(S.config.depotName)}</span></div></section>`);
+      }});});
+  return {pages,missing};
+}
+function renderHojas(){
+  S.print=S.print||{...P0};const pr=S.print;const ALL=vehicles();
+  if(!pr.week)pr.week=isoDate(mondayOf(new Date()));
+  const days=pr.days||DAYS.map(d=>d[0]);const vs=new Set(pr.veh||ALL.map(v=>v.idx));
+  $("#panel").innerHTML=`<h2>Hojas de ruta</h2>
+  <div class="card" style="gap:12px">
+    <div class="field"><label for="p-week">Semana del lunes</label><input id="p-week" type="date" value="${pr.week}"></div>
+    <div class="field"><label>Días</label><div class="pcheck">
+      <label class="vchip ${days.length===5?"on":""}"><input type="checkbox" id="p-alldays" ${days.length===5?"checked":""}>Todos</label>
+      ${DAYS.map(([k,s])=>`<label class="vchip ${days.includes(k)?"on":""}"><input type="checkbox" data-pday="${k}" ${days.includes(k)?"checked":""}>${s} <small class="num">${fmtDate(dayDate(k)).slice(0,5)}</small></label>`).join("")}</div></div>
+    <div class="field"><label>Transporte</label><div class="pcheck">
+      <label class="vchip ${vs.size===ALL.length?"on":""}"><input type="checkbox" id="p-allveh" ${vs.size===ALL.length?"checked":""}>Todos</label>
+      ${ALL.map(v=>`<label class="vchip ${vs.has(v.idx)?"on":""}"><input type="checkbox" data-pveh="${v.idx}" ${vs.has(v.idx)?"checked":""}><span class="swatch" style="background:${COLORS[v.idx%COLORS.length]}"></span>${esc(v.name)}</label>`).join("")}</div></div>
+    <div class="field"><label for="p-format">Formato</label><select id="p-format">
+      <option value="hoja" ${pr.format!=="remito"?"selected":""}>Hoja de ruta (una hoja por vehículo y día)</option>
+      <option value="remito" ${pr.format==="remito"?"selected":""}>Remitos (uno por cliente, 2 por hoja)</option></select></div>
+    <label class="check"><input type="checkbox" id="p-eta" ${pr.eta?"checked":""}><span>Mostrar hora aproximada de llegada</span></label>
+    ${pr.format!=="remito"?`<label class="check"><input type="checkbox" id="p-sign" ${pr.sign?"checked":""}><span>Columna de firma del cliente</span></label>`:""}
+    <div class="row"><button class="btn primary" id="p-print">Imprimir</button><button class="btn" id="p-pdf">Descargar PDF</button></div>
+    <p class="hint" style="margin:0">Las aclaraciones salen del campo “Instrucciones de entrega” de cada cliente (pestaña Clientes). Si está vacío, queda un renglón para escribir a mano.</p>
+  </div><div id="p-info"></div>`;
+  const P=$("#panel");
+  const set=(k,v)=>{pr[k]=v;renderHojas();};
+  $("#p-week").onchange=e=>{const d=e.target.value?mondayOf(new Date(e.target.value+"T12:00:00")):mondayOf(new Date());set("week",isoDate(d));};
+  $("#p-alldays").onchange=e=>set("days",e.target.checked?DAYS.map(d=>d[0]):[]);
+  P.querySelectorAll("[data-pday]").forEach(cb=>cb.onchange=()=>{const cur=new Set(days);cb.checked?cur.add(cb.dataset.pday):cur.delete(cb.dataset.pday);set("days",DAYS.map(d=>d[0]).filter(k=>cur.has(k)));});
+  $("#p-allveh").onchange=e=>set("veh",e.target.checked?ALL.map(v=>v.idx):[]);
+  P.querySelectorAll("[data-pveh]").forEach(cb=>cb.onchange=()=>{const cur=new Set(vs);const i=+cb.dataset.pveh;cb.checked?cur.add(i):cur.delete(i);set("veh",[...cur]);});
+  $("#p-format").onchange=e=>set("format",e.target.value);
+  $("#p-eta").onchange=e=>set("eta",e.target.checked);
+  if($("#p-sign"))$("#p-sign").onchange=e=>set("sign",e.target.checked);
+  const draw=()=>{const {pages,missing}=buildSheets();
+    $("#sheets").innerHTML=pages.length?`<div id="sheetsInner">${pages.join("")}</div>`:`<div class="empty">No hay recorridos para lo que elegiste. Revisá días y transporte, o armá los recorridos en la pestaña Recorridos.</div>`;
+    $("#p-info").innerHTML=(pages.length?`<div class="note info">${pages.length} hoja${pages.length>1?"s":""} lista${pages.length>1?"s":""} para imprimir.</div>`:"")+(missing.length?`<div class="note warn">Sin recorrido armado: ${missing.join(", ")}.</div>`:"");
+    $("#p-print").disabled=$("#p-pdf").disabled=!pages.length;return pages;};
+  draw();ensureLogo().then(l=>{if(l&&S.tab==="hojas")draw();});
+  $("#p-print").onclick=async()=>{await ensureLogo();const pages=draw();$("#printRoot").innerHTML=pages.join("");setTimeout(()=>window.print(),150);};
+  $("#p-pdf").onclick=async e=>{const b=e.target;if(!window.html2pdf){toast("El generador de PDF todavía está cargando, probá en unos segundos");return;}
+    b.disabled=true;b.textContent="Generando PDF…";await ensureLogo();draw();
+    const sel=(pr.days||DAYS.map(d=>d[0]));const name=`${pr.format==="remito"?"Remitos":"Hojas de ruta"} Easy Lunch ${fmtDate(dayDate(sel[0]||"lun")).slice(0,5).replace("/","-")}${sel.length>1?" a "+fmtDate(dayDate(sel[sel.length-1])).slice(0,5).replace("/","-"):""}.pdf`;
+    const holder=document.createElement("div");holder.style.cssText="width:210mm;background:#fff";holder.innerHTML=buildSheets().pages.join("");
+    holder.querySelectorAll(".sheet").forEach((s,i,a)=>{s.style.boxShadow="none";s.style.margin="0";s.style.height="296.8mm";s.style.minHeight="0";s.style.overflow="hidden";if(i<a.length-1){s.style.pageBreakAfter="always";s.style.breakAfter="page";}});
+    try{await window.html2pdf().set({margin:0,filename:name,image:{type:"jpeg",quality:.95},html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},pagebreak:{mode:["css","legacy"]}}).from(holder).save();toast("PDF descargado");}
+    catch(err){console.error(err);toast("No se pudo generar el PDF. Probá con Imprimir → Guardar como PDF.");}
+    holder.remove();b.disabled=false;b.textContent="Descargar PDF";};
+}
+window.addEventListener("afterprint",()=>{$("#printRoot").innerHTML="";});
 function locState(ok,t){const el=$("#locState");if(!el)return;el.className="locstate "+(ok?"ok":"no");el.textContent=t;}
-function render(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else renderConfig();renderMap();}
+function render(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else if(S.tab==="hojas")renderHojas();else renderConfig();
+  const sh=S.tab==="hojas";$("#sheets").hidden=!sh;$("#map").style.visibility=sh?"hidden":"visible";document.querySelector(".mapctl").hidden=sh;document.querySelector(".mapnote").hidden=sh;if(sh)$("#trafficLegend").hidden=true;
+  if(!sh)renderMap();}
 function renderSafe(){const a=document.activeElement;if(a&&a.closest&&a.closest("#panel form")){renderHeader();renderMap();return;}render();}
 render();setTimeout(()=>map.invalidateSize(),50);window.addEventListener("resize",()=>map.invalidateSize());
 initDb();
