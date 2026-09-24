@@ -133,6 +133,13 @@ table.sh tfoot td{font-weight:700;border-bottom:0;padding-top:3mm}
 .tripfilter .solo{border:0;background:transparent;color:var(--accent);font-weight:600;font-size:12px;cursor:pointer;padding:2px 4px}
 .tripfilter .all{border-bottom:1px solid var(--line);margin-bottom:3px;padding-bottom:5px}
 .trip.dim{opacity:.5}
+.tools summary{cursor:pointer;list-style:none;display:flex;gap:8px;align-items:baseline}
+.tools summary::-webkit-details-marker{display:none}
+.tools summary::before{content:"▸";color:var(--muted)}
+.tools[open] summary::before{content:"▾"}
+.tools[open]{gap:12px}
+.pending{border:1.5px solid var(--gold);border-radius:12px;padding:10px;background:var(--warn-bg);display:flex;flex-direction:column;gap:8px}
+.pending h3{color:var(--warn-ink)}
 .legend{position:absolute;left:12px;bottom:34px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .legend i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:4px;vertical-align:middle}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
@@ -272,7 +279,7 @@ const S={config:{...DEFAULT_CONFIG},clients:{},routes:{},day:todayKey(),tab:"rut
 function todayKey(){const d=new Date().getDay();return ["lun","lun","mar","mie","jue","vie","lun"][d];}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function toast(t){const el=$("#toast");el.textContent=t;el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,2200);}
+function toast(t,action,fn){const el=$("#toast");el.textContent=t;if(action){const b=document.createElement("button");b.className="btn small";b.style.marginLeft="10px";b.textContent=action;b.onclick=()=>{el.hidden=true;fn();};el.appendChild(b);}el.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>el.hidden=true,action?7000:2200);}
 const uid=()=>"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 
 /* ---------- geometry ---------- */
@@ -476,7 +483,7 @@ async function loadAll(first){
   const [cfg,cli,rut]=await Promise.all([sbGet("rutas_config?select=data&id=eq.main"),sbGet("rutas_clientes?select=id,data"),sbGet("rutas_recorridos?select=dia,data")]);
   if(cfg[0])S.config={...DEFAULT_CONFIG,...cfg[0].data};
   const o={};cli.forEach(r=>o[r.id]={...r.data,id:r.id});S.clients=o;
-  rut.forEach(r=>{if(!S.dirty[r.dia]){S.routes[r.dia]=r.data;loadGoogleFromRoute(r.data);}});
+  const sv={};rut.forEach(r=>{if(String(r.dia).startsWith("g_")){sv[r.dia]=r.data;return;}if(!S.dirty[r.dia]){S.routes[r.dia]=r.data;loadGoogleFromRoute(r.data);}});S.saved=sv;
   renderSafe();if(first)fitAll();
 }
 async function initDb(){
@@ -643,11 +650,21 @@ function renderRutas(){
     if(vs.length>1)h+=`<div class="vtimes">${vs.map(v=>`<span><i class="swatch" style="background:${COLORS[v%COLORS.length]}"></i>${esc(vanName(v))}: <b class="num">${durTxt(tot[v].min)}</b>${tot[v].trips>1?` <small>(${tot[v].trips} viajes)</small>`:""}</span>`).join("")}</div>`;}
   if(totalQ>capDay)h+=`<div class="note warn">Hay ${totalQ} viandas y entre los vehículos del día entran ${capDay}: algún vehículo va a tener que hacer un segundo viaje (línea punteada en el mapa).</div>`;
   if(noLoc.length)h+=`<div class="note bad">${noLoc.length} cliente${noLoc.length>1?"s":""} sin ubicación no entra${noLoc.length>1?"n":""} en el recorrido: ${noLoc.map(c=>`<a href="#" data-goclient="${c.id}">${esc(c.name)}</a>`).join(", ")}.</div>`;
+  const saved=Object.entries(S.saved||{}).sort((a,b)=>String(b[1].savedAt).localeCompare(String(a[1].savedAt)));
+  h+=`<details class="card tools" ${S.toolsOpen?"open":""}><summary><b>Guardar, cargar o copiar recorridos</b> <small class="hint">${saved.length} guardado${saved.length!==1?"s":""}</small></summary>
+    ${r?`<div class="field"><label for="saveName">Guardar el recorrido del ${dn.toLowerCase()} como</label><div class="row"><input id="saveName" class="search" style="flex:1;min-width:160px" placeholder="Ej: Base semanal, Prueba 2 motos"><button class="btn small primary" id="saveBtn">Guardar</button></div></div>
+    <div class="field"><label>Copiar este recorrido a</label><div class="row">${DAYS.filter(d=>d[0]!==day).map(([k,sn])=>`<label class="vchip"><input type="checkbox" data-copyday="${k}">${sn}</label>`).join("")}<button class="btn small" id="copyBtn">Copiar</button></div>
+      <span class="hint">Se copian los vehículos y el orden. En cada día se sacan los clientes que no tienen pedido y los que falten aparecen arriba en “Sin recorrido”. Reemplaza lo que ya haya en esos días.</span></div>`:""}
+    ${saved.length?`<div class="field"><label>Guardados</label><div class="clist">${saved.map(([id,g])=>`<div class="crow" style="cursor:default"><div><div style="font-weight:600">${esc(g.name)}</div><div class="hint">${esc((DAYS.find(d=>d[0]===g.day)||["","",""])[2])} · ${(g.trips||[]).length} vehículo${(g.trips||[]).length!==1?"s":""} · ${(g.trips||[]).reduce((a,t)=>a+t.stops.length,0)} paradas · ${g.savedAt?fmtDate(new Date(g.savedAt)):""}</div></div>
+      <div class="row"><button class="btn small" data-loadplan="${id}">Cargar en ${esc(dn.toLowerCase())}</button><button class="btn small danger" data-delplan="${id}">${S.confirmPlan===id?"¿Seguro? Borrar":"Borrar"}</button></div></div>`).join("")}</div></div>`:`<p class="hint" style="margin:0">Todavía no guardaste recorridos.</p>`}
+  </details>`;
   if(!r){h+=wanted.length?`<div class="empty">Todavía no hay recorrido para el ${dn.toLowerCase()}. Tocá “Armar recorridos”.</div>`:`<div class="empty">Ningún cliente recibe viandas el ${dn.toLowerCase()}. Cargá cantidades en la pestaña Clientes.</div>`;$("#panel").innerHTML=h;bindRutas();return;}
   const inTrip=new Set();r.trips.forEach(t=>t.stops.forEach(id=>inTrip.add(id)));
   const pending=wanted.filter(c=>hasLoc(c)&&!inTrip.has(c.id));
-  if(pending.length)h+=`<div class="note info"><span>${pending.length} cliente${pending.length>1?"s":""} sin recorrido asignado.</span><button class="btn small" id="insertAll">Sumarlos donde convenga</button></div>`;
   const tripOpts=(cur)=>r.trips.map((t,i)=>`<option value="${i}" ${i===cur?"selected":""}>${esc(vanName(t.van))}${t.trip>1?" · v"+t.trip:""}</option>`).join("");
+  if(pending.length)h+=`<section class="pending"><div class="row"><h3>Sin recorrido (${pending.length})</h3><span class="spacer"></span><button class="btn small" id="insertAll">Sumarlos donde convenga</button></div>
+    <div class="clist">${pending.map(c=>`<div class="crow" style="cursor:default"><div><div style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} · ${qty(c,day)} viandas${ctrans(c)!=="camioneta"?" · "+TRANS[ctrans(c)].toLowerCase():""}</div></div>
+      <div class="row"><select data-assign="${c.id}" aria-label="Asignar a"><option value="">Asignar a…</option>${tripOpts(-1)}</select></div></div>`).join("")}</div></section>`;
   r.trips.forEach((t,ti)=>{const st=ps[ti];const col=tripColor(t);const V=veh(t.van);const Q=V.cap;const pct=Math.min(100,st.load/Q*100);
     h+=`<article class="trip" data-trip="${ti}"><div class="trip-h"><span class="swatch" style="background:${col}"></span>
       <select class="vsel" data-veh="${ti}" aria-label="Vehículo de este viaje">${ALL.map(v=>`<option value="${v.idx}" ${v.idx===t.van?"selected":""}>${esc(v.name)}</option>`).join("")}${ALL.some(v=>v.idx===t.van)?"":`<option value="${t.van}" selected>${esc(V.name)}</option>`}</select>
@@ -678,17 +695,27 @@ function renderRutas(){
     h+=`</ol><div class="dropend" data-dropend="${ti}">${t.stops.length?"Soltá acá para mandar al final":"Arrastrá paradas acá"}</div>
       ${S.config.returnToBase&&t.stops.length?`<div class="depot-row">Vuelve a base ~${min2hm(st.end)}</div>`:""}</article>`;});
   h+=`<div class="row"><button class="btn small" id="addTrip">+ Agregar viaje / vehículo</button></div>`;
-  if(pending.length){h+=`<h3>Sin recorrido</h3><div class="clist">`+pending.map(c=>`<div class="crow" style="cursor:default"><div><div class="nm" style="font-weight:600">${esc(c.name)}</div><div class="hint">${esc(c.address||"")} · ${qty(c,day)} viandas</div></div>
-      <div class="row"><select data-assign="${c.id}" aria-label="Asignar a"><option value="">Asignar a…</option>${tripOpts(-1)}</select></div></div>`).join("")+`</div>`;}
   $("#panel").innerHTML=h;bindRutas();syncDim();
   setTimeout(()=>ensureGeometry(day),0);
 }
+function applyStructure(srcTrips,day,label){
+  const C=S.clients;const trips=(srcTrips||[]).map(t=>({van:t.van|0,stops:(t.stops||[]).filter(id=>C[id]&&hasLoc(C[id])&&qty(C[id],day)>0)})).filter(t=>t.stops.length);
+  S.routes[day]=normalizeTrips({trips,generatedAt:new Date().toISOString(),edited:true,from:label||null});saveRoute(day);
+}
+async function savePlan(day,name){const r=currentRoute(day);if(!r)return;const id="g_"+Date.now().toString(36);
+  const data={name:name||("Recorrido "+DAYS.find(d=>d[0]===day)[2]),day,savedAt:new Date().toISOString(),trips:r.trips.map(t=>({van:t.van,stops:t.stops.slice()}))};
+  S.saved={...(S.saved||{}),[id]:data};render();
+  try{await sbUpsert("rutas_recorridos",{dia:id,data,updated_at:now()});toast("Recorrido guardado: "+data.name);}catch(e){onWriteErr(e);}}
+async function deletePlan(id){const n={...(S.saved||{})};delete n[id];S.saved=n;render();try{await sbDel("rutas_recorridos","dia=eq."+encodeURIComponent(id));toast("Guardado eliminado");}catch(e){onWriteErr(e);}}
+function snapshotDay(day){const r=S.routes[day];return r?JSON.parse(JSON.stringify(r)):null;}
+function restoreDay(day,snap){if(snap){S.routes[day]=snap;saveRoute(day);}else{delete S.routes[day];sbDel("rutas_recorridos","dia=eq."+day).catch(()=>{});}render();}
 function mutate(fn){const r=currentRoute(S.day);if(!r)return;fn(r);normalizeTrips(r);r.edited=true;S.routes[S.day]=r;saveRoute(S.day);render();clearTimeout(mutate._t);const d=S.day;mutate._t=setTimeout(()=>ensureGeometry(d),700);}
 function bindRutas(){
   const P=$("#panel"),day=S.day,C=S.clients;
   const ob=$("#optBtn");if(ob)ob.onclick=async()=>{ob.disabled=true;ob.textContent="Calculando por calles…";const r=await optimize(day);S.routes[day]=r;saveRoute(day);render();fitClients();
     const g=await googleDay(day);ensureGeometry(day);toast(`Recorrido armado: ${r.trips.length} viaje${r.trips.length>1?"s":""}${g?" con tránsito de Google":""}`);};
   P.querySelectorAll("[data-goclient]").forEach(a=>a.onclick=e=>{e.preventDefault();S.tab="clientes";S.sel=a.dataset.goclient;render();});
+  const tl=P.querySelector("details.tools");if(tl)tl.ontoggle=()=>{S.toolsOpen=tl.open;};
   const stSel=$("#strat");if(stSel)stSel.onchange=()=>{S.config.strategy=stSel.value;saveConfig();toast("Tocá “Recalcular recorridos” para aplicar");render();};
   P.querySelectorAll("[data-dayveh]").forEach(cb=>cb.onchange=()=>{const cur=new Set(dayVehicles(day).map(v=>v.idx));const i=+cb.dataset.dayveh;if(cb.checked)cur.add(i);else cur.delete(i);
     if(!cur.size){toast("Tiene que quedar al menos un vehículo");cb.checked=true;return;}
@@ -699,7 +726,14 @@ function bindRutas(){
       r.trips[best[1]].stops=best[2];});});
   P.onclick=e=>{const b=e.target.closest("button");if(!b||b.disabled)return;const d=b.dataset;
     if(d.up||d.down){const [t,i]=(d.up||d.down).split(":").map(Number);const dir=d.up?-1:1;mutate(r=>{const s=r.trips[t].stops;const j=i+dir;[s[i],s[j]]=[s[j],s[i]];});}
-    else if(d.rm){const [t,i]=d.rm.split(":").map(Number);mutate(r=>r.trips[t].stops.splice(i,1));}
+    else if(d.rm){const [t,i]=d.rm.split(":").map(Number);const snap=snapshotDay(day);const cur=currentRoute(day);const nm=cur&&C[cur.trips[t].stops[i]]?C[cur.trips[t].stops[i]].name:"Cliente";
+      mutate(r=>r.trips[t].stops.splice(i,1));toast(nm+" quedó en “Sin recorrido”","Deshacer",()=>restoreDay(day,snap));}
+    else if(d.loadplan){const g=(S.saved||{})[d.loadplan];if(!g)return;const snap=snapshotDay(day);applyStructure(g.trips,day,g.name);render();ensureGeometry(day);toast("Cargado “"+g.name+"” en el "+DAYS.find(x=>x[0]===day)[2].toLowerCase(),"Deshacer",()=>restoreDay(day,snap));}
+    else if(d.delplan){if(S.confirmPlan!==d.delplan){S.confirmPlan=d.delplan;render();return;}S.confirmPlan=null;deletePlan(d.delplan);}
+    else if(b.id==="saveBtn"){savePlan(day,$("#saveName").value.trim());}
+    else if(b.id==="copyBtn"){const targets=[...P.querySelectorAll("[data-copyday]:checked")].map(x=>x.dataset.copyday);if(!targets.length){toast("Elegí a qué días copiar");return;}
+      const src=currentRoute(day);const snaps={};targets.forEach(k=>{snaps[k]=snapshotDay(k);applyStructure(src.trips,k,"Copia del "+DAYS.find(x=>x[0]===day)[2].toLowerCase());});
+      render();toast("Copiado a "+targets.map(k=>DAYS.find(x=>x[0]===k)[1]).join(", "),"Deshacer",()=>{targets.forEach(k=>restoreDay(k,snaps[k]));});}
     else if(d.gtrip!==undefined){b.disabled=true;b.textContent="Consultando…";googleDay(day,+d.gtrip).then(()=>ensureGeometry(day));}
     else if(d.reopt){const t=+d.reopt;mutate(r=>r.trips[t].stops=twoOpt(r.trips[t].stops,C));toast("Paradas reordenadas");}
     else if(d.deltrip){const t=+d.deltrip;mutate(r=>r.trips.splice(t,1));}
