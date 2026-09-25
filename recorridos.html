@@ -995,6 +995,7 @@ const normName=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-
 function guessClient(emp){const toks=normName(emp).split(" ").filter(t=>t.length>=3);if(!toks.length)return null;let best=null,bs=0,tie=false;
   Object.values(S.clients).forEach(c=>{const hay=" "+normName(c.name+" "+(c.address||""))+" ";const nm=" "+normName(c.name)+" ";if(nm.trim()===normName(emp)){best=c.id;bs=99;tie=false;return;}
     let sc=0;toks.forEach(t=>{if(hay.includes(" "+t+" ")||hay.includes(" "+t))sc++;});if(!toks.some(t=>nm.includes(t)))sc=0;
+    const etk=new Set(normName(emp).split(" "));const ctk=normName(c.name).split(" ").filter(t=>t.length>=3);if(ctk.length&&ctk.every(t=>etk.has(t)))sc=Math.max(sc,toks.length);
     if(sc>bs){bs=sc;best=c.id;tie=false;}else if(sc===bs&&sc>0&&bs<99)tie=true;});
   return bs>=Math.max(1,Math.ceil(toks.length*.6))&&!tie?best:null;}
 function pedWeekDays(){const m=new Date((PED.week||isoDate(mondayOf(new Date())))+"T12:00:00");return DAYS.map(([k],i)=>{const d=new Date(m);d.setDate(d.getDate()+i);return [k,isoDate(d)];});}
