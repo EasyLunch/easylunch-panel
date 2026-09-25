@@ -148,6 +148,8 @@ table.pedt td.num{text-align:center}
 table.pedt tr.unm td{background:var(--warn-bg)}
 table.pedt select{max-width:190px;width:100%;margin-top:4px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:3px;background:var(--panel)}
 table.pedt tfoot td{font-weight:700}
+.syncline{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--panel2);border-radius:10px;padding:6px 10px;font-size:13px}
+.day .dd{font-family:var(--mono);font-size:10px;font-weight:500}
 .legend{position:absolute;left:12px;bottom:34px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .legend i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:4px;vertical-align:middle}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
@@ -283,7 +285,7 @@ const COLORS=["#1F7A4D","#D9622B","#2F6FB3","#A63D8F","#138A8A","#8A6D1F","#C23B
 const ROAD_FACTOR=1.3;
 const DEFAULT_CONFIG={depotName:"Cocina Easy Lunch",depotAddress:"José C. Paz",depotLat:-34.5160,depotLng:-58.7640,vans:1,capacity:200,startTime:"10:30",speed:30,serviceMin:6,traffic:35,useGoogle:true,motos:0,motoCapacity:15,strategy:"min",dayVeh:{},returnToBase:true,useAllVans:false};
 
-const S={config:{...DEFAULT_CONFIG},clients:{},routes:{},day:todayKey(),tab:"rutas",sel:null,pick:false,db:null,sample:null,dirty:{},readOnly:false,confirmDel:false,importOpen:false,q:""};
+const S={week:null,config:{...DEFAULT_CONFIG},clients:{},routes:{},day:todayKey(),tab:"rutas",sel:null,pick:false,db:null,sample:null,dirty:{},readOnly:false,confirmDel:false,importOpen:false,q:""};
 function todayKey(){const d=new Date().getDay();return ["lun","lun","mar","mie","jue","vie","lun"][d];}
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -475,7 +477,11 @@ async function sbGet(q){const r=await fetch(SB+"/"+q,{headers:H});if(!r.ok)throw
 async function sbUpsert(t,row){const r=await fetch(SB+"/"+t,{method:"POST",headers:{...H,Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(row)});if(!r.ok)throw new Error(await r.text());}
 async function sbDel(t,f){const r=await fetch(SB+"/"+t+"?"+f,{method:"DELETE",headers:H});if(!r.ok)throw new Error(await r.text());}
 const now=()=>new Date().toISOString();
+function updateHabit(day){const r=currentRoute(day);if(!r)return;const H={...(S.config.habit||{})};const hd={...(H[day]||{})};let ch=false;
+  r.trips.forEach(t=>t.stops.forEach((id,i)=>{const v={v:t.van,p:t.stops.slice(Math.max(0,i-3),i).reverse(),n:t.stops.slice(i+1,i+4)};if(JSON.stringify(hd[id])!==JSON.stringify(v)){hd[id]=v;ch=true;}}));
+  if(ch){H[day]=hd;S.config.habit=H;saveConfig();}}
 function saveRoute(day){
+  try{updateHabit(day);}catch(_){}
   S.dirty[day]=true;clearTimeout(saveRoute["_"+day]);
   saveRoute["_"+day]=setTimeout(async()=>{
     const r=S.routes[day];
@@ -496,11 +502,13 @@ async function loadAll(first){
 }
 async function initDb(){
   S.sample=true;
-  try{await loadAll(true);S.db=true;$("#syncState").textContent="Sincronizado";}
+  try{await loadAll(true);S.db=true;$("#syncState").textContent="Sincronizado";setTimeout(()=>syncPedidos(),300);}
   catch(e){console.error(e);$("#syncState").textContent="Sin base de datos";
     $("#panel").insertAdjacentHTML("afterbegin",`<div class="note bad">No encuentro las tablas de recorridos. Ejecutá <b>agregar_tablas_recorridos.sql</b> en Supabase → SQL Editor y recargá la página.</div>`);return;}
   const refresh=()=>{if(document.hidden)return;const busy=Object.values(S.dirty).some(Boolean);if(!busy)loadAll(false).catch(()=>{});};
   setInterval(refresh,30000);document.addEventListener("visibilitychange",refresh);
+  setInterval(()=>{if(!document.hidden)syncPedidos();},15*60000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&SYNC.at&&Date.now()-SYNC.at>5*60000)syncPedidos();});
 }
 
 /* ---------- geocoding (Photon + Nominatim) ---------- */
@@ -612,7 +620,7 @@ $("#pickCancel").onclick=e=>{e.stopPropagation();S.pick=false;$("#pickBanner").h
 function renderHeader(){
   document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===S.tab)));
   const C=Object.values(S.clients);
-  $("#days").innerHTML=DAYS.map(([k,s])=>{const tot=C.reduce((a,c)=>a+qty(c,k),0);return `<button class="day" role="tab" data-day="${k}" aria-selected="${k===S.day}">${s}<small>${tot}</small></button>`;}).join("");
+  const wd=weekDays(S.week||defaultWeek());$("#days").innerHTML=DAYS.map(([k,s],i)=>{const tot=C.reduce((a,c)=>a+qty(c,k),0);return `<button class="day" role="tab" data-day="${k}" aria-selected="${k===S.day}">${s} <span class="dd">${wd[i][1].slice(8)}</span><small>${tot}</small></button>`;}).join("");
   $("#days").style.visibility=(S.tab==="config"||S.tab==="hojas")?"hidden":"visible";
 }
 document.querySelector(".tabs").onclick=e=>{const b=e.target.closest(".tab");if(!b)return;S.tab=b.dataset.tab;S.confirmDel=false;render();};
@@ -640,7 +648,7 @@ function renderRutas(){
   const totalQ=wanted.reduce((a,c)=>a+qty(c,day),0);
   const ALL=vehicles(),DV=dayVehicles(day),dvSet=new Set(DV.map(v=>v.idx));const capDay=DV.reduce((a,v)=>a+v.cap,0);
   const strat=S.config.strategy==="balance"?"balance":"min";
-  let h=`<div class="row"><h2>${dn}</h2><span class="spacer"></span>
+  let h=syncLine()+`<div class="row"><h2>${dn} <small class="hint num">${(weekDays(S.week||defaultWeek()).find(d=>d[0]===day)||["",""])[1].split("-").reverse().slice(0,2).join("/")}</small></h2><span class="spacer"></span>
     <button class="btn primary" id="optBtn" ${S.readOnly?"disabled":""}>${r?"Recalcular recorridos":"Armar recorridos"}</button></div>
     <div class="card" style="gap:10px;padding:12px">
       <div class="field"><label for="strat">Cómo repartir</label>
@@ -722,6 +730,7 @@ function bindRutas(){
   const P=$("#panel"),day=S.day,C=S.clients;
   const ob=$("#optBtn");if(ob)ob.onclick=async()=>{ob.disabled=true;ob.textContent="Calculando por calles…";const r=await optimize(day);S.routes[day]=r;saveRoute(day);render();fitClients();
     const g=await googleDay(day);ensureGeometry(day);toast(`Recorrido armado: ${r.trips.length} viaje${r.trips.length>1?"s":""}${g?" con tránsito de Google":""}`);};
+  bindSyncLine();
   P.querySelectorAll("[data-goclient]").forEach(a=>a.onclick=e=>{e.preventDefault();S.tab="clientes";S.sel=a.dataset.goclient;render();});
   const tl=P.querySelector("details.tools");if(tl)tl.ontoggle=()=>{S.toolsOpen=tl.open;};
   const stSel=$("#strat");if(stSel)stSel.onchange=()=>{S.config.strategy=stSel.value;saveConfig();toast("Tocá “Recalcular recorridos” para aplicar");render();};
@@ -895,13 +904,14 @@ function renderConfig(){
       <div class="field"><label for="c-traffic">Demora extra por tránsito sin Google (%)</label><input id="c-traffic" type="number" min="0" max="300" value="${esc(c.traffic??35)}"></div>
       <div class="field"><label for="c-speed">Velocidad si no hay datos de calles (km/h)</label><input id="c-speed" type="number" min="5" max="90" value="${esc(c.speed)}"></div>
       <div class="field"><label for="c-svc">Minutos por entrega</label><input id="c-svc" type="number" min="0" max="60" value="${esc(c.serviceMin)}"></div></div>
+    <label class="check"><input type="checkbox" id="c-autoped" ${c.autoPedidos!==false?"checked":""}><span><b>Traer pedidos del sistema automáticamente</b><br><span class="hint">Al abrir Recorridos y cada 15 minutos se actualizan las viandas de la semana. Los clientes habituales se suman solos a su recorrido de siempre; las empresas nuevas quedan para asignar a mano.</span></span></label>
     <label class="check"><input type="checkbox" id="c-google" ${c.useGoogle!==false?"checked":""}><span><b>Usar Google con tránsito</b><br><span class="hint">Al armar recorridos, Google reordena cada camioneta con el tránsito previsto para el día y hora de salida. Usa 1 consulta por camioneta (entra en la cuota gratis).</span></span></label>
     <label class="check"><input type="checkbox" id="c-ret" ${c.returnToBase?"checked":""}><span><b>Vuelve a la base al terminar</b><br><span class="hint">Si está apagado, el recorrido termina en la última entrega.</span></span></label>
     <p class="hint" style="margin:0">Los recorridos van por calles reales respetando los sentidos de circulación. Con Google activo, el orden y los horarios usan el tránsito previsto para el día y la hora de salida. Si Google no está disponible o editás a mano, se usa el cálculo por calles más la demora por tránsito de arriba.</p>
   </form>
   <div class="note info">Los cambios se guardan solos. Después de cambiar camionetas o capacidad, entrá a cada día y tocá “Recalcular recorridos”.</div>`;
   const upd=()=>{const loc=parseLoc($("#c-loc").value);Object.assign(S.config,{depotName:$("#c-name").value,depotAddress:$("#c-addr").value,
-      vans:Math.max(0,Math.min(8,parseInt($("#c-vans").value,10)||0)),capacity:Math.max(1,parseInt($("#c-cap").value,10)||1),motos:Math.max(0,Math.min(12,parseInt($("#c-motos").value,10)||0)),motoCapacity:Math.max(1,parseInt($("#c-mcap").value,10)||15),strategy:$("#c-strat").value,useGoogle:$("#c-google").checked,
+      vans:Math.max(0,Math.min(8,parseInt($("#c-vans").value,10)||0)),capacity:Math.max(1,parseInt($("#c-cap").value,10)||1),motos:Math.max(0,Math.min(12,parseInt($("#c-motos").value,10)||0)),motoCapacity:Math.max(1,parseInt($("#c-mcap").value,10)||15),strategy:$("#c-strat").value,useGoogle:$("#c-google").checked,autoPedidos:$("#c-autoped").checked,
       startTime:$("#c-start").value||"10:30",speed:Math.max(5,+$("#c-speed").value||30),serviceMin:Math.max(0,+$("#c-svc").value||0),traffic:Math.max(0,+$("#c-traffic").value||0),returnToBase:$("#c-ret").checked});
     if(loc){S.config.depotLat=loc.lat;S.config.depotLng=loc.lng;}saveConfig();renderMap();renderHeader();};
   $("#panel").querySelectorAll("input").forEach(i=>i.addEventListener("change",upd));
@@ -944,7 +954,7 @@ function buildSheets(){
 }
 function renderHojas(){
   S.print=S.print||{...P0};const pr=S.print;const ALL=vehicles();
-  if(!pr.week)pr.week=isoDate(mondayOf(new Date()));
+  if(!pr.week)pr.week=S.week||defaultWeek();
   const days=pr.days||DAYS.map(d=>d[0]);const vs=new Set(pr.veh||ALL.map(v=>v.idx));
   $("#panel").innerHTML=`<h2>Hojas de ruta</h2>
   <div class="card" style="gap:12px">
@@ -962,7 +972,7 @@ function renderHojas(){
     ${pr.format!=="remito"?`<label class="check"><input type="checkbox" id="p-sign" ${pr.sign?"checked":""}><span>Columna de firma del cliente</span></label>`:""}
     <div class="row"><button class="btn primary" id="p-print">Imprimir</button><button class="btn" id="p-pdf">Descargar PDF</button></div>
     <p class="hint" style="margin:0">Las aclaraciones salen del campo “Instrucciones de entrega” de cada cliente (pestaña Clientes). Si está vacío, queda un renglón para escribir a mano.</p>
-  </div><div id="p-info"></div>`;
+  </div>${pr.week!==(S.week||defaultWeek())?`<div class="note warn">Ojo: elegiste una semana distinta a la de los pedidos cargados (${weekDays(S.week||defaultWeek())[0][1].split("-").reverse().slice(0,2).join("/")}). Las cantidades salen de la semana activa; cambiala en Recorridos para usar los pedidos de esta.</div>`:""}<div id="p-info"></div>`;
   const P=$("#panel");
   const set=(k,v)=>{pr[k]=v;renderHojas();};
   $("#p-week").onchange=e=>{const d=e.target.value?mondayOf(new Date(e.target.value+"T12:00:00")):mondayOf(new Date());set("week",isoDate(d));};
@@ -989,6 +999,59 @@ function renderHojas(){
     holder.remove();b.disabled=false;b.textContent="Descargar PDF";};
 }
 window.addEventListener("afterprint",()=>{$("#printRoot").innerHTML="";});
+/* ---------- sincronización automática de pedidos ---------- */
+function defaultWeek(){const t=new Date();const m=mondayOf(t);if(t.getDay()===5)m.setDate(m.getDate()+7);return isoDate(m);}
+function weekDays(w){const m=new Date(w+"T12:00:00");return DAYS.map(([k],i)=>{const d=new Date(m);d.setDate(d.getDate()+i);return [k,isoDate(d)];});}
+const SYNC={at:null,busy:false,unmatched:[],err:null,total:null,week:null,last:null};
+function habitFor(day,id){const H=S.config.habit||{};if(H[day]&&H[day][id])return H[day][id];for(const [k] of DAYS){if(H[k]&&H[k][id])return H[k][id];}return null;}
+function insertHabitual(r,day,id){const c=S.clients[id];const h=habitFor(day,id);if(!h)return false;
+  let t=r.trips.find(x=>x.van===h.v);
+  if(!t){let best=null;r.trips.forEach(tt=>{if(!transOk(c,veh(tt.van)))return;const n=bestInsert(tt.stops,id);const add=seqCost(n)-seqCost(tt.stops);if(!best||add<best[0])best=[add,tt,n];});if(!best)return false;best[1].stops=best[2];best[1].g=null;return true;}
+  for(const p of h.p||[]){const i=t.stops.indexOf(p);if(i>=0){t.stops.splice(i+1,0,id);t.g=null;return true;}}
+  for(const n of h.n||[]){const i=t.stops.indexOf(n);if(i>=0){t.stops.splice(i,0,id);t.g=null;return true;}}
+  t.stops=bestInsert(t.stops,id);t.g=null;return true;}
+async function syncPedidos(opts={}){
+  if(!S.db||SYNC.busy)return;if(S.config.autoPedidos===false&&!opts.force)return;
+  S.week=S.week||defaultWeek();const days=weekDays(S.week);SYNC.busy=true;SYNC.err=null;if(opts.force)render();
+  try{
+    const r=await fetch(`/api/pedidos?desde=${days[0][1]}&hasta=${days[4][1]}`);const j=await r.json();if(!r.ok)throw new Error(j.message||"sin respuesta");
+    const filas=j.filas||[];SYNC.total=filas.reduce((a,f)=>a+f.viandas,0);SYNC.week=S.week;
+    const groups={};filas.forEach(f=>{const g=groups[f.id_empresa]||(groups[f.id_empresa]={id:f.id_empresa,name:f.empresa,q:{}});const dk=(days.find(d=>d[1]===f.fecha)||[])[0];if(dk)g.q[dk]=(g.q[dk]||0)+f.viandas;});
+    const per={};const unmatched=[];const empMap={...(S.config.empMap||{})};let mapCh=false;
+    Object.values(groups).forEach(g=>{let m=empMap[g.id];if(m==="_ign")return;if(!m||!S.clients[m]){m=guessClient(g.name);if(m){empMap[g.id]=m;mapCh=true;}}
+      if(!m){unmatched.push(g);return;}const q=per[m]||(per[m]={});DAYS.forEach(([k])=>{if(g.q[k])q[k]=(q[k]||0)+g.q[k];});});
+    SYNC.unmatched=unmatched;
+    const summary={changed:0,added:0,pending:0,removed:0};
+    if(SYNC.total>0){
+      const before={};Object.values(S.clients).forEach(c=>before[c.id]={...(c.qty||{})});
+      for(const c of Object.values(S.clients)){const nq={};DAYS.forEach(([k])=>{const v=per[c.id]&&per[c.id][k];if(v)nq[k]=v;});
+        if(JSON.stringify(c.qty||{})!==JSON.stringify(nq)){S.clients[c.id]={...c,qty:nq};summary.changed++;sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);}}
+      // pedidos nuevos de clientes habituales: van a su recorrido y posición de siempre
+      DAYS.forEach(([k])=>{const cur=currentRoute(k);if(!cur)return;const inT=new Set();cur.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));let ch=false;
+        Object.values(S.clients).forEach(c=>{if(qty(c,k)>0&&hasLoc(c)&&!inT.has(c.id)){if(insertHabitual(cur,k,c.id)){summary.added++;ch=true;}else summary.pending++;}
+          if(!(qty(c,k)>0)&&(before[c.id]||{})[k]>0&&(S.routes[k].trips||[]).some(t=>(t.stops||[]).includes(c.id)))summary.removed++;});
+        if(ch){S.routes[k]={...S.routes[k],trips:normalizeTrips(cur).trips};saveRoute(k);}});
+    }
+    if(mapCh){S.config.empMap=empMap;saveConfig();}
+    SYNC.last=summary;SYNC.at=Date.now();
+    if(summary.changed&&(summary.added||summary.pending||summary.removed))toast(`Pedidos actualizados: ${summary.added?summary.added+" agregado"+(summary.added>1?"s":"")+" a su recorrido de siempre":""}${summary.added&&summary.pending?" · ":""}${summary.pending?summary.pending+" para asignar a mano":""}${(summary.added||summary.pending)&&summary.removed?" · ":""}${summary.removed?summary.removed+" sin pedido (fuera del recorrido)":""}`);
+  }catch(e){SYNC.err=e.message;}
+  SYNC.busy=false;render();
+}
+function syncLine(){const days=weekDays(S.week||defaultWeek());const f=d=>d.slice(8)+"/"+d.slice(5,7);
+  let h=`<div class="syncline"><span>Pedidos · semana <b>${f(days[0][1])} al ${f(days[4][1])}</b></span>
+    <button class="btn ghost icon" data-wk="-7" aria-label="Semana anterior">‹</button><button class="btn ghost icon" data-wk="7" aria-label="Semana siguiente">›</button>
+    <span class="spacer"></span><span class="hint">${SYNC.busy?"Actualizando…":SYNC.err?"Error al traer pedidos":SYNC.at?"actualizado "+new Date(SYNC.at).toTimeString().slice(0,5):""}</span>
+    <button class="btn small" id="syncBtn" ${SYNC.busy?"disabled":""}>Actualizar</button></div>`;
+  if(SYNC.err)h+=`<div class="note bad">No pude traer los pedidos del sistema: ${esc(SYNC.err)}</div>`;
+  else if(SYNC.at&&SYNC.total===0)h+=`<div class="note warn">Todavía no hay pedidos cargados en el sistema para esta semana. Se muestran las últimas cantidades guardadas.</div>`;
+  if(SYNC.unmatched.length)h+=`<div class="note warn"><span>${SYNC.unmatched.length} empresa${SYNC.unmatched.length>1?"s":""} con pedidos sin asignar a un cliente: <b>${SYNC.unmatched.map(g=>esc(g.name)).join(", ")}</b></span><button class="btn small" id="goMap">Asignar</button></div>`;
+  return h;}
+function bindSyncLine(){const P=$("#panel");
+  P.querySelectorAll("[data-wk]").forEach(b=>b.onclick=()=>{const d=new Date((S.week||defaultWeek())+"T12:00:00");d.setDate(d.getDate()+ +b.dataset.wk);S.week=isoDate(d);SYNC.at=null;SYNC.unmatched=[];syncPedidos({force:true});});
+  const sb=$("#syncBtn");if(sb)sb.onclick=()=>syncPedidos({force:true});
+  const gm=$("#goMap");if(gm)gm.onclick=()=>{S.tab="clientes";S.pedOpen=true;PED.week=S.week;PED.data=null;render();setTimeout(()=>{const g=$("#pedGo");if(g)g.click();},50);};}
+
 /* ---------- pedidos del sistema Easy Lunch ---------- */
 const PED={week:null,data:null,loading:false,err:null,sel:{},zero:true};
 const normName=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
@@ -1002,7 +1065,7 @@ function pedWeekDays(){const m=new Date((PED.week||isoDate(mondayOf(new Date()))
 function pedGroups(){const days=pedWeekDays();const g={};(PED.data||[]).forEach(f=>{const x=g[f.id_empresa]||(g[f.id_empresa]={id:f.id_empresa,name:f.empresa,q:{}});const dk=(days.find(d=>d[1]===f.fecha)||[])[0];if(dk)x.q[dk]=(x.q[dk]||0)+f.viandas;});return Object.values(g).sort((a,b)=>a.name.localeCompare(b.name,"es"));}
 function pedChoice(g){if(PED.sel[g.id]!==undefined)return PED.sel[g.id];const m=(S.config.empMap||{})[g.id];if(m&&(m==="_ign"||S.clients[m]))return m;return guessClient(g.name)||"";}
 function pedidosCard(){
-  if(!PED.week){const t=new Date();PED.week=isoDate(mondayOf(t));}
+  if(!PED.week){PED.week=S.week||defaultWeek();}
   const days=pedWeekDays();const groups=pedGroups();const opts=Object.values(S.clients).sort((a,b)=>String(a.name).localeCompare(String(b.name),"es"));
   const chosen=new Set(groups.map(pedChoice).filter(x=>x&&x!=="_ign"&&x!=="_new"));const noOrder=opts.filter(c=>!chosen.has(c.id));
   let h=`<div class="card ped"><div class="row"><h3>Pedidos del sistema Easy Lunch</h3><span class="spacer"></span><button class="btn ghost small" id="pedClose">Cerrar</button></div>
