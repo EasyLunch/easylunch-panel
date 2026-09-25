@@ -140,6 +140,14 @@ table.sh tfoot td{font-weight:700;border-bottom:0;padding-top:3mm}
 .tools[open]{gap:12px}
 .pending{border:1.5px solid var(--gold);border-radius:12px;padding:10px;background:var(--warn-bg);display:flex;flex-direction:column;gap:8px}
 .pending h3{color:var(--warn-ink)}
+.ped .tblwrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table.pedt{width:100%;border-collapse:collapse;font-size:13px}
+table.pedt th{background:var(--panel2);text-align:left;padding:6px 8px;font-size:12px;color:var(--muted)}
+table.pedt td{border-top:1px solid var(--line);padding:6px 8px;vertical-align:middle}
+table.pedt td.num{text-align:center}
+table.pedt tr.unm td{background:var(--warn-bg)}
+table.pedt select{max-width:190px;width:100%;margin-top:4px;font-size:12px;border:1px solid var(--line);border-radius:6px;padding:3px;background:var(--panel)}
+table.pedt tfoot td{font-weight:700}
 .legend{position:absolute;left:12px;bottom:34px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;gap:10px;align-items:center;box-shadow:var(--shadow)}
 .legend i{display:inline-block;width:18px;height:5px;border-radius:3px;margin-right:4px;vertical-align:middle}
 .pickbanner{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:600;background:var(--gold);color:#1a1200;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:var(--shadow)}
@@ -770,8 +778,10 @@ function renderClientes(){
   const q=S.q.toLowerCase();const shown=list.filter(c=>!q||(c.name+" "+(c.address||"")).toLowerCase().includes(q));
   const noLoc=list.filter(c=>!hasLoc(c));
   let h=`<div class="row"><h2>Clientes</h2><span class="hint num">${list.length}</span><span class="spacer"></span>
+    <button class="btn small primary" id="pedBtn">Traer pedidos</button>
     <button class="btn small" id="importBtn">Importar lista</button>
     <button class="btn primary small" id="newBtn" ${S.readOnly?"disabled":""}>+ Nuevo cliente</button></div>`;
+  if(S.pedOpen)h+=pedidosCard();
   if(S.importOpen)h+=`<div class="card"><h3>Importar desde planilla</h3>
     <p class="hint" style="margin:0">Pegá filas copiadas de Excel/Sheets con estas columnas: <b>Nombre · Dirección · Lun · Mar · Mié · Jue · Vie · Ubicación (opcional)</b>. La ubicación es opcional: si no la ponés, se busca sola por la dirección.</p>
     <div class="field"><label for="impTxt">Filas</label><textarea id="impTxt" placeholder="Oficinas Norte	Av. del Libertador 7000, CABA	20	20	20	20	15	-34.545, -58.456"></textarea></div>
@@ -811,6 +821,8 @@ function bindClientes(){
   const C=S.clients;
   $("#newBtn").onclick=()=>{S.sel="new";S.confirmDel=false;render();$("#f-name")?.focus();};
   $("#importBtn").onclick=()=>{S.importOpen=!S.importOpen;render();};
+  $("#pedBtn").onclick=()=>{S.pedOpen=!S.pedOpen;render();};
+  if(S.pedOpen)bindPedidos();
   const q=$("#q");q.oninput=()=>{S.q=q.value;const pos=q.selectionStart;renderClientes();const n=$("#q");n.focus();try{n.setSelectionRange(pos,pos);}catch(_){}};
   document.querySelectorAll("[data-cid]").forEach(r=>r.onclick=()=>{S.sel=r.dataset.cid;S.confirmDel=false;render();const c=C[S.sel];if(hasLoc(c))map.setView([c.lat,c.lng],Math.max(map.getZoom(),15));$("#panel").scrollTop=0;});
   if($("#impX"))$("#impX").onclick=()=>{S.importOpen=false;render();};
@@ -977,6 +989,59 @@ function renderHojas(){
     holder.remove();b.disabled=false;b.textContent="Descargar PDF";};
 }
 window.addEventListener("afterprint",()=>{$("#printRoot").innerHTML="";});
+/* ---------- pedidos del sistema Easy Lunch ---------- */
+const PED={week:null,data:null,loading:false,err:null,sel:{},zero:true};
+const normName=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+function guessClient(emp){const toks=normName(emp).split(" ").filter(t=>t.length>=3);if(!toks.length)return null;let best=null,bs=0,tie=false;
+  Object.values(S.clients).forEach(c=>{const hay=" "+normName(c.name+" "+(c.address||""))+" ";const nm=" "+normName(c.name)+" ";if(nm.trim()===normName(emp)){best=c.id;bs=99;tie=false;return;}
+    let sc=0;toks.forEach(t=>{if(hay.includes(" "+t+" ")||hay.includes(" "+t))sc++;});if(!toks.some(t=>nm.includes(t)))sc=0;
+    if(sc>bs){bs=sc;best=c.id;tie=false;}else if(sc===bs&&sc>0&&bs<99)tie=true;});
+  return bs>=Math.max(1,Math.ceil(toks.length*.6))&&!tie?best:null;}
+function pedWeekDays(){const m=new Date((PED.week||isoDate(mondayOf(new Date())))+"T12:00:00");return DAYS.map(([k],i)=>{const d=new Date(m);d.setDate(d.getDate()+i);return [k,isoDate(d)];});}
+function pedGroups(){const days=pedWeekDays();const g={};(PED.data||[]).forEach(f=>{const x=g[f.id_empresa]||(g[f.id_empresa]={id:f.id_empresa,name:f.empresa,q:{}});const dk=(days.find(d=>d[1]===f.fecha)||[])[0];if(dk)x.q[dk]=(x.q[dk]||0)+f.viandas;});return Object.values(g).sort((a,b)=>a.name.localeCompare(b.name,"es"));}
+function pedChoice(g){if(PED.sel[g.id]!==undefined)return PED.sel[g.id];const m=(S.config.empMap||{})[g.id];if(m&&(m==="_ign"||S.clients[m]))return m;return guessClient(g.name)||"";}
+function pedidosCard(){
+  if(!PED.week){const t=new Date();PED.week=isoDate(mondayOf(t));}
+  const days=pedWeekDays();const groups=pedGroups();const opts=Object.values(S.clients).sort((a,b)=>String(a.name).localeCompare(String(b.name),"es"));
+  const chosen=new Set(groups.map(pedChoice).filter(x=>x&&x!=="_ign"&&x!=="_new"));const noOrder=opts.filter(c=>!chosen.has(c.id));
+  let h=`<div class="card ped"><div class="row"><h3>Pedidos del sistema Easy Lunch</h3><span class="spacer"></span><button class="btn ghost small" id="pedClose">Cerrar</button></div>
+    <div class="row"><div class="field" style="flex:1;min-width:150px"><label for="pedWeek">Semana del lunes</label><input id="pedWeek" type="date" value="${PED.week}"></div>
+      <button class="btn small" data-pedwk="0">Esta semana</button><button class="btn small" data-pedwk="7">Próxima</button>
+      <button class="btn primary small" id="pedGo" ${PED.loading?"disabled":""}>${PED.loading?"Buscando…":"Buscar pedidos"}</button></div>`;
+  if(PED.err)h+=`<div class="note bad">${esc(PED.err)}</div>`;
+  if(PED.data){
+    if(!groups.length)h+=`<div class="note warn">No hay pedidos cargados en el sistema para la semana del ${fmtDate(new Date(days[0][1]+"T12:00:00")).slice(0,5)} al ${fmtDate(new Date(days[4][1]+"T12:00:00")).slice(0,5)}.</div>`;
+    else{
+      const tot=DAYS.map(([k])=>groups.reduce((a,g)=>a+(g.q[k]||0),0));
+      h+=`<div class="tblwrap"><table class="pedt"><thead><tr><th>Empresa → cliente</th>${DAYS.map(([k,sn],i)=>`<th>${sn}<br><small>${days[i][1].slice(8)}/${days[i][1].slice(5,7)}</small></th>`).join("")}</tr></thead><tbody>`+
+        groups.map(g=>{const ch=pedChoice(g);return `<tr class="${ch?"":"unm"}"><td><b>${esc(g.name)}</b><br><select data-pedmap="${esc(g.id)}"><option value="">— Elegí —</option><option value="_new" ${ch==="_new"?"selected":""}>+ Crear cliente nuevo</option><option value="_ign" ${ch==="_ign"?"selected":""}>No entregar / ignorar</option>${opts.map(c=>`<option value="${c.id}" ${ch===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></td>${DAYS.map(([k])=>`<td class="num">${g.q[k]||"·"}</td>`).join("")}</tr>`;}).join("")+
+        `</tbody><tfoot><tr><td>Total</td>${tot.map(t=>`<td class="num">${t}</td>`).join("")}</tr></tfoot></table></div>`;
+      const unm=groups.filter(g=>!pedChoice(g)).length;
+      if(unm)h+=`<div class="note warn">${unm} empresa${unm>1?"s":""} sin cliente asignado (en amarillo). Elegí a qué cliente corresponde${unm>1?"n":""}, creala${unm>1?"s":""} o ignorala${unm>1?"s":""}. Se recuerda para las próximas veces.</div>`;
+      h+=`<label class="check"><input type="checkbox" id="pedZero" ${PED.zero?"checked":""}><span>Poner en 0 esa semana a los clientes sin pedidos (${noOrder.length})</span></label>
+        <div class="row"><button class="btn primary" id="pedApply" ${unm?"disabled":""}>Cargar estas viandas</button><span class="hint">Reemplaza las viandas de lunes a viernes de cada cliente. Después recalculá o cargá un recorrido guardado.</span></div>`;
+    }}
+  return h+`</div>`;}
+function bindPedidos(){
+  const P=$("#panel");$("#pedClose").onclick=()=>{S.pedOpen=false;render();};
+  $("#pedWeek").onchange=e=>{PED.week=isoDate(mondayOf(new Date(e.target.value+"T12:00:00")));PED.data=null;render();};
+  P.querySelectorAll("[data-pedwk]").forEach(b=>b.onclick=()=>{const d=mondayOf(new Date());d.setDate(d.getDate()+ +b.dataset.pedwk);PED.week=isoDate(d);PED.data=null;render();});
+  $("#pedGo").onclick=async()=>{const days=pedWeekDays();PED.loading=true;PED.err=null;render();
+    try{const r=await fetch(`/api/pedidos?desde=${days[0][1]}&hasta=${days[4][1]}`);const j=await r.json();if(!r.ok)throw new Error(j.message||"No se pudo leer el sistema");PED.data=j.filas;PED.sel={};}
+    catch(e){PED.err="No pude traer los pedidos: "+e.message;}PED.loading=false;render();};
+  P.querySelectorAll("[data-pedmap]").forEach(sel=>sel.onchange=()=>{PED.sel[sel.dataset.pedmap]=sel.value;render();});
+  const z=$("#pedZero");if(z)z.onchange=()=>{PED.zero=z.checked;};
+  const ap=$("#pedApply");if(ap)ap.onclick=async()=>{ap.disabled=true;ap.textContent="Cargando…";
+    const groups=pedGroups();const perClient={};const empMap={...(S.config.empMap||{})};const created=[];
+    for(const g of groups){let ch=pedChoice(g);if(ch==="_ign"){empMap[g.id]="_ign";continue;}
+      if(ch==="_new"){const c={id:uid(),name:g.name,address:"",lat:null,lng:null,geo:null,qty:{},before:"",notes:"",transport:"camioneta"};S.clients[c.id]=c;created.push(c);ch=c.id;}
+      empMap[g.id]=ch;const q=perClient[ch]||(perClient[ch]={});DAYS.forEach(([k])=>{if(g.q[k])q[k]=(q[k]||0)+g.q[k];});}
+    let n=0;for(const c of Object.values(S.clients)){const q=perClient[c.id];if(!q&&!PED.zero)continue;const nq={};DAYS.forEach(([k])=>{if(q&&q[k])nq[k]=q[k];});
+      const same=JSON.stringify(c.qty||{})===JSON.stringify(nq);if(same&&!created.includes(c))continue;await saveClient({...c,qty:nq});n++;}
+    S.config.empMap=empMap;saveConfig();PED.sel={};
+    toast(`Listo: ${n} cliente${n!==1?"s":""} actualizado${n!==1?"s":""}${created.length?` (${created.length} nuevo${created.length>1?"s":""}: cargales la dirección)`:""}. Ahora recalculá los recorridos o cargá uno guardado.`);
+    render();};
+}
 function locState(ok,t){const el=$("#locState");if(!el)return;el.className="locstate "+(ok?"ok":"no");el.textContent=t;}
 function render(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else if(S.tab==="hojas")renderHojas();else renderConfig();
   const sh=S.tab==="hojas";$("#sheets").hidden=!sh;$("#map").style.visibility=sh?"hidden":"visible";document.querySelector(".mapctl").hidden=sh;document.querySelector(".mapnote").hidden=sh;if(sh){$("#trafficLegend").hidden=true;$("#tripFilter").hidden=true;}
