@@ -92,8 +92,9 @@ table.sh td{border-bottom:1px solid #cfd6d0;padding:2.4mm 2mm;vertical-align:top
 table.sh tr{page-break-inside:avoid;break-inside:avoid}
 table.sh td.n{width:7mm;font-weight:700;color:#1F5A3D}
 table.sh td.q{width:14mm;text-align:center;font-weight:700;font-size:11pt}
+table.sh th.q{text-align:center;padding:2mm 1mm;font-size:7.5pt}
 table.sh td.h{width:13mm;white-space:nowrap}
-table.sh td.ins{width:44mm}
+table.sh td.ins{width:38mm}
 table.sh td.ins .pre{color:#333}
 table.sh td.ins .lines{border-bottom:1px dotted #999;height:6mm}
 table.sh td.f{width:24mm}
@@ -298,6 +299,9 @@ const km=(a,b)=>hav(a,b)*ROAD_FACTOR;
 const depot=()=>({lat:+S.config.depotLat,lng:+S.config.depotLng});
 const hasLoc=c=>c&&isFinite(c.lat)&&isFinite(c.lng)&&c.lat!==null&&c.lng!==null&&c.lat!==""&&c.lng!=="";
 const qty=(c,day)=>Math.max(0,+((c.qty||{})[day])||0);
+const qx=(c,day)=>{const x=(c&&c.qx&&c.qx[day])||{};return {p:+x.p||0,b:+x.b||0};};
+/* postres y bebidas por cliente y día (del sistema), con la misma asociación empresa→cliente que las viandas */
+function extrasPorCliente(extras,days,empMap){const out={};(extras||[]).forEach(e=>{const m=empMap[e.id_empresa];if(!m||m==="_ign"||!S.clients[m])return;const dk=(days.find(d=>d[1]===e.fecha)||[])[0];if(!dk)return;const o=out[m]||(out[m]={});const x=o[dk]||(o[dk]={p:0,b:0});x.p+=e.postres||0;x.b+=e.bebidas||0;});return out;}
 function parseLoc(txt){
   if(!txt)return null;txt=String(txt).trim();
   let m=txt.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||txt.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||txt.match(/[?&](?:q|query|ll|destination)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i)||txt.match(/(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)/);
@@ -937,17 +941,18 @@ function buildSheets(){
       if(pr.format==="remito"){
         const items=t.stops.map((id,i)=>{const c=C[id];return `<div class="remito">${sheetHead("Remito de entrega",dn+" "+date)}
           <div class="rm-grid"><div><small>Cliente</small><b>${esc(c.name)}</b></div><div><small>Fecha</small><b>${date}</b></div>
-          <div><small>Dirección</small><b>${esc(c.address||"")}</b></div><div><small>Cantidad de viandas</small><span class="rm-q">${qty(c,k)}</span></div>
+          <div><small>Dirección</small><b>${esc(c.address||"")}</b></div><div><small>Platos · Postres · Bebidas</small><span class="rm-q">${qty(c,k)}</span> <b>· ${qx(c,k).p} · ${qx(c,k).b}</b></div>
           <div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Parada</small><b>${i+1} de ${t.stops.length}${pr.eta?" · ~"+min2hm(st.etas[i]):""}</b></div></div>
           <div class="rm-ins"><small>Aclaraciones / instrucciones de entrega</small>${esc(c.notes||"")}</div>
           <div class="rm-sign"><div>Recibí conforme (firma)</div><div>Aclaración</div><div>Hora de entrega</div></div></div>`;});
         for(let i=0;i<items.length;i+=2)pages.push(`<section class="sheet half">${items[i]}${items[i+1]?`<div class="cut"></div>${items[i+1]}`:""}</section>`);
       }else{
-        const rows=t.stops.map((id,i)=>{const c=C[id];return `<tr><td class="n">${i+1}</td><td><b>${esc(c.name)}</b></td><td>${esc(c.address||"")}</td><td class="q">${qty(c,k)}</td>${pr.eta?`<td class="h">~${min2hm(st.etas[i])}</td>`:""}<td class="ins"><div class="pre">${esc(c.notes||"")}</div>${c.notes?"":`<div class="lines"></div>`}</td>${pr.sign?`<td class="f"></td>`:""}</tr>`;}).join("");
+        const tp=t.stops.reduce((a,id)=>a+qx(C[id],k).p,0),tb=t.stops.reduce((a,id)=>a+qx(C[id],k).b,0);
+        const rows=t.stops.map((id,i)=>{const c=C[id],x=qx(c,k);return `<tr><td class="n">${i+1}</td><td><b>${esc(c.name)}</b></td><td>${esc(c.address||"")}</td><td class="q">${qty(c,k)}</td><td class="q">${x.p||""}</td><td class="q">${x.b||""}</td>${pr.eta?`<td class="h">~${min2hm(st.etas[i])}</td>`:""}<td class="ins"><div class="pre">${esc(c.notes||"")}</div>${c.notes?"":`<div class="lines"></div>`}</td>${pr.sign?`<td class="f"></td>`:""}</tr>`;}).join("");
         pages.push(`<section class="sheet">${sheetHead("Hoja de ruta",dn+" "+date)}
-          <div class="sh-meta"><div><small>Fecha</small><b>${dn} ${date}</b></div><div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Salida</small><b>${min2hm(st.start)} · ${esc(S.config.depotName)}</b></div><div><small>Total</small><b>${st.load} viandas · ${t.stops.length} entregas</b></div></div>
-          <table class="sh"><thead><tr><th>#</th><th>Cliente</th><th>Dirección</th><th>Viandas</th>${pr.eta?"<th>Hora aprox.</th>":""}<th>Aclaraciones / instrucciones</th>${pr.sign?"<th>Firma recibí</th>":""}</tr></thead>
-          <tbody>${rows}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="q">${st.load}</td>${pr.eta?"<td></td>":""}<td></td>${pr.sign?"<td></td>":""}</tr></tfoot></table>
+          <div class="sh-meta"><div><small>Fecha</small><b>${dn} ${date}</b></div><div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Salida</small><b>${min2hm(st.start)} · ${esc(S.config.depotName)}</b></div><div><small>Total</small><b>${st.load} platos · ${tp} postres · ${tb} bebidas · ${t.stops.length} entregas</b></div></div>
+          <table class="sh"><thead><tr><th>#</th><th>Cliente</th><th>Dirección</th><th class="q">Platos</th><th class="q">Postres</th><th class="q">Bebidas</th>${pr.eta?"<th>Hora aprox.</th>":""}<th>Aclaraciones / instrucciones</th>${pr.sign?"<th>Firma recibí</th>":""}</tr></thead>
+          <tbody>${rows}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="q">${st.load}</td><td class="q">${tp}</td><td class="q">${tb}</td>${pr.eta?"<td></td>":""}<td></td>${pr.sign?"<td></td>":""}</tr></tfoot></table>
           <div class="sh-foot"><span>Chofer: ______________________</span><span>Easy Lunch · ${esc(S.config.depotName)}</span></div></section>`);
       }});});
   return {pages,missing};
@@ -1021,11 +1026,14 @@ async function syncPedidos(opts={}){
     Object.values(groups).forEach(g=>{let m=empMap[g.id];if(m==="_ign")return;if(!m||!S.clients[m]){m=guessClient(g.name);if(m){empMap[g.id]=m;mapCh=true;}}
       if(!m){unmatched.push(g);return;}const q=per[m]||(per[m]={});DAYS.forEach(([k])=>{if(g.q[k])q[k]=(q[k]||0)+g.q[k];});});
     SYNC.unmatched=unmatched;
+    const perX=extrasPorCliente(j.extras,days,empMap);
     const summary={changed:0,added:0,pending:0,removed:0};
     if(SYNC.total>0){
       const before={};Object.values(S.clients).forEach(c=>before[c.id]={...(c.qty||{})});
       for(const c of Object.values(S.clients)){const nq={};DAYS.forEach(([k])=>{const v=per[c.id]&&per[c.id][k];if(v)nq[k]=v;});
-        if(JSON.stringify(c.qty||{})!==JSON.stringify(nq)){S.clients[c.id]={...c,qty:nq};summary.changed++;sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);}}
+        const nx=perX[c.id]||{};const xCambio=JSON.stringify(c.qx||{})!==JSON.stringify(nx);
+        if(xCambio&&JSON.stringify(c.qty||{})===JSON.stringify(nq)){S.clients[c.id]={...c,qx:nx};sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);continue;}
+        if(JSON.stringify(c.qty||{})!==JSON.stringify(nq)){S.clients[c.id]={...c,qty:nq,qx:nx};summary.changed++;sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);}}
       // pedidos nuevos de clientes habituales: van a su recorrido y posición de siempre
       DAYS.forEach(([k])=>{const cur=currentRoute(k);if(!cur)return;const inT=new Set();cur.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));let ch=false;
         Object.values(S.clients).forEach(c=>{if(qty(c,k)>0&&hasLoc(c)&&!inT.has(c.id)){if(insertHabitual(cur,k,c.id)){summary.added++;ch=true;}else summary.pending++;}
@@ -1091,7 +1099,7 @@ function bindPedidos(){
   $("#pedWeek").onchange=e=>{PED.week=isoDate(mondayOf(new Date(e.target.value+"T12:00:00")));PED.data=null;render();};
   P.querySelectorAll("[data-pedwk]").forEach(b=>b.onclick=()=>{const d=mondayOf(new Date());d.setDate(d.getDate()+ +b.dataset.pedwk);PED.week=isoDate(d);PED.data=null;render();});
   $("#pedGo").onclick=async()=>{const days=pedWeekDays();PED.loading=true;PED.err=null;render();
-    try{const r=await fetch(`/api/pedidos?desde=${days[0][1]}&hasta=${days[4][1]}`);const j=await r.json();if(!r.ok)throw new Error(j.message||"No se pudo leer el sistema");PED.data=j.filas;PED.sel={};}
+    try{const r=await fetch(`/api/pedidos?desde=${days[0][1]}&hasta=${days[4][1]}`);const j=await r.json();if(!r.ok)throw new Error(j.message||"No se pudo leer el sistema");PED.data=j.filas;PED.extras=j.extras||[];PED.sel={};}
     catch(e){PED.err="No pude traer los pedidos: "+e.message;}PED.loading=false;render();};
   P.querySelectorAll("[data-pedmap]").forEach(sel=>sel.onchange=()=>{PED.sel[sel.dataset.pedmap]=sel.value;render();});
   const z=$("#pedZero");if(z)z.onchange=()=>{PED.zero=z.checked;};
@@ -1100,8 +1108,9 @@ function bindPedidos(){
     for(const g of groups){let ch=pedChoice(g);if(ch==="_ign"){empMap[g.id]="_ign";continue;}
       if(ch==="_new"){const c={id:uid(),name:g.name,address:"",lat:null,lng:null,geo:null,qty:{},before:"",notes:"",transport:"camioneta"};S.clients[c.id]=c;created.push(c);ch=c.id;}
       empMap[g.id]=ch;const q=perClient[ch]||(perClient[ch]={});DAYS.forEach(([k])=>{if(g.q[k])q[k]=(q[k]||0)+g.q[k];});}
-    let n=0;for(const c of Object.values(S.clients)){const q=perClient[c.id];if(!q&&!PED.zero)continue;const nq={};DAYS.forEach(([k])=>{if(q&&q[k])nq[k]=q[k];});
-      const same=JSON.stringify(c.qty||{})===JSON.stringify(nq);if(same&&!created.includes(c))continue;await saveClient({...c,qty:nq});n++;}
+    const perX=extrasPorCliente(PED.extras,pedWeekDays(),empMap);
+    let n=0;for(const c of Object.values(S.clients)){const q=perClient[c.id];if(!q&&!PED.zero)continue;const nq={};DAYS.forEach(([k])=>{if(q&&q[k])nq[k]=q[k];});const nx=perX[c.id]||{};
+      const same=JSON.stringify(c.qty||{})===JSON.stringify(nq)&&JSON.stringify(c.qx||{})===JSON.stringify(nx);if(same&&!created.includes(c))continue;await saveClient({...c,qty:nq,qx:nx});n++;}
     S.config.empMap=empMap;saveConfig();PED.sel={};
     toast(`Listo: ${n} cliente${n!==1?"s":""} actualizado${n!==1?"s":""}${created.length?` (${created.length} nuevo${created.length>1?"s":""}: cargales la dirección)`:""}. Ahora recalculá los recorridos o cargá uno guardado.`);
     render();};
