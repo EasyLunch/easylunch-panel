@@ -88,6 +88,13 @@ export default async function handler(req, res) {
       empresas[idEmp] = { cliente: clientes[cli].name || '', vehiculo: v.nombre, tipo: v.tipo, ...p }
     })
 
+    // degustaciones (clientes "deg_<id>" que carga la app de Modificaciones): se devuelven con su propio id
+    Object.keys(pos).forEach(id => {
+      if (!id.startsWith('deg_')) return
+      const p = pos[id], v = veh(p.vehIdx)
+      empresas[id] = { cliente: clientes[id].name || '', vehiculo: v.nombre, tipo: v.tipo, ...p }
+    })
+
     return res.status(200).json({ fecha, dia, hayRecorrido: !!(ruta && (ruta.trips || []).length), vehiculos: V, empresas })
   } catch (e) {
     return res.status(500).json({ error: 'interno', message: String((e && e.message) || e) })
