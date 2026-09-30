@@ -301,6 +301,8 @@ const hasLoc=c=>c&&isFinite(c.lat)&&isFinite(c.lng)&&c.lat!==null&&c.lng!==null&
 const qty=(c,day)=>Math.max(0,+((c.qty||{})[day])||0);
 const qx=(c,day)=>{const x=(c&&c.qx&&c.qx[day])||{};return {p:+x.p||0,b:+x.b||0};};
 /* postres y bebidas por cliente y día (del sistema), con la misma asociación empresa→cliente que las viandas */
+/* Degustaciones (las carga la app de Modificaciones: clientes "deg_<id>" con deg={fecha,viandas,postres}): solo cuentan la semana de su fecha */
+function degQ(c,days){const g=c&&c.deg;const o={q:{},x:{}};if(!g||!g.fecha)return o;const dk=(days.find(d=>d[1]===g.fecha)||[])[0];if(!dk)return o;if(+g.viandas)o.q[dk]=+g.viandas;if(+g.postres)o.x[dk]={p:+g.postres,b:0};return o;}
 function extrasPorCliente(extras,days,empMap){const out={};(extras||[]).forEach(e=>{const m=empMap[e.id_empresa];if(!m||m==="_ign"||!S.clients[m])return;const dk=(days.find(d=>d[1]===e.fecha)||[])[0];if(!dk)return;const o=out[m]||(out[m]={});const x=o[dk]||(o[dk]={p:0,b:0});x.p+=e.postres||0;x.b+=e.bebidas||0;});return out;}
 function parseLoc(txt){
   if(!txt)return null;txt=String(txt).trim();
@@ -1031,7 +1033,7 @@ async function syncPedidos(opts={}){
     if(SYNC.total>0){
       const before={};Object.values(S.clients).forEach(c=>before[c.id]={...(c.qty||{})});
       for(const c of Object.values(S.clients)){const nq={};DAYS.forEach(([k])=>{const v=per[c.id]&&per[c.id][k];if(v)nq[k]=v;});
-        const nx=perX[c.id]||{};const xCambio=JSON.stringify(c.qx||{})!==JSON.stringify(nx);
+        const dg=degQ(c,days);Object.assign(nq,dg.q);const nx={...(perX[c.id]||{}),...dg.x};const xCambio=JSON.stringify(c.qx||{})!==JSON.stringify(nx);
         if(xCambio&&JSON.stringify(c.qty||{})===JSON.stringify(nq)){S.clients[c.id]={...c,qx:nx};sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);continue;}
         if(JSON.stringify(c.qty||{})!==JSON.stringify(nq)){S.clients[c.id]={...c,qty:nq,qx:nx};summary.changed++;sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);}}
       // pedidos nuevos de clientes habituales: van a su recorrido y posición de siempre
@@ -1109,7 +1111,7 @@ function bindPedidos(){
       if(ch==="_new"){const c={id:uid(),name:g.name,address:"",lat:null,lng:null,geo:null,qty:{},before:"",notes:"",transport:"camioneta"};S.clients[c.id]=c;created.push(c);ch=c.id;}
       empMap[g.id]=ch;const q=perClient[ch]||(perClient[ch]={});DAYS.forEach(([k])=>{if(g.q[k])q[k]=(q[k]||0)+g.q[k];});}
     const perX=extrasPorCliente(PED.extras,pedWeekDays(),empMap);
-    let n=0;for(const c of Object.values(S.clients)){const q=perClient[c.id];if(!q&&!PED.zero)continue;const nq={};DAYS.forEach(([k])=>{if(q&&q[k])nq[k]=q[k];});const nx=perX[c.id]||{};
+    let n=0;for(const c of Object.values(S.clients)){const q=perClient[c.id];if(!q&&!PED.zero&&!c.deg)continue;const nq={};DAYS.forEach(([k])=>{if(q&&q[k])nq[k]=q[k];});const dg=degQ(c,pedWeekDays());Object.assign(nq,dg.q);const nx={...(perX[c.id]||{}),...dg.x};
       const same=JSON.stringify(c.qty||{})===JSON.stringify(nq)&&JSON.stringify(c.qx||{})===JSON.stringify(nx);if(same&&!created.includes(c))continue;await saveClient({...c,qty:nq,qx:nx});n++;}
     S.config.empMap=empMap;saveConfig();PED.sel={};
     toast(`Listo: ${n} cliente${n!==1?"s":""} actualizado${n!==1?"s":""}${created.length?` (${created.length} nuevo${created.length>1?"s":""}: cargales la dirección)`:""}. Ahora recalculá los recorridos o cargá uno guardado.`);
