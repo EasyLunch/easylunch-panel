@@ -1091,9 +1091,9 @@ function pedidosCard(){
         groups.map(g=>{const ch=pedChoice(g);return `<tr class="${ch?"":"unm"}"><td><b>${esc(g.name)}</b><br><select data-pedmap="${esc(g.id)}"><option value="">— Elegí —</option><option value="_new" ${ch==="_new"?"selected":""}>+ Crear cliente nuevo</option><option value="_ign" ${ch==="_ign"?"selected":""}>No entregar / ignorar</option>${opts.map(c=>`<option value="${c.id}" ${ch===c.id?"selected":""}>${esc(c.name)}</option>`).join("")}</select></td>${DAYS.map(([k])=>`<td class="num">${g.q[k]||"·"}</td>`).join("")}</tr>`;}).join("")+
         `</tbody><tfoot><tr><td>Total</td>${tot.map(t=>`<td class="num">${t}</td>`).join("")}</tr></tfoot></table></div>`;
       const unm=groups.filter(g=>!pedChoice(g)).length;
-      if(unm)h+=`<div class="note warn">${unm} empresa${unm>1?"s":""} sin cliente asignado (en amarillo). Elegí a qué cliente corresponde${unm>1?"n":""}, creala${unm>1?"s":""} o ignorala${unm>1?"s":""}. Se recuerda para las próximas veces.</div>`;
+      if(unm)h+=`<div class="note warn">${unm} empresa${unm>1?"s":""} sin cliente asignado (en amarillo). Elegí a qué cliente corresponde${unm>1?"n":""}, “Crear cliente nuevo” o “No entregar”. Cada elección se guarda en el momento y se recuerda para las próximas semanas.</div>`;
       h+=`<label class="check"><input type="checkbox" id="pedZero" ${PED.zero?"checked":""}><span>Poner en 0 esa semana a los clientes sin pedidos (${noOrder.length})</span></label>
-        <div class="row"><button class="btn primary" id="pedApply" ${unm?"disabled":""}>Cargar estas viandas</button><span class="hint">Reemplaza las viandas de lunes a viernes de cada cliente. Después recalculá o cargá un recorrido guardado.</span></div>`;
+        <div class="row"><button class="btn primary" id="pedApply">Cargar estas viandas</button><span class="hint">Reemplaza las viandas de lunes a viernes de cada cliente${unm?" (las empresas sin asignar no se cargan)":""}. Después recalculá o cargá un recorrido guardado.</span></div>`;
     }}
   return h+`</div>`;}
 function bindPedidos(){
@@ -1103,11 +1103,25 @@ function bindPedidos(){
   $("#pedGo").onclick=async()=>{const days=pedWeekDays();PED.loading=true;PED.err=null;render();
     try{const r=await fetch(`/api/pedidos?desde=${days[0][1]}&hasta=${days[4][1]}`);const j=await r.json();if(!r.ok)throw new Error(j.message||"No se pudo leer el sistema");PED.data=j.filas;PED.extras=j.extras||[];PED.sel={};}
     catch(e){PED.err="No pude traer los pedidos: "+e.message;}PED.loading=false;render();};
-  P.querySelectorAll("[data-pedmap]").forEach(sel=>sel.onchange=()=>{PED.sel[sel.dataset.pedmap]=sel.value;render();});
+  // la asignación empresa → cliente se guarda apenas se elige (no hace falta tocar "Cargar estas viandas")
+  P.querySelectorAll("[data-pedmap]").forEach(sel=>sel.onchange=()=>{
+    const id=sel.dataset.pedmap,v=sel.value,g=pedGroups().find(x=>x.id===id),nom=g?g.name:"La empresa";
+    const em={...(S.config.empMap||{})};
+    if(v==="_new"){
+      const c={id:uid(),name:nom,address:"",lat:null,lng:null,geo:null,qty:{},before:"",notes:"",transport:"camioneta"};
+      em[id]=c.id;PED.sel[id]=c.id;S.config.empMap=em;saveConfig();saveClient(c);
+      toast(`Cliente “${nom}” creado y asignado. Cargale la dirección en la lista de clientes.`);
+    }else{
+      if(v)em[id]=v;else delete em[id];PED.sel[id]=v;S.config.empMap=em;saveConfig();
+      toast(v==="_ign"?`${nom}: guardado como “no entregar”`:v?`Guardado: ${nom} → ${S.clients[v]?S.clients[v].name:""}`:`${nom}: asignación borrada`);
+      render();
+    }
+    clearTimeout(bindPedidos._s);bindPedidos._s=setTimeout(()=>syncPedidos({force:true}),1500);
+  });
   const z=$("#pedZero");if(z)z.onchange=()=>{PED.zero=z.checked;};
   const ap=$("#pedApply");if(ap)ap.onclick=async()=>{ap.disabled=true;ap.textContent="Cargando…";
     const groups=pedGroups();const perClient={};const empMap={...(S.config.empMap||{})};const created=[];
-    for(const g of groups){let ch=pedChoice(g);if(ch==="_ign"){empMap[g.id]="_ign";continue;}
+    for(const g of groups){let ch=pedChoice(g);if(!ch)continue;if(ch==="_ign"){empMap[g.id]="_ign";continue;}
       if(ch==="_new"){const c={id:uid(),name:g.name,address:"",lat:null,lng:null,geo:null,qty:{},before:"",notes:"",transport:"camioneta"};S.clients[c.id]=c;created.push(c);ch=c.id;}
       empMap[g.id]=ch;const q=perClient[ch]||(perClient[ch]={});DAYS.forEach(([k])=>{if(g.q[k])q[k]=(q[k]||0)+g.q[k];});}
     const perX=extrasPorCliente(PED.extras,pedWeekDays(),empMap);
@@ -1118,7 +1132,9 @@ function bindPedidos(){
     render();};
 }
 function locState(ok,t){const el=$("#locState");if(!el)return;el.className="locstate "+(ok?"ok":"no");el.textContent=t;}
-function render(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else if(S.tab==="hojas")renderHojas();else renderConfig();
+function render(){const P0=$("#panel"),st=P0.scrollTop,mismaTab=render._tab===S.tab;render._tab=S.tab;
+  renderInner();if(mismaTab&&st)P0.scrollTop=st;}
+function renderInner(){if(S.tab!=="clientes"||S.sel===null)clearPreview();const P=$("#panel");if(S.tab!=="rutas"){P.onclick=null;P.onchange=null;}renderHeader();if(S.tab==="rutas")renderRutas();else if(S.tab==="clientes")renderClientes();else if(S.tab==="hojas")renderHojas();else renderConfig();
   const sh=S.tab==="hojas";$("#sheets").hidden=!sh;$("#map").style.visibility=sh?"hidden":"visible";document.querySelector(".mapctl").hidden=sh;document.querySelector(".mapnote").hidden=sh;if(sh){$("#trafficLegend").hidden=true;$("#tripFilter").hidden=true;}
   if(!sh)renderMap();}
 function renderSafe(){const a=document.activeElement;if(a&&a.closest&&a.closest("#panel form")){renderHeader();renderMap();return;}render();}
