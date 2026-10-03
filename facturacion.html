@@ -128,7 +128,8 @@
         <div id="price-alerts" class="alerts-panel"></div>
 
         <div class="alert alert-info" style="margin-bottom:16px">
-            El sistema detecta automáticamente platos <span class="tag tag-xl">XL</span> (nombre comienza con "XL") y <span class="tag tag-sintacc">Sin TACC</span> en la comanda.
+            El sistema detecta automáticamente platos <span class="tag tag-xl">XL</span> y <span class="tag tag-sintacc">Sin TACC</span>, y el tipo de postre (común, liviano = postres del día, casero, sin TACC).
+            <br><b>Empresas con varias sedes:</b> HIT, Promecor, LUMMA y Norcel / GR8 se facturan juntas con un precio por grupo. Cargá un cliente con ese nombre exacto (<b>HIT</b>, <b>Promecor</b>, <b>LUMMA</b>, <b>Norcel / GR8</b>); mientras no exista, se usa el precio de una de sus sedes.
         </div>
 
         <!-- Zero-cost plates -->
@@ -151,11 +152,7 @@
             <table><thead><tr>
                 <th>Cliente</th>
                 <th>CUIT</th>
-                <th>Plato Normal</th>
-                <th>Plato XL</th>
-                <th>Sin TACC</th>
-                <th>Postre</th>
-                <th>Bebida</th>
+                <th>Productos y precios (sin IVA)</th>
                 <th>IVA</th>
                 <th>Vigente desde</th>
                 <th>Próx. Actualiz.</th>
@@ -169,6 +166,17 @@
     <!-- ===== FACTURACIÓN ===== -->
     <div id="tab-facturacion" class="panel">
         <h2 style="margin-bottom:16px">Generar Facturación Quincenal</h2>
+
+        <div class="card" style="border-left:4px solid #27ae60">
+            <h3 style="margin-bottom:6px">⚡ Generar desde el sistema (sin subir comandas)</h3>
+            <p class="text-muted" style="margin-bottom:12px;font-size:13px">Los pedidos salen directo del sistema, con todos los cambios cargados en Modificaciones. Elegís el período y los clientes y baja un Excel por cliente: hoja Resumen (precios, pedidos por semana y por sede, importes) y una solapa por sede con las personas y su DNI. Usa los precios que cargás acá en “Clientes y Precios”. Se abre en la app de Modificaciones (con tu cuenta de Google).</p>
+            <a class="btn-success" style="display:inline-block;padding:9px 18px;border-radius:5px;color:#fff;text-decoration:none;font-weight:600" target="_blank" rel="noopener"
+               href="https://script.google.com/macros/s/AKfycbxOjRt8pxcadcqpLC1JYHB2-ptt5pqgTK_3SQ1dvRBUWU5Hu4i8xy-rONycyyGOlswp/exec?tab=facturacion">Abrir facturación desde el sistema ↗</a>
+        </div>
+
+        <details class="card" style="padding:0">
+        <summary style="padding:16px 20px;cursor:pointer;font-weight:600">Modo anterior: subir comandas Excel</summary>
+        <div style="padding:0 20px 20px">
 
         <div class="card">
             <h3 style="margin-bottom:6px">Subir Comandas (1 o 2 semanas)</h3>
@@ -186,6 +194,8 @@
                 <button class="btn-secondary" onclick="clearFiles()">Limpiar</button>
             </div>
         </div>
+        </div>
+        </details>
 
         <div id="billing-results" style="display:none">
             <div class="summary-grid" id="summary-grid"></div>
@@ -221,51 +231,9 @@
             </div>
 
             <div class="price-group">
-                <div class="price-group-title">💰 Precios de platos</div>
-                <div class="form-row-3">
-                    <div class="form-group">
-                        <label>Plato Normal ($)</label>
-                        <input type="number" id="mc-precio-plato" placeholder="10500" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Plato XL ($)</label>
-                        <input type="number" id="mc-precio-xl" placeholder="13000" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Sin TACC ($)</label>
-                        <input type="number" id="mc-precio-sintacc" placeholder="10500" min="0">
-                    </div>
-                </div>
-            </div>
-
-            <div class="price-group">
-                <div class="price-group-title">🍮 Postres y Bebidas</div>
-                <div class="form-row">
-                    <div>
-                        <label class="checkbox" style="margin-bottom:8px">
-                            <input type="checkbox" id="mc-chk-postre" onchange="togglePostre(this.checked)">
-                            Facturar postres
-                        </label>
-                        <div id="mc-row-postre" style="display:none">
-                            <div class="form-group">
-                                <label>Precio postre ($)</label>
-                                <input type="number" id="mc-precio-postre" placeholder="0" min="0">
-                            </div>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="checkbox" style="margin-bottom:8px">
-                            <input type="checkbox" id="mc-chk-bebida" onchange="toggleBebida(this.checked)">
-                            Facturar bebidas
-                        </label>
-                        <div id="mc-row-bebida" style="display:none">
-                            <div class="form-group">
-                                <label>Precio bebida ($)</label>
-                                <input type="number" id="mc-precio-bebida" placeholder="0" min="0">
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <div class="price-group-title">💰 Productos y precios (sin IVA)</div>
+                <p class="text-muted" style="font-size:12px;margin-bottom:8px">Tildá lo que el cliente tiene habilitado. Lo que no está tildado no sale en la facturación (los platos XL o sin TACC sin tildar se cobran como plato común).</p>
+                <div id="mc-productos"></div>
             </div>
 
             <div class="form-row-3">
@@ -307,31 +275,7 @@
     <div class="modal" style="width:420px">
         <h3 id="modal-np-title">Actualizar precio</h3>
         <div class="form-grid">
-            <div class="price-group">
-                <div class="price-group-title">Precios de platos</div>
-                <div class="form-row-3">
-                    <div class="form-group">
-                        <label>Plato Normal ($)</label>
-                        <input type="number" id="np-precio-plato" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Plato XL ($)</label>
-                        <input type="number" id="np-precio-xl" min="0">
-                    </div>
-                    <div class="form-group">
-                        <label>Sin TACC ($)</label>
-                        <input type="number" id="np-precio-sintacc" min="0">
-                    </div>
-                </div>
-            </div>
-            <div class="form-group" id="np-row-postre" style="display:none">
-                <label>Precio postre ($)</label>
-                <input type="number" id="np-precio-postre" min="0">
-            </div>
-            <div class="form-group" id="np-row-bebida" style="display:none">
-                <label>Precio bebida ($)</label>
-                <input type="number" id="np-precio-bebida" min="0">
-            </div>
+            <div id="np-productos"></div>
             <div class="form-group">
                 <label>Vigente desde</label>
                 <input type="date" id="np-vigencia">
@@ -511,6 +455,60 @@ function renderPriceAlerts() {
     document.getElementById('price-alerts').innerHTML=html;
 }
 
+
+// ============================================================
+//  PRODUCTOS (habilitados por cliente + precio)
+// ============================================================
+// flag: c[flag] dice si está habilitado · precio: campo en cada entrada de c.precios
+const PRODUCTOS=[
+    {k:'xl',n:'Plato XL',flag:'factura_xl',precio:'precio_xl'},
+    {k:'sintacc',n:'Plato sin TACC',flag:'factura_sintacc',precio:'precio_sintacc'},
+    {k:'postre',n:'Postre (común: alfajor, barrita, oblea)',flag:'factura_postre',precio:'precio_postre'},
+    {k:'postre_liviano',n:'Postre liviano (del día: fruta, gelatina…)',flag:'factura_postre_liviano',precio:'precio_postre_liviano'},
+    {k:'postre_casero',n:'Postre casero',flag:'factura_postre_casero',precio:'precio_postre_casero'},
+    {k:'postre_sintacc',n:'Postre sin TACC',flag:'factura_postre_sintacc',precio:'precio_postre_sintacc'},
+    {k:'bebida',n:'Bebida',flag:'factura_bebida',precio:'precio_bebida'}
+];
+const nombreCorto=k=>({xl:'XL',sintacc:'Sin TACC',postre:'Postre',postre_liviano:'P. liviano',postre_casero:'P. casero',postre_sintacc:'P. sin TACC',bebida:'Bebida'})[k];
+/** ¿Habilitado? Si el cliente es viejo y no tiene el tilde guardado: XL / sin TACC cuentan si tienen precio propio. */
+function habilitado(c,prod,lp){
+    if(c[prod.flag]!==undefined) return !!c[prod.flag];
+    if(prod.k==='xl'||prod.k==='sintacc') return Number(lp[prod.precio])>0 && Number(lp[prod.precio])!==Number(lp.precio_plato);
+    return false;
+}
+function renderProdFields(prefix,c,lp,soloHabilitados){
+    const cont=document.getElementById(prefix+'-productos');
+    let html=`<div class="form-group" style="margin-bottom:10px"><label>Plato ($)</label><input type="number" id="${prefix}-p-plato" min="0" value="${lp&&lp.precio_plato||''}" placeholder="10500"></div>`;
+    PRODUCTOS.forEach(p=>{
+        const on=c?habilitado(c,p,lp||{}):false;
+        if(soloHabilitados&&!on) return;
+        const val=lp&&lp[p.precio]?lp[p.precio]:'';
+        html+=`<div style="display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center;margin-bottom:6px">
+            ${soloHabilitados?`<span style="font-size:13px">${p.n}</span>`:`<label class="checkbox" style="margin:0"><input type="checkbox" id="${prefix}-f-${p.k}" ${on?'checked':''} onchange="document.getElementById('${prefix}-p-${p.k}').disabled=!this.checked"> ${p.n}</label>`}
+            <input type="number" id="${prefix}-p-${p.k}" min="0" value="${val}" placeholder="$" ${on||soloHabilitados?'':'disabled'}>
+        </div>`;
+    });
+    cont.innerHTML=html;
+}
+function leerProdFields(prefix,c,soloHabilitados){
+    const num=id=>parseFloat((document.getElementById(id)||{}).value)||0;
+    const pp=num(prefix+'-p-plato');
+    const entry={precio_plato:pp};
+    const flags={};
+    PRODUCTOS.forEach(p=>{
+        const on=soloHabilitados?habilitado(c,p,c.precios[c.precios.length-1]):!!(document.getElementById(prefix+'-f-'+p.k)||{}).checked;
+        flags[p.flag]=on;
+        entry[p.precio]=on?num(prefix+'-p-'+p.k):0;
+        if((p.k==='xl'||p.k==='sintacc')&&!entry[p.precio]) entry[p.precio]=pp;   // sin precio propio = plato
+    });
+    return {pp,entry,flags};
+}
+function preciosTexto(c,lp){
+    const partes=[`Plato ${fmt(lp.precio_plato)}`];
+    PRODUCTOS.forEach(p=>{ if(habilitado(c,p,lp)) partes.push(`${nombreCorto(p.k)} ${fmt(lp[p.precio]||0)}`); });
+    return partes.join(' · ');
+}
+
 // ============================================================
 //  CLIENTS TABLE
 // ============================================================
@@ -518,7 +516,7 @@ function renderClients() {
     const tbody=document.getElementById('clients-tbody');
     const entries=Object.entries(DB.clientes);
     if(!entries.length){
-        tbody.innerHTML='<tr><td colspan="10" class="text-center text-muted" style="padding:36px">No hay clientes. Hacé click en "Agregar Cliente".</td></tr>';
+        tbody.innerHTML='<tr><td colspan="7" class="text-center text-muted" style="padding:36px">No hay clientes. Hacé click en "Agregar Cliente".</td></tr>';
         return;
     }
     const today=todayISO();
@@ -534,11 +532,7 @@ function renderClients() {
         return `<tr>
             <td><strong>${name}</strong></td>
             <td style="font-family:monospace;font-size:12px">${c.cuit||'<span class="text-muted">—</span>'}</td>
-            <td>${fmt(lp.precio_plato)}</td>
-            <td>${fmt(lp.precio_xl)}</td>
-            <td>${fmt(lp.precio_sintacc)}</td>
-            <td>${c.factura_postre?fmt(lp.precio_postre||0):'<span class="text-muted">—</span>'}</td>
-            <td>${c.factura_bebida?fmt(lp.precio_bebida||0):'<span class="text-muted">—</span>'}</td>
+            <td style="font-size:12px;line-height:1.5">${preciosTexto(c,lp)}</td>
             <td>${c.iva}%</td>
             <td>${fmtDate(lp.vigente_desde)}</td>
             <td>${nextUpd}</td>
@@ -559,18 +553,13 @@ function deleteClient(name) {
 // ============================================================
 //  CLIENT MODAL
 // ============================================================
-function togglePostre(v) { document.getElementById('mc-row-postre').style.display=v?'block':'none'; }
-function toggleBebida(v) { document.getElementById('mc-row-bebida').style.display=v?'block':'none'; }
-
 function openClientModal() {
     editingClient=null;
     document.getElementById('modal-client-title').textContent='Agregar Cliente';
     document.getElementById('mc-nombre').value=''; document.getElementById('mc-nombre').disabled=false;
     document.getElementById('mc-cuit').value='';
-    ['mc-precio-plato','mc-precio-xl','mc-precio-sintacc','mc-precio-postre','mc-precio-bebida'].forEach(id=>document.getElementById(id).value='');
+    renderProdFields('mc',null,null,false);
     document.getElementById('mc-iva').value='21';
-    document.getElementById('mc-chk-postre').checked=false; togglePostre(false);
-    document.getElementById('mc-chk-bebida').checked=false; toggleBebida(false);
     document.getElementById('mc-vigencia').value=todayISO();
     document.getElementById('mc-fecha-actualizacion').value='';
     openModal('modal-client');
@@ -582,14 +571,8 @@ function openEditClient(name) {
     document.getElementById('modal-client-title').textContent=`Editar: ${name}`;
     document.getElementById('mc-nombre').value=name; document.getElementById('mc-nombre').disabled=true;
     document.getElementById('mc-cuit').value=c.cuit||'';
-    document.getElementById('mc-precio-plato').value=lp.precio_plato;
-    document.getElementById('mc-precio-xl').value=lp.precio_xl;
-    document.getElementById('mc-precio-sintacc').value=lp.precio_sintacc;
+    renderProdFields('mc',c,lp,false);
     document.getElementById('mc-iva').value=c.iva;
-    document.getElementById('mc-chk-postre').checked=c.factura_postre; togglePostre(c.factura_postre);
-    document.getElementById('mc-chk-bebida').checked=c.factura_bebida; toggleBebida(c.factura_bebida);
-    document.getElementById('mc-precio-postre').value=lp.precio_postre||'';
-    document.getElementById('mc-precio-bebida').value=lp.precio_bebida||'';
     document.getElementById('mc-vigencia').value=lp.vigente_desde;
     document.getElementById('mc-fecha-actualizacion').value=c.fecha_actualizacion||'';
     openModal('modal-client');
@@ -599,28 +582,22 @@ function saveClient() {
     const nombre=editingClient||document.getElementById('mc-nombre').value.trim();
     if(!nombre) return alert('Ingresá el nombre del cliente.');
     const cuit=document.getElementById('mc-cuit').value.trim()||null;
-    const pp=parseFloat(document.getElementById('mc-precio-plato').value);
+    const {pp,entry,flags}=leerProdFields('mc',editingClient?DB.clientes[editingClient]:null,false);
     if(!pp||pp<=0) return alert('Ingresá un precio de plato válido.');
-    const pxl   =parseFloat(document.getElementById('mc-precio-xl').value)||pp;
-    const pst   =parseFloat(document.getElementById('mc-precio-sintacc').value)||pp;
     const iva   =parseFloat(document.getElementById('mc-iva').value)||21;
-    const fPost =document.getElementById('mc-chk-postre').checked;
-    const fBeb  =document.getElementById('mc-chk-bebida').checked;
-    const pPost =fPost?(parseFloat(document.getElementById('mc-precio-postre').value)||0):0;
-    const pBeb  =fBeb ?(parseFloat(document.getElementById('mc-precio-bebida').value)||0):0;
     const vig   =document.getElementById('mc-vigencia').value;
     const fechaAct=document.getElementById('mc-fecha-actualizacion').value||null;
     if(!vig) return alert('Ingresá la fecha de vigencia.');
-
-    const entry={vigente_desde:vig,precio_plato:pp,precio_xl:pxl,precio_sintacc:pst,precio_postre:pPost,precio_bebida:pBeb};
+    entry.vigente_desde=vig;
 
     if(editingClient){
         const c=DB.clientes[editingClient];
-        c.iva=iva; c.factura_postre=fPost; c.factura_bebida=fBeb; c.fecha_actualizacion=fechaAct; c.cuit=cuit;
+        Object.assign(c,flags);
+        c.iva=iva; c.fecha_actualizacion=fechaAct; c.cuit=cuit;
         Object.assign(c.precios[c.precios.length-1],entry);
     } else {
         if(DB.clientes[nombre]) return alert(`Ya existe "${nombre}".`);
-        DB.clientes[nombre]={iva,factura_postre:fPost,factura_bebida:fBeb,fecha_actualizacion:fechaAct,cuit,precios:[entry]};
+        DB.clientes[nombre]=Object.assign({iva,fecha_actualizacion:fechaAct,cuit,precios:[entry]},flags);
     }
     saveDB(); renderClients(); closeModal('modal-client');
 }
@@ -636,14 +613,11 @@ function openHistory(name) {
 function renderHistory() {
     const c=DB.clientes[activeHistoryClient];
     const sorted=[...c.precios].sort((a,b)=>b.vigente_desde.localeCompare(a.vigente_desde));
-    let html=`<table><thead><tr><th>Vigente desde</th><th>Normal</th><th>XL</th><th>Sin TACC</th>`;
-    if(c.factura_postre) html+=`<th>Postre</th>`;
-    if(c.factura_bebida) html+=`<th>Bebida</th>`;
-    html+=`<th></th></tr></thead><tbody>`;
+    const lpH=c.precios[c.precios.length-1];
+    const hab=PRODUCTOS.filter(p=>habilitado(c,p,lpH));
+    let html=`<table><thead><tr><th>Vigente desde</th><th>Plato</th>${hab.map(p=>`<th>${nombreCorto(p.k)}</th>`).join('')}<th></th></tr></thead><tbody>`;
     sorted.forEach((p,i)=>{
-        html+=`<tr><td>${fmtDate(p.vigente_desde)}</td><td>${fmt(p.precio_plato)}</td><td>${fmt(p.precio_xl)}</td><td>${fmt(p.precio_sintacc)}</td>`;
-        if(c.factura_postre) html+=`<td>${fmt(p.precio_postre||0)}</td>`;
-        if(c.factura_bebida) html+=`<td>${fmt(p.precio_bebida||0)}</td>`;
+        html+=`<tr><td>${fmtDate(p.vigente_desde)}</td><td>${fmt(p.precio_plato)}</td>${hab.map(q=>`<td>${fmt(p[q.precio]||0)}</td>`).join('')}`;
         html+=`<td><button class="btn-danger btn-sm" onclick="deletePriceRow(${i})">×</button></td></tr>`;
     });
     html+=`</tbody></table>`;
@@ -664,28 +638,18 @@ function deletePriceRow(si) {
 function openAddPrice() {
     const c=DB.clientes[activeHistoryClient]; const lp=c.precios[c.precios.length-1];
     document.getElementById('modal-np-title').textContent=`Nuevo precio: ${activeHistoryClient}`;
-    document.getElementById('np-precio-plato').value=lp.precio_plato;
-    document.getElementById('np-precio-xl').value=lp.precio_xl;
-    document.getElementById('np-precio-sintacc').value=lp.precio_sintacc;
-    document.getElementById('np-row-postre').style.display=c.factura_postre?'block':'none';
-    document.getElementById('np-row-bebida').style.display=c.factura_bebida?'block':'none';
-    document.getElementById('np-precio-postre').value=lp.precio_postre||'';
-    document.getElementById('np-precio-bebida').value=lp.precio_bebida||'';
+    renderProdFields('np',c,lp,true);
     document.getElementById('np-vigencia').value=todayISO();
     openModal('modal-new-price');
 }
 function saveNewPrice() {
     const c=DB.clientes[activeHistoryClient];
-    const pp=parseFloat(document.getElementById('np-precio-plato').value); if(!pp) return alert('Precio inválido.');
+    const {pp,entry,flags}=leerProdFields('np',c,true);
+    if(!pp) return alert('Precio inválido.');
     const vig=document.getElementById('np-vigencia').value; if(!vig) return alert('Ingresá la fecha.');
-    c.precios.push({
-        vigente_desde:vig,
-        precio_plato:pp,
-        precio_xl:parseFloat(document.getElementById('np-precio-xl').value)||pp,
-        precio_sintacc:parseFloat(document.getElementById('np-precio-sintacc').value)||pp,
-        precio_postre:c.factura_postre?(parseFloat(document.getElementById('np-precio-postre').value)||0):0,
-        precio_bebida:c.factura_bebida?(parseFloat(document.getElementById('np-precio-bebida').value)||0):0
-    });
+    entry.vigente_desde=vig;
+    Object.assign(c,flags);
+    c.precios.push(entry);
     // Suggest resetting next update date
     c.fecha_actualizacion=null;
     saveDB(); renderHistory(); renderClients(); closeModal('modal-new-price');
