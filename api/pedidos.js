@@ -14,6 +14,10 @@
 // Sábados y domingos: se entregan junto con el viernes (o el día que se elija en Modificaciones si el viernes es
 // feriado). La app publica ese mapa en la misma fila (data.entregaFinde = { 'AAAA-MM-DD': 'AAAA-MM-DD' }); si no está,
 // se usa el viernes anterior. Las filas de fin de semana salen con la fecha del día de entrega.
+//
+// Login: el reporte de pedidos pide la sesión de un administrador de Easy Lunch. Se inicia sesión con las variables
+// de entorno de Vercel EASYLUNCH_ADMIN_USER y EASYLUNCH_ADMIN_PASSWORD (Settings → Environment Variables; nunca en
+// el código). La cookie EASYLUNCH_ADMIN se reutiliza mientras la función siga activa y se renueva si vence (401/403).
 
 const ORIGEN = process.env.PEDIDOS_URL || 'https://app.easylunch.com.ar/server/easylunch/traer_pedidos_de_todos_los_usuarios.php'
 const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 }
@@ -33,6 +37,48 @@ function diaEntrega(fecha, mapa) {
   return d.toISOString().slice(0, 10)
 }
 
+const LOGIN = process.env.EASYLUNCH_LOGIN_URL || 'https://app.easylunch.com.ar/server/login/login-admin.php'
+let cookieAdmin = ''
+
+/** Inicia sesión como administrador y devuelve la cookie "EASYLUNCH_ADMIN=…". */
+async function sesionAdmin() {
+  if (cookieAdmin) return cookieAdmin
+  const user = String(process.env.EASYLUNCH_ADMIN_USER || '').trim()
+  const pass = process.env.EASYLUNCH_ADMIN_PASSWORD || ''
+  if (!user || !pass) throw Object.assign(new Error('Faltan EASYLUNCH_ADMIN_USER y/o EASYLUNCH_ADMIN_PASSWORD en las variables de entorno de Vercel.'), { code: 'config' })
+  const r = await fetch(LOGIN, {
+    method: 'POST', redirect: 'manual',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: new URLSearchParams({ user, pass }).toString()
+  })
+  const txt = await r.text()
+  if (r.status !== 200) throw Object.assign(new Error('El login de Easy Lunch respondió ' + r.status), { code: 'login' })
+  let login
+  try { login = JSON.parse(txt) } catch (e) { throw Object.assign(new Error('El login de Easy Lunch no devolvió JSON'), { code: 'login' }) }
+  if (!login || typeof login !== 'object' || Array.isArray(login) || typeof login.user !== 'string' || !login.user.trim() ||
+      Object.prototype.hasOwnProperty.call(login, 'error')) {
+    throw Object.assign(new Error('Easy Lunch no autorizó la sesión (revisá usuario y contraseña en Vercel)'), { code: 'login' })
+  }
+  const lista = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [r.headers.get('set-cookie') || '']
+  let ultima = ''
+  for (const c of lista) {
+    const re = /(?:^|[,\s])EASYLUNCH_ADMIN=([A-Za-z0-9,-]{1,256}?)(?=;|$|,\s*[A-Za-z_]+=)/g
+    let m
+    while ((m = re.exec(String(c || '')))) ultima = m[1]
+  }
+  if (!ultima) throw Object.assign(new Error('El login de Easy Lunch no entregó la cookie de administrador'), { code: 'login' })
+  cookieAdmin = 'EASYLUNCH_ADMIN=' + ultima
+  return cookieAdmin
+}
+
+/** Trae el reporte de pedidos con la sesión de administrador (si venció, inicia sesión de nuevo una vez). */
+async function traerPedidos() {
+  const pedir = async () => fetch(ORIGEN, { redirect: 'manual', headers: { Accept: 'application/json', Cookie: await sesionAdmin() } })
+  let r = await pedir()
+  if (r.status === 401 || r.status === 403) { cookieAdmin = ''; r = await pedir() }
+  return r
+}
+
 async function leerAjustes() {
   const r = await fetch(SB + '/rutas_config?select=data&id=eq.mods_pedidos', { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
   if (!r.ok) throw new Error('Supabase ' + r.status)
@@ -50,7 +96,10 @@ export default async function handler(req, res) {
 
   try {
     const pAjustes = leerAjustes().catch(e => ({ error: String((e && e.message) || e) }))
-    const r = await fetch(ORIGEN, { headers: { Accept: 'application/json' } })
+    let r
+    try { r = await traerPedidos() } catch (e) {
+      return res.status(502).json({ error: e.code || 'login', message: String((e && e.message) || e) })
+    }
     if (!r.ok) return res.status(502).json({ error: 'origen', message: 'El sistema de pedidos respondió ' + r.status })
     const data = await r.json()
     if (!Array.isArray(data)) return res.status(502).json({ error: 'formato', message: 'El sistema de pedidos no devolvió una lista' })
