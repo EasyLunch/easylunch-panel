@@ -29,9 +29,13 @@ function vehiculos(c) {
   const V = []
   const nv = Math.max(0, Math.min(8, parseInt(c.vans, 10) || 0))
   const nm = Math.max(0, Math.min(12, parseInt(c.motos, 10) || 0))
-  for (let i = 0; i < nv; i++) V.push({ idx: i, nombre: 'Camioneta ' + (i + 1), tipo: 'camioneta' })
-  for (let i = 0; i < nm; i++) V.push({ idx: nv + i, nombre: 'Moto ' + (i + 1), tipo: 'moto' })
-  if (!V.length) V.push({ idx: 0, nombre: 'Camioneta 1', tipo: 'camioneta' })
+  // nombre (ej. el de quien maneja) y orden de carga: Configuración → Flota en Recorridos
+  const vn = c.vehNames || {}, vo = c.vehOrden || {}
+  const nom = (i, d) => String(vn[i] || '').trim() || d
+  const ord = i => (+vo[i] > 0 ? +vo[i] : i + 1)
+  for (let i = 0; i < nv; i++) V.push({ idx: i, nombre: nom(i, 'Camioneta ' + (i + 1)), tipo: 'camioneta', orden: ord(i) })
+  for (let i = 0; i < nm; i++) V.push({ idx: nv + i, nombre: nom(nv + i, 'Moto ' + (i + 1)), tipo: 'moto', orden: ord(nv + i) })
+  if (!V.length) V.push({ idx: 0, nombre: nom(0, 'Camioneta 1'), tipo: 'camioneta', orden: 1 })
   return V
 }
 
@@ -53,7 +57,7 @@ export default async function handler(req, res) {
     ])
     const cfg = (cfgRows[0] && cfgRows[0].data) || {}
     const V = vehiculos(cfg)
-    const veh = i => V.find(v => v.idx === i) || { idx: i, nombre: 'Vehículo ' + (i + 1), tipo: 'camioneta' }
+    const veh = i => V.find(v => v.idx === i) || { idx: i, nombre: 'Vehículo ' + (i + 1), tipo: 'camioneta', orden: i + 1 }
     const clientes = {}
     cliRows.forEach(r => { clientes[r.id] = r.data || {} })
 
@@ -85,14 +89,14 @@ export default async function handler(req, res) {
       const cli = empMap[idEmp]
       if (!cli || cli === '_ign' || !pos[cli]) return
       const p = pos[cli], v = veh(p.vehIdx)
-      empresas[idEmp] = { cliente: clientes[cli].name || '', vehiculo: v.nombre, tipo: v.tipo, ...p }
+      empresas[idEmp] = { cliente: clientes[cli].name || '', vehiculo: v.nombre, tipo: v.tipo, orden: v.orden, ...p }
     })
 
     // degustaciones (clientes "deg_<id>" que carga la app de Modificaciones): se devuelven con su propio id
     Object.keys(pos).forEach(id => {
       if (!id.startsWith('deg_')) return
       const p = pos[id], v = veh(p.vehIdx)
-      empresas[id] = { cliente: clientes[id].name || '', vehiculo: v.nombre, tipo: v.tipo, ...p }
+      empresas[id] = { cliente: clientes[id].name || '', vehiculo: v.nombre, tipo: v.tipo, orden: v.orden, ...p }
     })
 
     return res.status(200).json({ fecha, dia, hayRecorrido: !!(ruta && (ruta.trips || []).length), vehiculos: V, empresas })
