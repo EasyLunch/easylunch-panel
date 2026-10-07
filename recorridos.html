@@ -881,7 +881,7 @@ function bindClientes(){
     const adr=$("#f-addr").value.trim();if(!loc&&adr){try{const g=await aiLocate(adr);loc={lat:g.lat,lng:g.lng};$("#f-loc").dataset.geo="auto";}catch(_){toast("Guardado sin ubicación: no encontré la dirección");}}
     const qd={};DAYS.forEach(([k])=>{const v=parseInt($("#f-q-"+k).value,10);if(v>0)qd[k]=v;});
     let geo=old?old.geo:null;if(loc&&(!old||!hasLoc(old)||Math.abs(old.lat-loc.lat)>1e-6||Math.abs(old.lng-loc.lng)>1e-6))geo=$("#f-loc").dataset.geo||"manual";if(!loc)geo=null;
-    const c={id,name:$("#f-name").value.trim()||"Sin nombre",address:$("#f-addr").value.trim(),lat:loc?loc.lat:null,lng:loc?loc.lng:null,geo,qty:qd,before:$("#f-before").value,notes:$("#f-notes").value.trim(),transport:(document.querySelector('input[name="f-trans"]:checked')||{}).value||"camioneta"};
+    const c={...(old||{}),id,name:$("#f-name").value.trim()||"Sin nombre",address:$("#f-addr").value.trim(),lat:loc?loc.lat:null,lng:loc?loc.lng:null,geo,qty:qd,before:$("#f-before").value,notes:$("#f-notes").value.trim(),transport:(document.querySelector('input[name="f-trans"]:checked')||{}).value||"camioneta"};
     S.sel=id;await saveClient(c);toast("Cliente guardado");};
 }
 
