@@ -568,8 +568,10 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",setTiles)
 
 function mkIcon(label,color,size=24,extra=""){return L.divIcon({className:"",html:`<div class="mk ${extra}" style="width:${size}px;height:${size}px;background:${color}">${esc(label)}</div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]});}
 function vehicles(){const c=S.config,V=[];const nv=Math.max(0,Math.min(8,parseInt(c.vans,10)||0)),nm=Math.max(0,Math.min(12,parseInt(c.motos,10)||0));
-  for(let i=0;i<nv;i++)V.push({idx:i,type:"camioneta",name:"Camioneta "+(i+1),cap:Math.max(1,+c.capacity||1)});
-  for(let i=0;i<nm;i++)V.push({idx:nv+i,type:"moto",name:"Moto "+(i+1),cap:Math.max(1,+c.motoCapacity||15)});
+  // nombre (ej. el de quien maneja) y orden de carga de cada vehículo: se editan en Configuración → Flota
+  const vn=c.vehNames||{},vo=c.vehOrden||{};const nom=(i,d)=>String(vn[i]||"").trim()||d;const ord=i=>+vo[i]>0?+vo[i]:i+1;
+  for(let i=0;i<nv;i++)V.push({idx:i,type:"camioneta",def:"Camioneta "+(i+1),name:nom(i,"Camioneta "+(i+1)),orden:ord(i),cap:Math.max(1,+c.capacity||1)});
+  for(let i=0;i<nm;i++)V.push({idx:nv+i,type:"moto",def:"Moto "+(i+1),name:nom(nv+i,"Moto "+(i+1)),orden:ord(nv+i),cap:Math.max(1,+c.motoCapacity||15)});
   if(!V.length)V.push({idx:0,type:"camioneta",name:"Camioneta 1",cap:Math.max(1,+c.capacity||1)});return V;}
 function veh(i){return vehicles()[i]||{idx:i,type:"camioneta",name:"Vehículo "+(i+1),cap:Math.max(1,+S.config.capacity||1)};}
 function dayVehicles(day){const all=vehicles();const sel=(S.config.dayVeh||{})[day];const f=Array.isArray(sel)?all.filter(v=>sel.includes(v.idx)):all;return f.length?f:all;}
@@ -904,6 +906,9 @@ function renderConfig(){
       <option value="min" ${c.strategy!=="balance"?"selected":""}>Llenar un vehículo y lo que sobra al siguiente (menos vehículos)</option>
       <option value="balance" ${c.strategy==="balance"?"selected":""}>Tiempos parejos entre los vehículos elegidos</option></select>
       <span class="hint">“Tiempos parejos” sirve cuando igual pagás un mínimo de horas por camioneta. Qué vehículos salen cada día lo elegís en la pestaña Recorridos.</span></div>
+    <div class="field"><label>Nombre y orden de carga de cada vehículo</label>
+      ${vehicles().map(v=>`<div class="grid2" style="margin-bottom:6px"><input data-vn="${v.idx}" value="${esc(v.name===v.def?"":v.name)}" placeholder="${esc(v.def)} (ej. quien la maneja)"><input data-vo="${v.idx}" type="number" min="1" max="20" value="${v.orden}" title="Orden de carga en la Base (1 = se carga primero)"></div>`).join("")}
+      <span class="hint">El nombre sale en Recorridos y en la columna “logística” de la comanda. El número es el orden de carga en las solapas Base (1 = primero). Si cambiás la cantidad de vehículos, volvé a abrir Configuración para ver la lista nueva.</span></div>
   </form>
   <form class="card" id="cfg3"><h3>Tiempos</h3>
     <div class="grid2"><div class="field"><label for="c-start">Hora de salida</label><input id="c-start" type="time" value="${esc(c.startTime)}"></div>
@@ -919,6 +924,7 @@ function renderConfig(){
   const upd=()=>{const loc=parseLoc($("#c-loc").value);Object.assign(S.config,{depotName:$("#c-name").value,depotAddress:$("#c-addr").value,
       vans:Math.max(0,Math.min(8,parseInt($("#c-vans").value,10)||0)),capacity:Math.max(1,parseInt($("#c-cap").value,10)||1),motos:Math.max(0,Math.min(12,parseInt($("#c-motos").value,10)||0)),motoCapacity:Math.max(1,parseInt($("#c-mcap").value,10)||15),strategy:$("#c-strat").value,useGoogle:$("#c-google").checked,autoPedidos:$("#c-autoped").checked,
       startTime:$("#c-start").value||"10:30",speed:Math.max(5,+$("#c-speed").value||30),serviceMin:Math.max(0,+$("#c-svc").value||0),traffic:Math.max(0,+$("#c-traffic").value||0),returnToBase:$("#c-ret").checked});
+    {const vn={},vo={};$("#panel").querySelectorAll("[data-vn]").forEach(i=>{if(i.value.trim())vn[i.dataset.vn]=i.value.trim();});$("#panel").querySelectorAll("[data-vo]").forEach(i=>{const n=parseInt(i.value,10);if(n>0)vo[i.dataset.vo]=n;});S.config.vehNames=vn;S.config.vehOrden=vo;}
     if(loc){S.config.depotLat=loc.lat;S.config.depotLng=loc.lng;}saveConfig();renderMap();renderHeader();};
   $("#panel").querySelectorAll("input").forEach(i=>i.addEventListener("change",upd));
   $("#panel").querySelectorAll("form").forEach(f=>f.onsubmit=e=>{e.preventDefault();upd();});
