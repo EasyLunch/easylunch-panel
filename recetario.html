@@ -213,7 +213,7 @@ label{font-size:12.5px;font-weight:600;color:var(--gris);display:block;margin-bo
       <button class="btn" onclick="generarPropuesta()">✨ Generar propuesta</button>
       <button class="btn btn-p" id="btn-guardar-sem" onclick="guardarSemana()">💾 Guardar</button>
     </div>
-    <p style="font-size:13px;color:var(--gris);margin-bottom:14px">Regla: cada día lleva 1 plato vegetariano y 2 opciones con proteínas distintas (vacuna, cerdo, pollo o pescado). La propuesta automática evita platos parecidos el mismo día y la misma semana, y no repite platos en el período. Podés arrastrar los platos con el mouse para intercambiarlos de lugar.</p>
+    <p style="font-size:13px;color:var(--gris);margin-bottom:14px">Regla: cada día lleva 1 plato vegetariano y 2 opciones con proteínas distintas (vacuna, cerdo, pollo o pescado). La propuesta automática usa solo platos con receta y precio, evita platos parecidos el mismo día y la misma semana, no repite platos en el mes ni los de las últimas semanas del mes anterior, y si ningún plato cumple todas las reglas deja el casillero vacío para que cargues algo nuevo. Si ya hay platos cargados, podés pedirle que complete solo los vacíos. Podés arrastrar los platos con el mouse para intercambiarlos de lugar.</p>
     <div class="avisos-cal" id="cal-avisos"></div>
     <div id="cal-grid"></div>
   </section>
@@ -320,10 +320,12 @@ let reglas = { excluir: [], limites: [], notas: [], grupos: [], diasProhibidos: 
 const REGLAS_SISTEMA = [
   { k: 'veg',        t: 'El plato 1 de cada día es siempre vegetariano' },
   { k: 'prot',       t: 'Las otras 2 opciones llevan proteínas distintas entre sí' },
-  { k: 'repetir',    t: 'No se repite un plato dentro del período visible (semana o mes)' },
+  { k: 'repetir',    t: 'No se repite un plato en el mes (aunque armes semana por semana)' },
   { k: 'parecidos',  t: 'Se evitan platos parecidos el mismo día y en la misma semana' },
   { k: 'recencia',   t: 'Se prioriza lo que hace más tiempo no se sirve (historial desde 2024)' },
   { k: 'tiposFuera', t: 'Fuera de rotación automática: ensaladas, tartas, sándwiches, wraps y postres' },
+  { k: 'soloReceta', t: 'La propuesta automática usa solo platos con receta cargada en producción y precio' },
+  { k: 'mesAnterior', t: 'No se repiten platos del mes anterior (o siguiente) dentro de los' },
 ]
 const sisOn = k => !reglas.sistema || reglas.sistema[k] !== false
 let emplatados = {}           // nombre_norm -> url de foto de emplatado
@@ -454,7 +456,7 @@ function catsDePlato(p){
 function inferProteina(p){
   const cats = catsDePlato(p)
   for(const c of ['vacuno','cerdo','pescado','ave','cordero']) if(cats.has(c)) return CAT2PROT[c]
-  return 'vegetariano'
+  return protPorNombre(p.nombre)   // ingredientes sin carne marcada: se usa el nombre (ej. "albóndigas", "bolognesa")
 }
 function protDe(p){ return p.proteina || (p.historico ? 'otra' : inferProteina(p)) }
 function protInferida(p){ return !p.proteina }
@@ -962,6 +964,7 @@ async function cargarPeriodo(){
       for(const r of rows) if(cal[r.fecha] && r.slot >= 0 && r.slot < 3) cal[r.fecha][r.slot] = r.plato_id
     } catch(e){ console.warn(e) }
   }
+  await cargarVecinos()
   calDirty = false
   renderCal()
 }
@@ -1031,7 +1034,7 @@ function avisosPeriodo(){
       avisos.push(`⛔ "${platoMap[id].nombre}" está excluido por regla`)
   for(const g of (reglas.grupos || [])){
     const et = (g.palabras || []).join(', '), max = g.max || 1
-    const porDia = fechas.map(f => (cal[iso(f)] || []).filter(id => id && platoMap[id] && matchGrupo(normNombre(platoMap[id].nombre), g)).length)
+    const porDia = fechas.map(f => (cal[iso(f)] || []).filter(id => id && platoMap[id] && matchGrupoP(platoEfectivo(id), g)).length)
     fechas.forEach((f, i) => {
       if(porDia[i] > max) avisos.push(`🧩 ${diaNombre(iso(f))} ${fmtFecha(f)}: ${porDia[i]} platos con "${et}" (máx. ${max} por día)`)
       if(g.alcance === 'consec' && i > 0 && porDia[i] > 0 && porDia[i - 1] > 0 && diasEntre(iso(fechas[i - 1]), iso(f)) <= 3)
@@ -1050,6 +1053,15 @@ function avisosPeriodo(){
         if(id && platoMap[id] && matchPalabra(platoMap[id], r.palabra))
           avisos.push(`🗓️ ${diaNombre(iso(f))} ${fmtFecha(f)}: "${platoMap[id].nombre}" no se ofrece ese día por regla`)
     }
+  for(const f of fechas) for(const id of (cal[iso(f)] || [])){
+    if(!id || !platoMap[id]) continue
+    const d = choqueVecino(platoEfectivo(id), iso(f))
+    if(d && d.slice(0, 7) !== iso(f).slice(0, 7)) avisos.push(`↩️ "${platoEfectivo(id).nombre}" (${fmtFecha(f)}) ya se sirvió el ${fmtFecha(new Date(d + 'T12:00:00'))}`)
+    else if(d) avisos.push(`🔁 "${platoEfectivo(id).nombre}" ya está el ${fmtFecha(new Date(d + 'T12:00:00'))} (mismo mes)`)
+  }
+  const vacios = fechas.reduce((n, f) => n + (cal[iso(f)] || []).filter(x => !x).length, 0)
+  if(vacios && fechas.some(f => (cal[iso(f)] || []).some(x => x)))
+    avisos.unshift(`⬜ ${vacios > 1 ? 'Quedan' : 'Queda'} ${vacios} casillero${vacios > 1 ? 's' : ''} vacío${vacios > 1 ? 's' : ''}: no había plato con receta y precio que cumpla todas las reglas — lugar para un plato nuevo`)
   return [...new Set(avisos)]
 }
 
@@ -1198,6 +1210,8 @@ function renderPickList(){
       ${conflicto ? '<span style="font-size:11px;color:#b45309">⚠️ proteína repetida ese día</span>' : ''}
       ${parecido ? '<span style="font-size:11px;color:#b45309">⚠️ parecido a otro plato del día</span>' : ''}
       ${(reglas.diasProhibidos || []).some(r => (r.dias || []).includes((new Date(fecha + 'T12:00:00').getDay() + 6) % 7) && matchPalabra(p, r.palabra)) ? '<span style="font-size:11px;color:#b45309">🗓️ no se ofrece ese día</span>' : ''}
+      ${(() => { const d = choqueVecino(p, fecha); return d ? `<span style="font-size:11px;color:#b45309">↩️ servido el ${fmtFecha(new Date(d + 'T12:00:00'))}</span>` : '' })()}
+      ${!p.historico && !tieneRecetaYPrecio(p) ? '<span style="font-size:11px;color:#94a3b8">sin precio</span>' : ''}
       ${veces > 0 ? `<span style="font-size:11px;color:#64748b">ya está ${veces === 1 ? '' : veces + ' veces '}en ${vista === 'semana' ? 'la semana' : 'el mes'}</span>` : ''}
       <span style="font-size:12.5px;color:var(--verde-osc);font-weight:600">${p.historico ? '📜' : fmt$(c.vianda)}</span>
     </div>`
@@ -1212,6 +1226,7 @@ function elegirPlato(id){
 
 function protPorNombre(n){
   n = normNombre(n)
+  if(/(falafel|veggie|vegan|vegetal de|de lentejas|de garbanzos|de quinoa|de soja)/.test(n) && !/(pollo|cerdo|carne|ternera|pescado)/.test(n)) return 'vegetariano'
   if(/cordero/.test(n)) return 'cordero'
   if(/(cerdo|bondiola|matambre|solomillo|ribs|pastron)/.test(n)) return 'cerdo'
   if(/(merluza|brotola|pescad|atun|salmon|tilapia|marisco|abadejo)/.test(n)) return 'pescado'
@@ -1273,107 +1288,181 @@ async function cambiarProtPicker(id, v){
   }catch(e){ toast('Error al cambiar el tipo: ' + String(e.message).slice(0, 60)) }
 }
 
-// ─── Generar propuesta automática ────────────────────────────────────────────
-function elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx){
-  let best = null, bestS = Infinity
-  for(const p of pool){
-    const k = claveDe(p)
-    let s = Math.random() * 500
-    if(sisOn('parecidos') && clavesDia.has(k)) s += 1e9
-    s += (usadosRango.get(p.id) || 0) * (sisOn('repetir') ? 1e6 : 0)
-    if(sisOn('parecidos') && clavesSem.has(k)) s += 3e5
-    const nn = normNombre(p.nombre)
-    if(lims && lims.some(l => matchPalabra(p, l.palabra) && (l.counts[l.key] || 0) >= l.max)) s += 8e8
-    const dowF = (f.getDay() + 6) % 7
-    if((reglas.diasProhibidos || []).some(r => (r.dias || []).includes(dowF) && matchPalabra(p, r.palabra))) s += 9e8
-    if(gctx) for(const g of gctx.grupos){
-      if(!matchGrupo(nn, g)) continue
-      const max = g.max || 1
-      if(gctx.hoy.filter(x => matchGrupo(x, g)).length >= max){ s += 8e8; continue }
-      if(g.alcance === 'consec' && gctx.ayer.some(x => matchGrupo(x, g))) s += 7e8
-      if(g.alcance === 'semana' && gctx.semana.filter(x => matchGrupo(x, g)).length >= max) s += 7e8
-    }
-    const lu = sisOn('recencia') ? lastUsedDe(p) : null
-    if(lu){ const dd = diasEntre(lu, iso(f)); if(dd >= 0 && dd < 35) s += (35 - dd) * 2e3 }
-    if(s < bestS){ bestS = s; best = p }
-  }
-  return best
+// ─── Generar propuesta automática (reglas estrictas: si no hay plato que cumpla, queda vacío) ──
+const DIAS_SIN_REPETIR_DEF = 21
+function diasSinRepetir(){ const n = parseInt(reglas.sistema && reglas.sistema.diasSinRepetir); return n > 0 ? n : DIAS_SIN_REPETIR_DEF }
+function tieneRecetaYPrecio(p){ return !!p && !p.historico && (p.ingredientes || []).length > 0 && calcPlato(p).vianda > 0 }
+function aptoMenuAuto(p){
+  if(!aptoRotacion(p)) return false
+  return sisOn('soloReceta') ? tieneRecetaYPrecio(p) : true
 }
 
-async function generarPropuesta(){
+// Platos guardados alrededor del período (mes anterior / siguiente y resto del mes) para no repetir
+let calVecinos = {}           // fechaISO (fuera del período visible) -> [plato_id]
+let vecinosPorNombre = {}     // nombre normalizado -> [fechaISO] (índice de calVecinos)
+async function cargarVecinos(){
+  calVecinos = {}; vecinosPorNombre = {}
+  if(!dbListo) return
+  const fechas = visibleDates(), N = diasSinRepetir()
+  const ini = fechas[0], fin = fechas[fechas.length - 1]
+  const desde = new Date(Math.min(addDays(ini, -N), new Date(ini.getFullYear(), ini.getMonth(), 1, 12)))
+  const hasta = new Date(Math.max(addDays(fin, N), new Date(fin.getFullYear(), fin.getMonth() + 1, 0, 12)))
+  const visibles = new Set(fechas.map(iso))
+  try{
+    const rows = await sbGet(`calendario_menu?select=fecha,plato_id&fecha=gte.${iso(desde)}&fecha=lte.${iso(hasta)}`)
+    for(const r of rows) if(!visibles.has(r.fecha) && r.plato_id) (calVecinos[r.fecha] ??= []).push(r.plato_id)
+  } catch(e){ console.warn('[Vecinos]', e) }
+  rebuildRealNombreMap()
+  for(const [d, ids] of Object.entries(calVecinos)) for(const id of ids)
+    if(platoMap[id]) (vecinosPorNombre[normNombre(platoEfectivo(id).nombre)] ??= []).push(d)
+}
+
+// ¿Se sirvió este plato cerca de la fecha f en OTRO mes (o en otra semana del mismo mes fuera de la vista)?
+function choqueVecino(p, fISO){
+  const N = diasSinRepetir(), mes = fISO.slice(0, 7)
+  for(const d of (vecinosPorNombre[normNombre(p.nombre)] || [])){
+    if(sisOn('repetir') && d.slice(0, 7) === mes) return d
+    if(sisOn('mesAnterior') && d.slice(0, 7) !== mes && Math.abs(diasEntre(d, fISO)) <= N) return d
+  }
+  return null
+}
+
+function generarPropuesta(){
   const fechas = visibleDates()
   const hayAlgo = fechas.some(f => (cal[iso(f)] || []).some(x => x))
-  if(hayAlgo && !confirm('Ya hay platos cargados en este período. ¿Genero una propuesta nueva y los reemplazo?')) return
-  const rotacion = [...platos, ...historicos].filter(aptoRotacion)
-  const vegPool = sisOn('veg') ? rotacion.filter(p => protDe(p) === 'vegetariano') : rotacion
-  const pools = {}; for(const pr of PROT_CARNES) pools[pr] = rotacion.filter(p => protDe(p) === pr)
-  const carnesTodas = rotacion.filter(p => PROT_CARNES.includes(protDe(p)))
-  const dispo = PROT_CARNES.filter(pr => pools[pr].length > 0)
-  if(sisOn('veg') && vegPool.length === 0){ toast('No hay platos vegetarianos en rotación'); return }
-  if(sisOn('prot') && dispo.length < 2){ toast('Se necesitan platos de al menos 2 proteínas distintas'); return }
-  if(carnesTodas.length === 0){ toast('No hay platos con proteína en rotación'); return }
+  if(!hayAlgo){ correrGenerador(false); return }
+  $('modal-det-body').innerHTML = `
+    <h2 style="margin-bottom:10px">✨ Generar propuesta</h2>
+    <p style="font-size:13.5px;color:var(--gris);margin-bottom:16px">Ya hay platos cargados en ${vista === 'semana' ? 'esta semana' : 'este mes'}. ¿Qué hago?</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-p" onclick="cerrarModal('modal-det');correrGenerador(true)">Completar solo los casilleros vacíos (respeta lo que ya está)</button>
+      <button class="btn" onclick="cerrarModal('modal-det');correrGenerador(false)">Reemplazar todo</button>
+      <button class="btn" onclick="cerrarModal('modal-det')">Cancelar</button>
+    </div>`
+  $('modal-det').classList.add('open')
+}
 
-  const lims = (reglas.limites || []).map(l => ({
-    palabra: l.palabra, max: Math.max(1, parseInt(l.max) || 1),
-    alcance: l.alcance === 'mes' ? 'mes' : 'semana', counts: {}, key: ''
-  }))
+async function correrGenerador(soloVacios){
+  const fechas = visibleDates()
+  toast('Armando la propuesta…')
+  await new Promise(r => setTimeout(r, 30))
+  rebuildRealNombreMap()
+  await cargarVecinos()
+  const pool = [...platos, ...(sisOn('soloReceta') ? [] : historicos)].filter(aptoMenuAuto)
+  const vegPool = sisOn('veg') ? pool.filter(p => protDe(p) === 'vegetariano') : []
+  const pools = {}; for(const pr of PROT_CARNES) pools[pr] = pool.filter(p => protDe(p) === pr)
+  const carnesTodas = pool.filter(p => sisOn('veg') ? protDe(p) !== 'vegetariano' : true)
+  if(pool.length === 0){ toast('No hay platos con receta y precio en rotación'); return }
 
-  // límites mensuales generando solo una semana: contar lo ya guardado en el resto del mes
-  if(lims.some(l => l.alcance === 'mes') && vista === 'semana' && dbListo){
-    try{
-      const mesK = iso(fechas[0]).slice(0, 7)
-      const rows = await sbGet(`calendario_menu?select=fecha,plato_id&fecha=gte.${mesK}-01&fecha=lte.${mesK}-31`)
-      const visibles = new Set(fechas.map(f => iso(f)))
-      for(const r of rows){
-        if(visibles.has(r.fecha)) continue
-        const p = platoMap[r.plato_id]; if(!p) continue
-        for(const l of lims) if(l.alcance === 'mes' && matchPalabra(p, l.palabra))
-          l.counts[mesK] = (l.counts[mesK] || 0) + 1
+  // Arranca de lo que ya está (completar vacíos) o de cero (reemplazar todo)
+  const visibles = new Set(fechas.map(iso))
+  const base = Object.fromEntries(fechas.map(f => { const fi = iso(f); return [fi, soloVacios ? [...(cal[fi] || [null, null, null])] : [null, null, null]] }))
+
+  // Hace un intento completo de armar el período; varios intentos y se queda con el que deja menos vacíos
+  function intentar(){
+    const cal = Object.fromEntries(Object.entries(base).map(([k, v]) => [k, [...v]]))
+    // Caches para que sea rápido (se prueban muchos platos × muchos días × varios intentos)
+    const nnC = new Map(), kC = new Map()
+    const NN = p => { let v = nnC.get(p); if(v === undefined){ v = normNombre(p.nombre); nnC.set(p, v) } return v }
+    const KK = p => { let v = kC.get(p); if(v === undefined){ v = claveDe(p); kC.set(p, v) } return v }
+    const wkC = {}
+    const semanaDe = fi => wkC[fi] || (wkC[fi] = iso(mondayOf(new Date(fi + 'T12:00:00'))))
+    // "ocupado": todo lo que ya está en el calendario (período + alrededores), por día, semana y mes
+    const ocupado = {}, porSem = {}, porMes = {}, nombresPeriodo = new Set()
+    const sumar = (fi, p) => {
+      (ocupado[fi] ??= []).push(p); (porSem[semanaDe(fi)] ??= []).push(p); (porMes[fi.slice(0, 7)] ??= []).push(p)
+      if(visibles.has(fi)) nombresPeriodo.add(NN(p))
+    }
+    for(const [d, ids] of Object.entries(calVecinos)) for(const id of ids) if(platoMap[id]) sumar(d, platoEfectivo(id))
+    for(const f of fechas){
+      const fi = iso(f); ocupado[fi] ??= []
+      for(const id of (cal[fi] || [])) if(id && platoMap[id]) sumar(fi, platoEfectivo(id))
+    }
+    const vecinoHabil = (fi, sentido) => {   // día hábil anterior/siguiente (hasta 3 días corridos)
+      for(let k = 1; k <= 3; k++){ const d = iso(addDays(new Date(fi + 'T12:00:00'), sentido * k)); if(ocupado[d] && ocupado[d].length) return ocupado[d] }
+      return []
+    }
+
+    // ¿El plato p rompe alguna regla si lo pongo el día fi? (devuelve true = no se puede)
+    function bloqueado(p, fi){
+      const nn = NN(p), k = KK(p)
+      const dia = ocupado[fi] || []
+      if(dia.some(x => NN(x) === nn)) return true
+      if(sisOn('parecidos') && dia.some(x => KK(x) === k)) return true
+      if(sisOn('repetir') && (nombresPeriodo.has(nn) || (porMes[fi.slice(0, 7)] || []).some(x => NN(x) === nn))) return true
+      if(choqueVecino(p, fi)) return true
+      const sem = porSem[semanaDe(fi)] || []
+      if(sisOn('parecidos') && sem.some(x => KK(x) === k)) return true
+      for(const l of (reglas.limites || [])){
+        if(!matchPalabra(p, l.palabra)) continue
+        const max = Math.max(1, parseInt(l.max) || 1)
+        const lista = l.alcance === 'mes' ? (porMes[fi.slice(0, 7)] || []) : sem
+        if(lista.filter(x => matchPalabra(x, l.palabra)).length >= max) return true
       }
-    } catch(e){ console.warn(e) }
+      const dow = (new Date(fi + 'T12:00:00').getDay() + 6) % 7
+      if((reglas.diasProhibidos || []).some(r => (r.dias || []).includes(dow) && matchPalabra(p, r.palabra))) return true
+      for(const g of (reglas.grupos || [])){
+        if(!matchGrupoP(p, g)) continue
+        const max = g.max || 1, cuenta = lista => lista.filter(x => matchGrupoP(x, g)).length
+        if(cuenta(dia) >= max) return true
+        if(g.alcance === 'consec' && (cuenta(vecinoHabil(fi, -1)) > 0 || cuenta(vecinoHabil(fi, 1)) > 0)) return true
+        if(g.alcance === 'semana' && cuenta(sem) >= max) return true
+      }
+      return false
+    }
+    function elegir(lista, fi){
+      let best = null, bestS = Infinity
+      for(const p of lista){
+        if(bloqueado(p, fi)) continue
+        let s = Math.random() * 500
+        const lu = sisOn('recencia') ? lastUsedDe(p) : null
+        if(lu){ const dd = diasEntre(lu, fi); if(dd >= 0 && dd < 35) s += (35 - dd) * 2e3 }
+        if(s < bestS){ bestS = s; best = p }
+      }
+      return best
+    }
+    const poner = (fi, slot, p) => { cal[fi][slot] = p.id; sumar(fi, p) }
+
+    let puestos = 0, vacios = 0
+    for(const f of fechas){
+      const fi = iso(f)
+      cal[fi] = cal[fi] || [null, null, null]
+      // Plato 1: vegetariano
+      if(!cal[fi][0]){
+        const p = elegir(sisOn('veg') ? vegPool : carnesTodas, fi)
+        if(p){ poner(fi, 0, p); puestos++ } else vacios++
+      }
+      // Opciones 2 y 3: proteínas distintas, la menos usada en la semana primero
+      for(const slot of [1, 2]){
+        if(cal[fi][slot]) continue
+        let p = null
+        if(sisOn('prot')){
+          const otroId = cal[fi][3 - slot]
+          const otra = otroId && platoMap[otroId] ? protDe(platoEfectivo(otroId)) : null
+          const sem = porSem[semanaDe(fi)] || []
+          const orden = shuffle(PROT_CARNES.filter(pr => pr !== otra && pools[pr].length))
+            .sort((x, y) => sem.filter(q => protDe(q) === x).length - sem.filter(q => protDe(q) === y).length)
+          for(const pr of orden){ p = elegir(pools[pr], fi); if(p) break }
+        } else p = elegir(carnesTodas, fi)
+        if(p){ poner(fi, slot, p); puestos++ } else vacios++
+      }
+    }
+    return { cal, puestos, vacios }
   }
 
-  const usadosRango = new Map(), clavesSemana = {}, nombresSemana = {}
-  const protCount = {}
-  let nombresAyer = []
-  fechas.forEach((f, di) => {
-    const fi = iso(f), wk = iso(mondayOf(f)), mesK = fi.slice(0, 7)
-    for(const l of lims) l.key = l.alcance === 'mes' ? mesK : wk
-    const clavesSem = (clavesSemana[wk] ??= new Set())
-    const clavesDia = new Set()
-    const nombresHoy = []
-    const gctx = { grupos: reglas.grupos || [], hoy: nombresHoy, ayer: nombresAyer, semana: (nombresSemana[wk] ??= []) }
-    const elegir = pool => {
-      const p = elegirCandidato(pool, f, clavesDia, clavesSem, usadosRango, lims, gctx)
-      if(p){
-        usadosRango.set(p.id, (usadosRango.get(p.id) || 0) + 1); clavesDia.add(claveDe(p)); clavesSem.add(claveDe(p))
-        const nn = normNombre(p.nombre)
-        nombresHoy.push(nn); nombresSemana[wk].push(nn)
-        for(const l of lims) if(matchPalabra(p, l.palabra)) l.counts[l.key] = (l.counts[l.key] || 0) + 1
-      }
-      return p
-    }
-    const veg = elegir(vegPool)
-    let a = null, b = null
-    if(sisOn('prot') && dispo.length >= 2){
-      const dowHoy = (f.getDay() + 6) % 7
-      const protLibre = pr => !lims.some(l => protDePalabra(l.palabra) === pr && (l.counts[l.key] || 0) >= l.max)
-        && !(reglas.diasProhibidos || []).some(rr => (rr.dias || []).includes(dowHoy) && protDePalabra(rr.palabra) === pr)
-      const orden = shuffle([...dispo]).sort((x, y) => (protCount[wk + x] || 0) - (protCount[wk + y] || 0))
-      const elegibles = orden.filter(protLibre)
-      const usar = elegibles.length >= 2 ? elegibles : orden
-      const pa = usar[0], pb = usar[1]
-      a = elegir(pools[pa]); if(a) protCount[wk + pa] = (protCount[wk + pa] || 0) + 1
-      b = elegir(pools[pb]); if(b) protCount[wk + pb] = (protCount[wk + pb] || 0) + 1
-    } else {
-      a = elegir(carnesTodas); b = elegir(carnesTodas)
-    }
-    cal[fi] = [veg?.id || null, a?.id || null, b?.id || null]
-    nombresAyer = nombresHoy
-  })
+  let mejor = null
+  for(let i = 0; i < 25; i++){
+    const r = intentar()
+    if(!mejor || r.vacios < mejor.vacios) mejor = r
+    if(mejor.vacios === 0) break
+  }
+  for(const [fi, ids] of Object.entries(mejor.cal)) cal[fi] = ids
+  const { puestos, vacios } = mejor
   calDirty = true
   renderCal()
-  toast('Propuesta generada — revisala y guardala')
+  toast(vacios
+    ? `Propuesta lista: ${puestos} platos. Quedaron ${vacios} casilleros vacíos para cargar platos nuevos — revisala y guardala`
+    : `Propuesta lista: ${puestos} platos — revisala y guardala`)
 }
 
 async function guardarSemana(){
@@ -1555,6 +1644,8 @@ function imprimirMenu(){
 
 // ─── Reglas personalizadas ───────────────────────────────────────────────────
 function matchGrupo(nombreNorm, g){ return (g.palabras || []).some(w => nombreNorm.includes(normNombre(w))) }
+// Igual que matchGrupo pero con el plato: una palabra que es proteína (cerdo, pollo, pescado…) también matchea por proteína
+function matchGrupoP(p, g){ return matchGrupo(normNombre(p.nombre), g) || (g.palabras || []).some(w => { const pr = protDePalabra(w); return pr && protDe(p) === pr }) }
 function protDePalabra(w){
   w = normNombre(w)
   if(/^cerdo/.test(w)) return 'cerdo'
@@ -1629,11 +1720,19 @@ function toggleSistema(k, v){
   persistirReglas(); renderRecetario(); if(Object.keys(cal).length) renderCal()
   toast(v ? 'Regla activada ✅' : 'Regla desactivada — el generador ya no la aplica')
 }
+function setDiasSinRepetir(v){
+  const n = Math.max(1, Math.min(60, parseInt(v) || DIAS_SIN_REPETIR_DEF))
+  reglas.sistema = reglas.sistema || {}
+  reglas.sistema.diasSinRepetir = n
+  persistirReglas()
+  if(Object.keys(cal).length) cargarVecinos().then(renderCal)
+  toast(`Listo: no se repiten platos servidos ${n} días antes o después en otro mes ✅`)
+}
 function renderReglas(){
   const sisBox = $('reglas-sistema')
   if(sisBox) sisBox.innerHTML = REGLAS_SISTEMA.map(r => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #f1f5f9;font-size:13.5px;${sisOn(r.k) ? '' : 'opacity:.45'}">
-      <span style="flex:1">${r.t}</span>
+      <span style="flex:1">${r.t}${r.k === 'mesAnterior' ? ` <input type="number" min="1" max="60" value="${diasSinRepetir()}" style="width:58px;padding:3px 6px" onchange="setDiasSinRepetir(this.value)"> días alrededor de cada fecha` : ''}</span>
       <label style="margin:0;cursor:pointer;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--gris)">
         <input type="checkbox" ${sisOn(r.k) ? 'checked' : ''} onchange="toggleSistema('${r.k}', this.checked)"> activa
       </label>
