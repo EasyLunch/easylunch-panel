@@ -1013,7 +1013,7 @@ function renderHojas(){
 }
 window.addEventListener("afterprint",()=>{$("#printRoot").innerHTML="";});
 /* ---------- sincronización automática de pedidos ---------- */
-function defaultWeek(){const t=new Date();const m=mondayOf(t);if(t.getDay()===5)m.setDate(m.getDate()+7);return isoDate(m);}
+function defaultWeek(){const t=new Date();const m=mondayOf(t);/* de lunes a viernes: la semana actual (así el viernes no se pisan las cantidades del día); sábado y domingo: la semana que viene (mondayOf ya salta al lunes) */return isoDate(m);}
 function weekDays(w){const m=new Date(w+"T12:00:00");return DAYS.map(([k],i)=>{const d=new Date(m);d.setDate(d.getDate()+i);return [k,isoDate(d)];});}
 const SYNC={at:null,busy:false,unmatched:[],err:null,total:null,week:null,last:null};
 function habitFor(day,id){const H=S.config.habit||{};if(H[day]&&H[day][id])return H[day][id];for(const [k] of DAYS){if(H[k]&&H[k][id])return H[k][id];}return null;}
