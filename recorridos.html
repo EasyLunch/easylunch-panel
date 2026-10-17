@@ -303,6 +303,22 @@ const qx=(c,day)=>{const x=(c&&c.qx&&c.qx[day])||{};return {p:+x.p||0,b:+x.b||0}
 /* postres y bebidas por cliente y día (del sistema), con la misma asociación empresa→cliente que las viandas */
 /* Degustaciones (las carga la app de Modificaciones: clientes "deg_<id>" con deg={fecha,viandas,postres}): solo cuentan la semana de su fecha */
 function degQ(c,days){const g=c&&c.deg;const o={q:{},x:{}};if(!g||!g.fecha)return o;const dk=(days.find(d=>d[1]===g.fecha)||[])[0];if(!dk)return o;if(+g.viandas)o.q[dk]=+g.viandas;if(+g.postres)o.x[dk]={p:+g.postres,b:0};return o;}
+/* Empresas que piden por evento/degustación pero ya están cargadas como cliente con el mismo nombre (ej. HX Group):
+   la parada del evento usa la dirección, la ubicación, el transporte, las instrucciones y el vehículo fijo de ese cliente. */
+function empresaDeg(c){return String((c&&c.name)||"").replace(/^\s*(evento|degustaci[oó]n)\s*·\s*/i,"").replace(/\s*\(\d{1,2}\/\d{1,2}\)\s*$/,"").trim();}
+function fichaFija(c){if(!c||!String(c.id||"").startsWith("deg_"))return null;const ok=x=>x&&!String(x.id).startsWith("deg_")&&!x.deg;
+  if(c.fija&&ok(S.clients[c.fija]))return S.clients[c.fija];const n=normName(empresaDeg(c));if(!n)return null;
+  return Object.values(S.clients).find(x=>ok(x)&&normName(x.name)===n)||null;}
+function vehFijoDe(c){const f=fichaFija(c)||c;const v=f&&f.vehFijo;return v===undefined||v===null||v===""||!isFinite(+v)?null:+v;}
+function fichaPendiente(c){const f=fichaFija(c);return !!(f&&hasLoc(f)&&(c.fija!==f.id||+c.lat!==+f.lat||+c.lng!==+f.lng||c.name!==f.name));}
+async function aplicarFichasFijas(){const movidos=new Set(),cambios=[];
+  Object.values(S.clients).forEach(c=>{const f=fichaFija(c);if(!f||!hasLoc(f))return;
+    const nc={...c,fija:f.id,name:f.name,address:f.address||c.address,lat:+f.lat,lng:+f.lng,geo:f.geo||"manual",transport:f.transport||c.transport||"camioneta",before:f.before||c.before||""};
+    if(f.notes&&!String(c.notes||"").includes(f.notes))nc.notes=(c.notes?c.notes+" · ":"")+f.notes;
+    if(!hasLoc(c)||Math.abs(+c.lat-nc.lat)>1e-5||Math.abs(+c.lng-nc.lng)>1e-5)movidos.add(c.id);
+    if(JSON.stringify(nc)!==JSON.stringify(c)){S.clients[c.id]=nc;cambios.push(nc);}});
+  for(const c of cambios){try{await sbUpsert("rutas_clientes",{id:c.id,data:c,updated_at:now()});}catch(e){onWriteErr(e);}}
+  return movidos;}
 function extrasPorCliente(extras,days,empMap){const out={};(extras||[]).forEach(e=>{const m=empMap[e.id_empresa];if(!m||m==="_ign"||!S.clients[m])return;const dk=(days.find(d=>d[1]===e.fecha)||[])[0];if(!dk)return;const o=out[m]||(out[m]={});const x=o[dk]||(o[dk]={p:0,b:0});x.p+=e.postres||0;x.b+=e.bebidas||0;});return out;}
 function parseLoc(txt){
   if(!txt)return null;txt=String(txt).trim();
@@ -484,7 +500,7 @@ async function sbUpsert(t,row){const r=await fetch(SB+"/"+t,{method:"POST",heade
 async function sbDel(t,f){const r=await fetch(SB+"/"+t+"?"+f,{method:"DELETE",headers:H});if(!r.ok)throw new Error(await r.text());}
 const now=()=>new Date().toISOString();
 function updateHabit(day){const r=currentRoute(day);if(!r)return;const H={...(S.config.habit||{})};const hd={...(H[day]||{})};let ch=false;
-  r.trips.forEach(t=>t.stops.forEach((id,i)=>{const v={v:t.van,p:t.stops.slice(Math.max(0,i-3),i).reverse(),n:t.stops.slice(i+1,i+4)};if(JSON.stringify(hd[id])!==JSON.stringify(v)){hd[id]=v;ch=true;}}));
+  r.trips.forEach(t=>t.stops.forEach((id,i)=>{const v={v:t.van,p:t.stops.slice(Math.max(0,i-3),i).reverse(),n:t.stops.slice(i+1,i+4)};if(JSON.stringify(hd[id])!==JSON.stringify(v)){hd[id]=v;ch=true;}const f=fichaFija(S.clients[id]);if(f&&JSON.stringify(hd[f.id])!==JSON.stringify(v)){hd[f.id]=v;ch=true;}}));
   if(ch){H[day]=hd;S.config.habit=H;saveConfig();}}
 function saveRoute(day){
   try{updateHabit(day);}catch(_){}
@@ -505,6 +521,7 @@ async function loadAll(first){
   const o={};cli.forEach(r=>o[r.id]={...r.data,id:r.id});S.clients=o;
   const sv={};rut.forEach(r=>{if(String(r.dia).startsWith("g_")){sv[r.dia]=r.data;return;}if(!S.dirty[r.dia]){S.routes[r.dia]=r.data;loadGoogleFromRoute(r.data);}});S.saved=sv;
   renderSafe();if(first)fitAll();
+  if(!first&&Object.values(S.clients).some(fichaPendiente))setTimeout(()=>syncPedidos(),200);
 }
 async function initDb(){
   S.sample=true;
@@ -829,6 +846,7 @@ function clientForm(c){
     <div class="field"><label>Se entrega en</label><div class="seg" role="radiogroup" aria-label="Vehículo de entrega">
       ${Object.entries(TRANS).map(([k,l])=>`<label class="vchip ${ctrans(c)===k?"on":""}"><input type="radio" name="f-trans" value="${k}" ${ctrans(c)===k?"checked":""}>${l}</label>`).join("")}</div>
       <span class="hint">Por defecto camioneta. Al armar recorridos se respeta; después podés cambiarlo a mano en Recorridos.</span></div>
+    ${String(c.id).startsWith("deg_")?(fichaFija(c)?`<p class="hint" style="margin:0">Pedido por evento de <b>${esc(fichaFija(c).name)}</b>: la dirección, la ubicación y el vehículo salen de ese cliente (cambialos ahí).</p>`:""):`<div class="field"><label for="f-vfijo">Vehículo fijo (opcional)</label><select id="f-vfijo"><option value="">El que convenga / el de siempre</option>${vehicles().map(v=>`<option value="${v.idx}" ${String(c.vehFijo??"")===String(v.idx)?"selected":""}>${esc(v.name)}</option>`).join("")}</select><span class="hint">Los pedidos nuevos de este cliente se suman a ese vehículo. Si la empresa pide por evento o degustación con este mismo nombre, esa parada usa la dirección, la ubicación y el vehículo de este cliente.</span></div>`}
     <div class="grid2"><div class="field"><label for="f-before">Entregar antes de (opcional)</label><input id="f-before" type="time" value="${esc(c.before||"")}"></div>
       <div class="field"><label for="f-notes">Instrucciones de entrega</label><input id="f-notes" value="${esc(c.notes||"")}" placeholder="Recepción piso 3"></div></div>
     <div class="row"><button class="btn primary" type="submit" ${S.readOnly?"disabled":""}>Guardar</button><span class="spacer"></span>
@@ -884,7 +902,9 @@ function bindClientes(){
     const qd={};DAYS.forEach(([k])=>{const v=parseInt($("#f-q-"+k).value,10);if(v>0)qd[k]=v;});
     let geo=old?old.geo:null;if(loc&&(!old||!hasLoc(old)||Math.abs(old.lat-loc.lat)>1e-6||Math.abs(old.lng-loc.lng)>1e-6))geo=$("#f-loc").dataset.geo||"manual";if(!loc)geo=null;
     const c={...(old||{}),id,name:$("#f-name").value.trim()||"Sin nombre",address:$("#f-addr").value.trim(),lat:loc?loc.lat:null,lng:loc?loc.lng:null,geo,qty:qd,before:$("#f-before").value,notes:$("#f-notes").value.trim(),transport:(document.querySelector('input[name="f-trans"]:checked')||{}).value||"camioneta"};
-    S.sel=id;await saveClient(c);toast("Cliente guardado");};
+    {const vs=$("#f-vfijo");if(vs)c.vehFijo=vs.value===""?null:+vs.value;}
+    S.sel=id;await saveClient(c);toast("Cliente guardado");
+    if(Object.values(S.clients).some(fichaPendiente))syncPedidos({force:true});};
 }
 
 /* ---------- config panel ---------- */
@@ -1017,7 +1037,10 @@ function defaultWeek(){const t=new Date();const m=mondayOf(t);/* de lunes a vier
 function weekDays(w){const m=new Date(w+"T12:00:00");return DAYS.map(([k],i)=>{const d=new Date(m);d.setDate(d.getDate()+i);return [k,isoDate(d)];});}
 const SYNC={at:null,busy:false,unmatched:[],err:null,total:null,week:null,last:null};
 function habitFor(day,id){const H=S.config.habit||{};if(H[day]&&H[day][id])return H[day][id];for(const [k] of DAYS){if(H[k]&&H[k][id])return H[k][id];}return null;}
-function insertHabitual(r,day,id){const c=S.clients[id];const h=habitFor(day,id);if(!h)return false;
+function insertHabitual(r,day,id,reubicar){const c=S.clients[id];const f=fichaFija(c);const vf=vehFijoDe(c);
+  const propio=reubicar?null:habitFor(day,id);let h=propio||(f?habitFor(day,f.id):null);
+  if(!propio&&vf!==null&&(!h||h.v!==vf))h={v:vf,p:[],n:[]};
+  if(!h)return false;
   let t=r.trips.find(x=>x.van===h.v);
   if(!t){let best=null;r.trips.forEach(tt=>{if(!transOk(c,veh(tt.van)))return;const n=bestInsert(tt.stops,id);const add=seqCost(n)-seqCost(tt.stops);if(!best||add<best[0])best=[add,tt,n];});if(!best)return false;best[1].stops=best[2];best[1].g=null;return true;}
   for(const p of h.p||[]){const i=t.stops.indexOf(p);if(i>=0){t.stops.splice(i+1,0,id);t.g=null;return true;}}
@@ -1037,14 +1060,17 @@ async function syncPedidos(opts={}){
     const perX=extrasPorCliente(j.extras,days,empMap);
     const summary={changed:0,added:0,pending:0,removed:0};
     if(SYNC.total>0){
+      const movidos=await aplicarFichasFijas();
       const before={};Object.values(S.clients).forEach(c=>before[c.id]={...(c.qty||{})});
       for(const c of Object.values(S.clients)){const nq={};DAYS.forEach(([k])=>{const v=per[c.id]&&per[c.id][k];if(v)nq[k]=v;});
         const dg=degQ(c,days);Object.assign(nq,dg.q);const nx={...(perX[c.id]||{}),...dg.x};const xCambio=JSON.stringify(c.qx||{})!==JSON.stringify(nx);
         if(xCambio&&JSON.stringify(c.qty||{})===JSON.stringify(nq)){S.clients[c.id]={...c,qx:nx};sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);continue;}
         if(JSON.stringify(c.qty||{})!==JSON.stringify(nq)){S.clients[c.id]={...c,qty:nq,qx:nx};summary.changed++;sbUpsert("rutas_clientes",{id:c.id,data:S.clients[c.id],updated_at:now()}).catch(onWriteErr);}}
       // pedidos nuevos de clientes habituales: van a su recorrido y posición de siempre
-      DAYS.forEach(([k])=>{const cur=currentRoute(k);if(!cur)return;const inT=new Set();cur.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));let ch=false;
-        Object.values(S.clients).forEach(c=>{if(qty(c,k)>0&&hasLoc(c)&&!inT.has(c.id)){if(insertHabitual(cur,k,c.id)){summary.added++;ch=true;}else summary.pending++;}
+      DAYS.forEach(([k])=>{const cur=currentRoute(k);if(!cur)return;let ch=false;
+        if(movidos.size)cur.trips.forEach(t=>{const n=t.stops.filter(x=>!movidos.has(x));if(n.length!==t.stops.length){t.stops=n;t.g=null;ch=true;}});
+        const inT=new Set();cur.trips.forEach(t=>t.stops.forEach(x=>inT.add(x)));
+        Object.values(S.clients).forEach(c=>{if(qty(c,k)>0&&hasLoc(c)&&!inT.has(c.id)){if(insertHabitual(cur,k,c.id,movidos.has(c.id))){summary.added++;ch=true;}else summary.pending++;}
           if(!(qty(c,k)>0)&&(before[c.id]||{})[k]>0&&(S.routes[k].trips||[]).some(t=>(t.stops||[]).includes(c.id)))summary.removed++;});
         if(ch){S.routes[k]={...S.routes[k],trips:normalizeTrips(cur).trips};saveRoute(k);}});
     }
