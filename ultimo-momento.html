@@ -1,28 +1,983 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cambios de último momento · Easy Lunch</title>
+<title>Cambios de último momento</title>
 <style>
-  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:#f3f6f1;color:#1b2433}
-  .c{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#1f7a3d;font-weight:600;text-align:center;padding:0 16px}
-  .s{width:26px;height:26px;border:3px solid #e3efe6;border-top-color:#1f7a3d;border-radius:50%;animation:g .8s linear infinite}
+  :root{
+    --azul:#173f7e; --azul2:#1f5aa8; --azulOsc:#0d2650; --azulClaro:#e8eff9; --azulBorde:#c9d8ef;
+    --fondo:#f3f6fb; --card:#ffffff; --borde:#e1e7f0; --texto:#1b2433; --gris:#667085;
+    --rojo:#c0362c; --rojoClaro:#fdeeed; --ambar:#fff6e0; --ambarTxt:#8a5a00; --verde:#1d8a55; --verdeClaro:#e6f6ee; --wa:#1faa53;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--fondo);color:var(--texto);font-size:16px;line-height:1.4}
+  header{background:linear-gradient(135deg,var(--azulOsc),var(--azul2));color:#fff;padding:22px 16px 56px}
+  .top{max-width:640px;margin:0 auto;position:relative;text-align:center;padding:0 64px}
+  .top #btnSalir{position:absolute;right:0;top:0}
+  @media(max-width:420px){.top{padding:0 58px}header h1{font-size:21px}}
+  header h1{font-size:23px;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+  header p{margin:0;opacity:.9;font-size:15px}
+  header button{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 12px;font-size:14px;border-radius:999px}
+  main{max-width:640px;margin:-40px auto 0;padding:0 16px 16px}
+  .card{background:var(--card);border:1px solid var(--borde);border-radius:16px;padding:20px;margin-bottom:14px;box-shadow:0 4px 18px rgba(22,64,127,.06)}
+  .card h2{font-size:17px;margin:0 0 14px;display:flex;align-items:center;gap:10px}
+  .paso{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--azulClaro);color:var(--azul);font-size:14px;font-weight:700;flex:none}
+  label{display:block;font-size:14px;color:var(--gris);margin:0 0 6px;font-weight:500}
+  input,select{width:100%;padding:12px 14px;border:1px solid var(--borde);border-radius:10px;font:inherit;background:#fff;color:var(--texto)}
+  input:focus,select:focus{outline:2px solid var(--azul2);border-color:transparent}
+  button{font:inherit;padding:11px 16px;border-radius:10px;border:1px solid var(--borde);background:#fff;cursor:pointer;color:var(--texto)}
+  button.prim{background:var(--azul);color:#fff;border-color:var(--azul);font-weight:600;width:100%;padding:14px;font-size:16px}
+  button.prim:hover:not(:disabled){background:var(--azulOsc)}
+  button.prim:disabled{opacity:.45;cursor:default}
+  button.link{border:none;background:none;color:var(--azul);padding:4px 0;font-size:14px;text-decoration:underline}
+  button.peligro{color:var(--rojo);border-color:#f3cbc7;padding:7px 12px;font-size:14px}
+  .campo{margin-bottom:14px}
+  .nota{font-size:14px;color:var(--gris);margin:6px 0}
+  .msg{border-radius:12px;padding:12px 14px;font-size:15px;margin:10px 0}
+  .error{background:var(--rojoClaro);color:var(--rojo)}
+  .ok{background:var(--verdeClaro);color:var(--verde)}
+  .aviso{background:var(--ambar);color:var(--ambarTxt)}
+  .info{background:var(--azulClaro);color:var(--azulOsc)}
+  .wa{display:inline-flex;align-items:center;gap:8px;background:var(--wa);color:#fff;text-decoration:none;font-weight:600;padding:11px 16px;border-radius:10px;margin-top:8px}
+  .dias{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
+  .dias button{flex:none;border-radius:12px;padding:8px 12px;text-align:center;min-width:74px;line-height:1.2}
+  .dias button b{display:block;font-size:15px}
+  .dias button small{font-size:12px;color:var(--gris)}
+  .dias button.sel{background:var(--azul);border-color:var(--azul);color:#fff}
+  .dias button.sel small{color:#dbe8ff}
+  .dias button.cerrado{opacity:.5}
+  .pedido{display:grid;gap:8px}
+  .item{display:flex;gap:12px;align-items:center;background:var(--fondo);border-radius:12px;padding:10px 12px}
+  .item .ic{width:34px;height:34px;border-radius:10px;background:var(--azulClaro);color:var(--azul);display:flex;align-items:center;justify-content:center;flex:none}
+  .item div{flex:1}
+  .item small{display:block;color:var(--gris);font-size:13px}
+  .vacio{color:var(--gris);font-size:15px;padding:6px 0}
+  .aclaracion ul{margin:6px 0 6px 18px;padding:0}
+  .aclaracion li{margin:3px 0}
+  .aclaracion details{margin-top:6px}
+  .aclaracion summary{cursor:pointer;color:var(--azul);font-weight:600;font-size:14px}
+  .acciones{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .acciones button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border-radius:14px;font-weight:600;font-size:14px}
+  .acciones button svg{color:var(--azul)}
+  .acciones button.sel{background:var(--azulClaro);border-color:var(--azul);color:var(--azulOsc)}
+  .acciones button:disabled{opacity:.4;cursor:default}
+  @media(max-width:420px){.acciones button{font-size:13px;padding:12px 4px}}
+  .bloque{margin-top:18px;padding-top:16px;border-top:1px solid var(--borde)}
+  .bloque h3{font-size:15px;margin:0 0 4px}
+  .opciones{display:grid;gap:6px;margin-top:8px}
+  .opciones label{display:flex;gap:10px;align-items:center;padding:11px 12px;border:1px solid var(--borde);border-radius:12px;margin:0;color:var(--texto);font-size:15px;cursor:pointer;font-weight:400}
+  .opciones label:has(input:checked){border-color:var(--azul);background:var(--azulClaro)}
+  .opciones label.no{opacity:.45;cursor:default}
+  .opciones input{width:auto;margin:0;accent-color:var(--azul)}
+  .opciones span{flex:1}
+  .lista-platos{max-height:360px;overflow:auto;padding-right:2px}
+  .cat{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--gris);margin:12px 0 2px;font-weight:600}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fff1e6;color:#b4540a;margin-left:6px;vertical-align:middle}
+  .tag.azul{background:var(--azulClaro);color:var(--azul)}
+  .tag.gris{background:#eef1f5;color:var(--gris)}
+  .lista{margin:0;padding:0;list-style:none}
+  .lista li{padding:12px 0;border-top:1px solid var(--borde);display:flex;gap:10px;align-items:center}
+  .lista li:first-child{border-top:0}
+  .lista li div{flex:1}
+  .lista small{display:block;color:var(--gris);font-size:13px}
+  .oculto{display:none!important}
+  .cargando{position:fixed;inset:0;background:rgba(243,246,251,.75);display:flex;align-items:center;justify-content:center;z-index:100;font-weight:600;color:var(--azul);gap:10px}
+  .spin{width:22px;height:22px;border:3px solid var(--azulClaro);border-top-color:var(--azul);border-radius:50%;animation:g .8s linear infinite}
   @keyframes g{to{transform:rotate(360deg)}}
-  a{color:#1f7a3d}
+  footer{text-align:center;font-size:13px;color:var(--gris);padding:6px 16px 32px;max-width:640px;margin:0 auto}
+  footer a{color:var(--azul);font-weight:600}
+  .modal{position:fixed;inset:0;background:rgba(13,38,80,.45);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px}
+  .modal-caja{background:#fff;border-radius:18px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 50px rgba(13,38,80,.3)}
+  .modal-caja h3{margin:0 0 8px;font-size:18px;color:var(--azulOsc)}
+  .modal-caja p{margin:0 0 20px;font-size:16px;color:var(--texto);white-space:pre-line}
+  .modal-texto{margin:0 0 20px;font-size:16px;color:var(--texto);white-space:pre-line}
+  .modal-texto.html{white-space:normal}
+  .cf-dia{font-weight:700;color:var(--azulOsc);margin-bottom:8px}
+  .cf-items{list-style:none;margin:0;padding:0;border:1px solid var(--borde);border-radius:12px;overflow:hidden}
+  .cf-items li{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:start;padding:10px 12px;border-top:1px solid var(--borde);font-size:15px;line-height:1.35}
+  .cf-items li:first-child{border-top:0}
+  .cf-que{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--gris);padding-top:2px}
+  .cf-monto{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .cf-monto.gris{font-weight:400;color:var(--gris);font-size:13px}
+  .cf-total{display:flex;justify-content:space-between;font-weight:700;font-size:17px;margin:12px 2px 0;color:var(--azulOsc)}
+  .cf-nota{font-size:14px;color:var(--gris);margin-top:12px}
+  .tag.pago{background:var(--verdeClaro);color:var(--verde)}
+  .tag.impago{background:var(--rojoClaro);color:var(--rojo)}
+  .pagobox{border:1px solid var(--azulBorde);background:var(--azulClaro);border-radius:14px;padding:14px 16px;margin:10px 0;color:var(--azulOsc);font-size:15px}
+  .mpbtn{display:inline-flex;align-items:center;gap:8px;background:#009ee3;color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px;margin:8px 0;font-size:16px}
+  .mpbtn:hover{filter:brightness(1.05)}
+  .prueba{background:#fff3cd;color:#7a5a00;border:1px solid #f0d58a;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-weight:600;text-align:center}
+  .pendiente{border:1px solid var(--azulBorde);background:var(--azulClaro);border-radius:14px;padding:12px 14px;margin-bottom:10px;color:var(--azulOsc)}
+  .saldo{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--verde);background:var(--verdeClaro);color:var(--verde);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .saldo b{font-size:18px}
+  .saldo small{display:block;color:var(--gris);font-weight:400}
+  .cf-total.cf-sub{font-weight:600;font-size:15px;margin-top:6px;color:var(--gris)}
+  .cf-total.favor{color:var(--verde)}
+  .pagobox button{padding:7px 12px;font-size:14px;margin-left:8px}
+  .sub{margin-top:12px;padding:12px;border:1px dashed var(--azulBorde);border-radius:12px}
+  .modal-botones{display:flex;gap:10px;justify-content:flex-end}
+  .modal-botones button{padding:11px 18px;font-weight:600}
+  .modal-botones .si{background:var(--azul);border-color:var(--azul);color:#fff}
+  .modal-botones .si.rojo{background:var(--rojo);border-color:var(--rojo)}
+
+   
+  :root{--azul:#2e9b4f;--azul2:#34a853;--azulOsc:#1e6b37;--azulClaro:#e8f5ec;--azulBorde:#bfe3c9;--fondo:#f4f7f2;--borde:#e3eae5}
+  header{background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22180%22%20height%3D%22150%22%3E%3Cg%20transform%3D%22translate%288%2010%29%20rotate%28-20%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M6%2026C6%2012%2016%206%2028%206c0%2012-6%2022-20%2022z%22%2F%3E%3Cpath%20d%3D%22M6%2026L22%2012%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2870%204%29%20rotate%2815%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M10%204v8a4%204%200%200%200%208%200V4M14%204v24%22%2F%3E%3Cpath%20d%3D%22M24%204c-3%202-4%206-4%2010h4v14%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28128%2018%29%20rotate%280%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M4%2014h24a12%2012%200%200%201-24%200z%22%2F%3E%3Cpath%20d%3D%22M10%209c0-2%202-2%202-4M16%209c0-2%202-2%202-4M22%209c0-2%202-2%202-4%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2830%2070%29%20rotate%2810%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M8%2026L22%2010l2%202L8%2026z%22%2F%3E%3Cpath%20d%3D%22M22%2010l4-6M22%2010l6-2M22%2010l1-5%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2895%2080%29%20rotate%280%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M6%2010h16v8a8%208%200%200%201-16%200z%22%2F%3E%3Cpath%20d%3D%22M22%2012h3a3%203%200%200%201%200%206h-3%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28145%2095%29%20rotate%28-15%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M16%204c6%200%209%208%209%2014a9%209%200%200%201-18%200c0-6%203-14%209-14z%22%2F%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%2218%22%20r%3D%224%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2810%20115%29%20rotate%280%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M4%2012l12-7%2012%207z%22%2F%3E%3Cpath%20d%3D%22M4%2016h24M5%2020h22M4%2024h24%22%2F%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%2860%20118%29%20rotate%288%2016%2016%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20opacity%3D%22.22%22%3E%3Cpath%20d%3D%22M16%209c-5-4-12%200-11%207%201%208%206%2012%2011%209%205%203%2010-1%2011-9%201-7-6-11-11-7z%22%2F%3E%3Cpath%20d%3D%22M16%209c0-3%201-5%203-6%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"),linear-gradient(135deg,#1e6b37,#34a853);background-size:180px 150px,cover;padding-bottom:60px}
+  .card{border-radius:18px;box-shadow:0 4px 16px rgba(20,60,30,.08)}
+  .paso{width:24px;height:24px;background:var(--azul);color:#fff;font-size:13px}
+  button.prim{border-radius:14px;background:linear-gradient(135deg,#34a853,#1e7a3c);border:0;font-size:17px;font-weight:700;padding:15px;box-shadow:0 6px 14px rgba(46,155,79,.3)}
+  button.prim:hover:not(:disabled){background:linear-gradient(135deg,#2e9b4f,#1e6b37)}
+  button.prim:disabled{box-shadow:none;background:#a9c9b3;opacity:1}
+  .dias{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;overflow:visible}
+  .dias button{min-width:0;min-height:84px;border:2px solid var(--borde);border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:border-color .15s,background .15s,transform .1s}
+  .dias button:active{transform:scale(.97)}
+  .dias button.sel{background:var(--azulClaro);border-color:var(--azul);color:var(--azulOsc)}
+  .dias button.sel small{color:var(--azul)}
+  .dias button.cerrado{opacity:.45;background:#f7f8f7}
+  .acciones button{border:2px solid var(--borde);border-radius:14px;transition:border-color .15s,background .15s,transform .1s}
+  .acciones button:active{transform:scale(.97)}
+  .opciones label{border-radius:14px}
+  .item .ic{background:var(--azulClaro);color:var(--azul)}
+  .msg.exito{display:flex;gap:10px;align-items:center;background:var(--azul);color:#fff;border-radius:16px;padding:14px;box-shadow:0 6px 16px rgba(46,155,79,.3);animation:pop .35s ease-out}
+  .msg.exito::before{content:"🎉";font-size:28px}
+  @keyframes pop{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}
+  .modal{background:rgba(20,60,30,.45)}
+  .cargando{background:rgba(244,247,242,.75)}
+  .lista li{border-top-color:var(--borde)}
 </style>
+<link rel="icon" type="image/svg&#43;xml" href="data:image/svg&#43;xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2224%22%20fill%3D%22%232e9b4f%22%2F%3E%3Crect%20x%3D%2227%22%20y%3D%224%22%20width%3D%2210%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%232e9b4f%22%2F%3E%3Ccircle%20cx%3D%2232%22%20cy%3D%2234%22%20r%3D%2218%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M32%2021v13l9%206%22%20fill%3D%22none%22%20stroke%3D%22%232e9b4f%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E">
 </head>
 <body>
-<div class="c"><div class="s"></div><span>Abriendo cambios de último momento…</span>
-<small style="font-weight:400;color:#5b6472">Si no se abre solo, <a id="l" href="#">tocá acá</a>.</small></div>
+<header>
+  <div class="top">
+    <div>
+      <h1>Cambios de último momento</h1>
+      <p id="subtitulo">¿Cambió tu día? Modificá tu vianda en un minuto.</p>
+    </div>
+    <button id="btnSalir" class="oculto" onclick="salir()">Salir</button>
+  </div>
+</header>
+
+<main>
+  
+  <section id="pLogin">
+    <div class="card">
+      <h2>Ingresá con tu usuario</h2>
+      <p class="nota" style="margin-top:-6px">Es el mismo mail y clave que usás para hacer tus pedidos de la semana.</p>
+      <form onsubmit="event.preventDefault(); ingresar()" style="margin-top:14px">
+        <div class="campo"><label for="usuario">Mail o usuario</label><input id="usuario" autocomplete="username" required></div>
+        <div class="campo"><label for="clave">Clave</label><input id="clave" type="password" autocomplete="current-password" required></div>
+        <button class="prim" type="submit">Ingresar</button>
+      </form>
+      <div id="msgLogin"></div>
+    </div>
+  </section>
+
+  
+  <section id="pApp" class="oculto">
+    <div class="card">
+      <h2><span class="paso">1</span> ¿Para qué día?</h2>
+      <div class="msg info aclaracion">
+        <b>Cambiá tu próximo pedido hasta las 18 hs del día hábil anterior.</b> Ensaladas, tartas, sándwiches, wraps, postres y bebidas.
+        <details>
+          <summary>¿Cómo funciona?</summary>
+          <ul>
+            <li><b>Qué día:</b> de lunes a jueves, hasta las 18 hs cambiás el pedido del día siguiente. El viernes hasta las 18 hs, el del lunes; después de esa hora, el sábado, el domingo y el lunes hasta las 18 hs, el del martes. Si hay un feriado, se corre al día hábil siguiente.</li>
+            <li><b>Desde acá:</b> podés agregar, cambiar, dar de baja o pasar a otro día ensaladas, tartas, sándwiches, wraps, postres y bebidas.</li>
+            <li><b>Platos calientes, calientes XL, milanesas y Balance &amp; Fit:</b> no se cambian desde acá, sino desde el sistema donde hacés tus pedidos, hasta las 23:59 de dos días hábiles antes (por ejemplo, el lunes hasta las 23:59 para el miércoles).</li>
+            <li><b>Los días siguientes:</b> cambiá todo desde el sistema, como siempre.</li>
+          </ul>
+        </details>
+      </div>
+      <div class="dias" id="dias"></div>
+      <input type="hidden" id="fecha">
+      <div id="estadoDia"></div>
+    </div>
+
+    <div class="card oculto" id="cPedido">
+      <h2><span class="paso">2</span> <span id="tituloPedido">Tu pedido</span></h2>
+      <div class="pedido" id="pedido"></div>
+      <div id="cambiosDia"></div>
+    </div>
+
+    <div class="card oculto" id="cCambio">
+      <h2><span class="paso">3</span> ¿Qué querés hacer?</h2>
+      <div class="acciones">
+        <button data-tipo="CAMBIAR" onclick="elegirTipo('CAMBIAR')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>
+          Agregar o cambiar plato</button>
+        <button data-tipo="BAJA" onclick="elegirTipo('BAJA')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>
+          Dar de baja o cambiar de día</button>
+      </div>
+
+      
+      <div id="secCambiar" class="oculto">
+        <div class="bloque">
+          <h3>Plato <span class="nota" id="platoActual" style="font-weight:400"></span></h3>
+          <p class="nota" id="notaCalientes"></p>
+          <input id="buscaProd" placeholder="Buscá tu plato…" oninput="pintarPlatos()" autocomplete="off" style="margin-top:6px">
+          <div class="opciones lista-platos" id="opcPlatos"></div>
+        </div>
+        <div class="bloque oculto" id="secPostre">
+          <h3>Postre <span class="nota" id="postreActual" style="font-weight:400"></span></h3>
+          <select id="selPostre" onchange="validar()" style="margin-top:6px"></select>
+        </div>
+        <div class="bloque oculto" id="secBebida">
+          <h3>Bebida <span class="nota" id="bebidaActual" style="font-weight:400"></span></h3>
+          <select id="selBebida" onchange="validar()" style="margin-top:6px"></select>
+        </div>
+      </div>
+
+      
+      <div id="secBaja" class="oculto bloque">
+        <h3>¿Qué querés dar de baja?</h3>
+        <div id="opcBaja" class="opciones"></div>
+        <div id="bajaPago"></div>
+        <div id="secOtroDia" class="sub oculto">
+          <label for="fechaDestino">¿Para qué día lo pasás?</label>
+          <input type="date" id="fechaDestino" onchange="cargarOtroDia()">
+          <div id="otroDiaInfo"></div>
+          <div id="otroDiaModo" class="opciones"></div>
+          <div id="secOtroPlato" class="oculto">
+            <input id="buscaOtro" placeholder="Buscá el plato…" oninput="pintarOtroDia()" autocomplete="off" style="margin-top:6px">
+            <div class="opciones lista-platos" id="opcOtroDia"></div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <div id="msgGuardar"></div>
+      <button class="prim" id="btnGuardar" onclick="guardar()" disabled style="margin-top:16px">Confirmar cambio</button>
+    </div>
+
+    <div class="card">
+      <h2>Mis cambios</h2>
+      <div id="saldo"></div>
+      <div id="pendientes"></div>
+      <ul class="lista" id="misCambios"><li class="nota">Cargando…</li></ul>
+    </div>
+  </section>
+</main>
+
+<footer>
+  ¿Una urgencia? <a id="linkWa" href="https://wa.me/5491139042215" target="_blank" rel="noopener">Escribinos por WhatsApp</a>
+</footer>
+
+<div class="modal oculto" id="modal" role="dialog" aria-modal="true">
+  <div class="modal-caja">
+    <h3 id="modalTitulo">Confirmá tu cambio</h3>
+    <div id="modalTexto" class="modal-texto"></div>
+    <div class="modal-botones">
+      <button id="modalNo">Volver</button>
+      <button id="modalSi" class="si">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="cargando oculto" id="cargando"><div class="spin"></div><span id="txtCargando">Cargando…</span></div>
+
 <script>
-// Botón "Cambios de último momento" del sistema → app de Apps Script "Cambios de último momento".
-// Se pasa tal cual lo que venga en la URL (por ejemplo ?sso=...) para que la app pueda hacer el ingreso directo.
-(function () {
-  var APP = 'https://script.google.com/macros/s/AKfycbw6aB1nVKYgMYSsIOkAhtaXX61zGKc-UeeK_o9jmEm1ki01-Nd8daXGxzYrbiivHAge/exec';
-  var destino = APP + (location.search || '');
-  document.getElementById('l').href = destino;
-  location.replace(destino);
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbw6aB1nVKYgMYSsIOkAhtaXX61zGKc-UeeK_o9jmEm1ki01-Nd8daXGxzYrbiivHAge/exec';
+const QUITAR = '(quitar)';
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const S = { token: null, init: null, dia: null, tipo: null, plato: null, saldo: 0, pendientes: [] };
+const IC = {
+  plato: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>',
+  postre: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11h14l-2 9H7z"/><path d="M8 11a4 4 0 0 1 8 0"/></svg>',
+  bebida: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h10l-1.5 18h-7z"/><path d="M7.5 8h9"/></svg>'
+};
+
+
+
+const SESION_MS = 6 * 3600 * 1000;
+function guardarToken(t) {
+  S.token = t;
+  try {
+    if (t) localStorage.setItem('el_token', JSON.stringify({ t: t, hasta: Date.now() + SESION_MS }));
+    else localStorage.removeItem('el_token');
+  } catch (e) { }
+  try { t ? sessionStorage.setItem('el_token', t) : sessionStorage.removeItem('el_token'); } catch (e) { }
+}
+function leerToken() {
+  try {
+    const x = JSON.parse(localStorage.getItem('el_token') || 'null');
+    if (x && x.t && x.hasta > Date.now()) return x.t;
+  } catch (e) { }
+  try { return sessionStorage.getItem('el_token'); } catch (e) { return null; }
+}
+
+function api(accion, datos) {
+  const req = Object.assign({ accion: accion, token: S.token }, datos || {});
+  const enAppsScript = typeof google !== 'undefined' && google.script && google.script.run;
+  const p = enAppsScript
+    ? new Promise((ok, mal) => google.script.run.withSuccessHandler(ok).withFailureHandler(mal).api(req))
+    : fetch(API_URL, { method: 'POST', body: JSON.stringify(req) }).then(r => r.json());
+  return p.then(r => {
+    if (r && r.ok === false) {
+      const e = new Error(r.error || 'Error');
+      e.codigo = r.codigo;
+      if (r.codigo === 'SESION') { guardarToken(null); mostrarLogin(r.error); }
+      throw e;
+    }
+    return r;
+  });
+}
+function cargando(si, txt) { $('cargando').classList.toggle('oculto', !si); $('txtCargando').textContent = txt || 'Cargando…'; }
+function waLink() { return 'https://wa.me/' + ((S.init && S.init.whatsapp) || '5491139042215'); }
+function botonWa(txt) { return `<a class="wa" href="${waLink()}" target="_blank" rel="noopener">${esc(txt || 'Escribinos por WhatsApp')}</a>`; }
+/** Ventana de confirmación propia (en vez del cartel del navegador). Devuelve una promesa con true / false. */
+function confirmar(titulo, texto, botonSi, peligro, html) {
+  return new Promise(ok => {
+    $('modalTitulo').textContent = titulo;
+    $('modalTexto').classList.toggle('html', !!html);
+    if (html) $('modalTexto').innerHTML = html; else $('modalTexto').textContent = texto;
+    $('modalSi').textContent = botonSi || 'Confirmar';
+    $('modalSi').classList.toggle('rojo', !!peligro);
+    $('modal').classList.remove('oculto');
+    const cerrar = v => { $('modal').classList.add('oculto'); $('modalSi').onclick = $('modalNo').onclick = $('modal').onclick = null; ok(v); };
+    $('modalSi').onclick = () => cerrar(true);
+    $('modalNo').onclick = () => cerrar(false);
+    $('modal').onclick = ev => { if (ev.target === $('modal')) cerrar(false); };
+    $('modalSi').focus();
+  });
+}
+function msg(clase, html) { return `<div class="msg ${clase}">${html}</div>`; }
+
+
+function mostrarLogin(m) {
+  $('pLogin').classList.remove('oculto'); $('pApp').classList.add('oculto'); $('btnSalir').classList.add('oculto');
+  $('subtitulo').textContent = '¿Cambió tu día? Modificá tu vianda en un minuto.';
+  $('msgLogin').innerHTML = m ? msg('error', esc(m)) : '';
+}
+async function ingresar() {
+  cargando(true, 'Ingresando…');
+  $('msgLogin').innerHTML = '';
+  try {
+    const r = await api('login', { usuario: $('usuario').value.trim(), clave: $('clave').value });
+    guardarToken(r.token);
+    $('clave').value = '';
+    await iniciar();
+  } catch (e) { if (e.codigo !== 'SESION') $('msgLogin').innerHTML = msg('error', esc(e.message)); }
+  cargando(false);
+}
+async function salir() {
+  try { await api('salir'); } catch (e) { }
+  guardarToken(null);
+  mostrarLogin();
+}
+
+
+async function iniciar() {
+  const r = await api('inicio');
+  S.init = r;
+  $('linkWa').href = waLink();
+  $('pLogin').classList.add('oculto'); $('pApp').classList.remove('oculto'); $('btnSalir').classList.remove('oculto');
+  $('subtitulo').textContent = 'Hola, ' + r.persona.nombre + ' · ' + r.persona.empresa;
+  const pr = document.getElementById('bandaPrueba');
+  if (r.modoPrueba && !pr) $('pApp').insertAdjacentHTML('afterbegin', '<div class="prueba" id="bandaPrueba">MODO PRUEBA · se ven más días que solo mañana</div>');
+  if (!r.modoPrueba && pr) pr.remove();
+  pintarSaldo(r.saldo);
+  $('fecha').min = r.hoy;
+  $('fecha').value = r.primeraFecha;
+  pintarDias();
+  
+  if (r.cambios) { pintarMisCambios(r.cambios); pintarPendientes(r.pendientes); }
+  await Promise.all([cargarDia(r.dia), r.cambios ? null : cargarMisCambios()]);
+}
+
+function pintarDias() {
+  const f = $('fecha').value;
+  $('dias').innerHTML = (S.init.proximos || []).map(d => {
+    const [dia, num] = d.texto.split(' ');
+    return `<button class="${d.fecha === f ? 'sel' : ''} ${d.ok ? '' : 'cerrado'}" onclick="elegirDia('${d.fecha}')"><small>${esc(dia.slice(0, 3))}</small><b>${esc(num)}</b><small>${d.ok ? 'abierto' : 'cerrado'}</small></button>`;
+  }).join('');
+}
+function elegirDia(f) { $('fecha').value = f; cargarDia(); }
+
+
+ 
+async function cargarDia(pre) {
+  const f = $('fecha').value;
+  pintarDias();
+  limpiarCambio();
+  $('cCambio').classList.add('oculto'); $('cPedido').classList.add('oculto');
+  if (!f) { $('estadoDia').innerHTML = ''; return; }
+  $('estadoDia').innerHTML = '<p class="nota">Buscando tu pedido…</p>';
+  try {
+    const d = pre && pre.fecha === f ? pre : await api('dia', { fecha: f });
+    if ($('fecha').value !== f) return;
+    S.dia = d;
+    if (!d.modificable) {
+      let h = msg('error', '<b>No se puede hacer el cambio.</b><br>' + esc(d.mensaje));
+      if (d.fueraVentana) h = msg('info', esc(d.mensaje));
+      else if (d.mensaje.indexOf('no hay entregas') === -1) h += '<p class="nota">Si es urgente, escribinos y vemos cómo ayudarte.</p>' + botonWa();
+      $('estadoDia').innerHTML = h;
+    } else {
+      $('estadoDia').innerHTML = msg('info', 'Tenés tiempo hasta el <b>' + esc(d.limiteTxt) + '</b>.');
+    }
+    pintarPedido();
+    if (d.modificable) prepararCambio();
+  } catch (e) { $('estadoDia').innerHTML = msg('error', esc(e.message)); }
+}
+
+function pintarPedido() {
+  const d = S.dia, a = d.actual;
+  if (d.mensaje && d.mensaje.indexOf('no hay entregas') >= 0) return;
+  $('cPedido').classList.remove('oculto');
+  $('tituloPedido').textContent = 'Tu pedido del ' + d.texto;
+  const items = a.platos.map(p => `<div class="item"><span class="ic">${IC.plato}</span><div>${esc(p.nombre)}${tagPago(p)}<small>${esc(p.categoria || 'Plato')}</small></div></div>`);
+  if (a.postre) items.push(`<div class="item"><span class="ic">${IC.postre}</span><div>${esc(a.postre)}${tagPago({ pagado: a.postrePagado })}<small>Postre</small></div></div>`);
+  if (a.bebida) items.push(`<div class="item"><span class="ic">${IC.bebida}</span><div>${esc(a.bebida)}${tagPago({ pagado: a.bebidaPagado })}<small>Bebida</small></div></div>`);
+  $('pedido').innerHTML = (items.length ? items.join('') : '<div class="vacio">No tenés nada pedido para ese día.</div>') +
+    (a.platos.length > 1 ? msg('aviso', '<b>Tenés ' + a.platos.length + ' platos para ese día y solo puede haber uno.</b> Da de baja el que no quieras en el paso 3.') : '');
+  const cambiosVer = d.cambios.filter(c => c.tipo !== 'Pago confirmado' && c.tipo !== 'Impago (sacado)');   
+  $('cambiosDia').innerHTML = cambiosVer.length
+    ? '<p class="nota" style="margin-top:12px">Ya incluye estos cambios: ' + cambiosVer.map(c => esc(c.detalle) + (c.cliente ? '' : ' <span class="tag gris">Easy Lunch</span>')).join(' · ') + '</p>' : '';
+}
+
+function prepararCambio() {
+  const d = S.dia, a = d.actual;
+  $('cCambio').classList.remove('oculto');
+  const hayPedido = a.platos.length > 0 || !!a.postre || !!a.bebida;
+  document.querySelector('[data-tipo=BAJA]').disabled = !hayPedido;   
+  
+  
+  const cerrado = p => p.caliente && !d.calientes.ok;
+  const hayCerrado = a.platos.some(cerrado);
+  
+  const nItems = a.platos.length + (a.postre ? 1 : 0) + (a.bebida ? 1 : 0);
+  const marcar = nItems === 1 ? 'checked' : '';
+  const opcItem = (valor, nombre, que, pagado) =>
+    `<label><input type="checkbox" name="baja" value="${esc(valor)}" onchange="cambioBaja()" ${marcar}> <span>${esc(nombre)}${tagPago({ pagado: pagado })}<br><small class="nota">${que}</small></span></label>`;
+  $('opcBaja').innerHTML = a.platos.map(p => cerrado(p)
+      ? `<label class="no" title="Los platos calientes se cambian desde el sistema"><input type="checkbox" disabled> <span>${esc(p.nombre)}${tagPago(p)}<span class="tag gris">caliente · se cambia desde el sistema</span></span></label>`
+      : opcItem(p.nombre, p.nombre, 'Plato', p.pagado)).join('') +
+    (a.postre ? opcItem('__postre', a.postre, 'Postre', a.postrePagado) : '') +
+    (a.bebida ? opcItem('__bebida', a.bebida, 'Bebida', a.bebidaPagado) : '') +
+    (nItems > 1 && !hayCerrado ? '<label><input type="checkbox" id="bajaTodo" onchange="todoBaja(this.checked)"> <span><b>Todo el pedido de ese día</b></span></label>' : '') +
+    (hayCerrado ? '<p class="nota">Los platos calientes se cambian directamente desde el sistema donde hacés tus pedidos.</p>' : '');
+  
+  $('platoActual').textContent = a.platos.length ? '· hoy tenés ' + a.platos[0].nombre : '· hoy no tenés plato';
+  
+  const dosPlatos = a.platos.length > 1;
+  S.platoBloqueado = dosPlatos || !!(a.platos[0] && a.platos[0].caliente && !d.calientes.ok);
+  $('notaCalientes').innerHTML = dosPlatos
+    ? 'Ese día tenés más de un plato y solo puede haber uno: primero da de baja el que no quieras (en "Dar de baja o cambiar de día").'
+    : S.platoBloqueado
+    ? 'Tu plato es caliente: se cambia directamente desde el sistema donde hacés tus pedidos. Desde acá podés cambiar el postre o la bebida (si tu empresa los tiene).'
+    : 'Desde acá podés elegir ensaladas, tartas, sándwiches o wraps. Los platos calientes se piden desde el sistema.';
+  $('buscaProd').value = '';
+  $('buscaProd').classList.toggle('oculto', S.platoBloqueado);
+  pintarPlatos();
+  
+  llenarAdicional('Postre', a.postre, d.opciones.postres, d.adicionales.postre, 'postre');
+  llenarAdicional('Bebida', a.bebida, d.opciones.bebidas, d.adicionales.bebida, 'bebida');
+}
+
+function llenarAdicional(Que, actual, opciones, contratado, que) {
+  $('sec' + Que).classList.toggle('oculto', !contratado || (!opciones.length && !actual));
+  $(que + 'Actual').textContent = actual ? '· hoy tenés ' + actual : '· hoy no tenés ' + que;
+  const sel = $('sel' + Que);
+  sel.innerHTML = '<option value="">Dejar como está</option>' +
+    (actual ? `<option value="${QUITAR}">Sacar ${que}</option>` : '') +
+    opciones.filter(o => norm(o) !== norm(actual)).map(o => `<option value="${esc(o)}">${actual ? 'Cambiar por ' : 'Agregar '}${esc(o)}</option>`).join('');
+}
+
+function pintarPlatos() {
+  const d = S.dia;
+  if (!d) return;
+  if (S.platoBloqueado) { $('opcPlatos').innerHTML = ''; return; }
+  const actual = d.actual.platos[0] ? norm(d.actual.platos[0].nombre) : '';
+  const t = norm($('buscaProd').value).split(/\s+/).filter(Boolean);
+  const lista = d.opciones.platos.filter(p => norm(p.nombre) !== actual && t.every(x => norm(p.nombre + ' ' + p.categoria).includes(x)));
+  let h = '', cat = null;
+  lista.forEach(p => {
+    if (p.categoria !== cat) { cat = p.categoria; h += `<div class="cat">${esc(cat)}</div>`; }
+    const sel = S.plato === p.nombre ? 'checked' : '';
+    const tag = p.caliente ? '<span class="tag">caliente</span>' : '';
+    h += p.disponible
+      ? `<label><input type="radio" name="plato" value="${esc(p.nombre)}" ${sel} onchange="S.plato=this.value; validar()"> <span>${esc(p.nombre)}${tag}</span></label>`
+      : `<label class="no" title="Cerró el ${esc(d.calientes.limiteTxt)}"><input type="radio" disabled> <span>${esc(p.nombre)}${tag}<span class="tag gris">cerrado</span></span></label>`;
+  });
+  if (S.plato) h = `<button class="link" onclick="S.plato=null; pintarPlatos(); validar()">Dejar el plato como está</button>` + h;
+  $('opcPlatos').innerHTML = h || (d.opciones.platos.length ? '<p class="nota">No encontré ese plato.</p>' : '<p class="nota">No hay platos cargados en el menú de ese día.</p>');
+}
+
+function elegirTipo(t) {
+  S.tipo = t;
+  document.querySelectorAll('.acciones button').forEach(b => b.classList.toggle('sel', b.dataset.tipo === t));
+  $('secCambiar').classList.toggle('oculto', t !== 'CAMBIAR');
+  $('secBaja').classList.toggle('oculto', t !== 'BAJA');
+  $('msgGuardar').innerHTML = '';
+  if (t === 'BAJA') cambioBaja(); else validar();
+}
+
+// ============ pagos (empresas donde paga el empleado) ============
+function tagPago(p) {
+  if (!S.dia || !S.dia.paga || !p.pagado) return '';
+  if (p.pagado === 'Diferencia') return ' <span class="tag">falta pagar la diferencia</span>';
+  return p.pagado === 'Sí' ? ' <span class="tag pago">pago</span>' : ' <span class="tag impago">sin pagar</span>';
+}
+/**
+ * Lo que eligió dar de baja (se pueden marcar varias cosas):
+ *   null · un plato · { adic: 'postre'|'bebida', … } · { todo: true, items } · { multi: true, items }
+ */
+function platoBajaSel() {
+  const a = S.dia.actual;
+  const vals = [...document.querySelectorAll('input[name=baja]:checked')].map(x => x.value);
+  if (!vals.length) return null;
+  const items = vals.map(v => v === '__postre' ? { adic: 'postre', nombre: a.postre, pagado: a.postrePagado, monto: a.postreMonto }
+    : v === '__bebida' ? { adic: 'bebida', nombre: a.bebida, pagado: a.bebidaPagado, monto: a.bebidaMonto }
+    : comoPagado(a.platos.find(p => p.nombre === v))).filter(Boolean);
+  const disponibles = document.querySelectorAll('input[name=baja]').length;
+  const hayCerrado = !!document.querySelector('#opcBaja label.no');
+  if (items.length > 1 && items.length === disponibles && !hayCerrado) return { todo: true, items: items };
+  if (items.length === 1) return items[0];
+  return { multi: true, items: items };
+}
+/** Un plato que reemplazó a otro pago (con la diferencia sin pagar) cuenta como pago por lo que valía el original. */
+function comoPagado(p) {
+  return p && p.pagado === 'Diferencia' ? Object.assign({}, p, { pagado: 'Sí', monto: p.montoPagado }) : p;
+}
+/** "Todo el pedido de ese día" marca o desmarca todo. */
+function todoBaja(si) {
+  document.querySelectorAll('input[name=baja]').forEach(x => { x.checked = si; });
+  cambioBaja();
+}
+/** Al elegir el plato: darlo de baja o pasarlo a otro día. Si estaba pago, la baja va con reintegro. */
+function cambioBaja() {
+  const d = S.dia, pl = platoBajaSel();
+  S.modoBaja = ''; S.platoDestino = null; $('secOtroDia').classList.add('oculto');
+  let h = '';
+  if (pl && pl.todo) {
+    S.modoBaja = 'baja';
+    const pago = d.paga && (d.actual.platos.some(p => comoPagado(p).pagado === 'Sí') || d.actual.postrePagado === 'Sí' || d.actual.bebidaPagado === 'Sí');
+    h = pago ? msg('aviso', 'Tenés cosas que ya estaban pagas: lo que pagaste te queda como <b>saldo a favor</b> y se descuenta solo en tu próxima compra.')
+      : d.paga ? msg('info', 'Tu pedido no estaba pago, así que no hay nada que devolver.') : '';
+    if (pago) S.modoBaja = 'reintegro';
+  } else if (pl && pl.multi) {
+    // varias cosas a la vez (por ejemplo postre y bebida): se dan de baja, no se pasan a otro día
+    S.modoBaja = 'baja';
+    const pagas = pl.items.filter(x => x.pagado === 'Sí');
+    h = d.paga && pagas.length ? msg('aviso', 'Lo que ya estaba pago (' + pagas.map(x => esc(x.nombre)).join(', ') + ') te queda como <b>saldo a favor</b> y se descuenta solo en tu próxima compra.')
+      : d.paga ? msg('info', 'No estaba pago, así que no hay nada que devolver.') : '';
+  } else if (pl && pl.adic) {
+    // postre o bebida sola: se saca (no se pasa a otro día)
+    S.modoBaja = 'baja';
+    const pago = d.paga && pl.pagado === 'Sí';
+    h = pago ? msg('aviso', 'Ya estaba pago: lo que pagaste' + (pl.monto ? ' (' + pesos(pl.monto) + ')' : '') + ' te queda como <b>saldo a favor</b> y se descuenta solo en tu próxima compra.')
+      : d.paga ? msg('info', 'No estaba pago, así que no hay nada que devolver.') : '';
+  } else if (pl) {
+    const pago = d.paga && pl.pagado === 'Sí';
+    const subDia = pago ? 'Elegís el día y el plato, y sigue pago. Si el nuevo sale más, pagás solo la diferencia; si sale menos, te queda a favor.'
+      : d.paga ? 'Elegís el día y el plato. Sigue sin pagar.' : 'Elegís el día y el plato.';
+    const subBaja = pago ? 'Lo que pagaste' + (pl.monto ? ' (' + pesos(pl.monto) + ')' : '') + ' te queda como saldo a favor para tu próxima compra.'
+      : d.paga ? 'No estaba pago, así que no hay nada que devolver.' : 'Ese día no recibís el plato.';
+    h = `${pago ? '<div class="msg aviso"><b>Este plato ya estaba pago.</b></div>' : ''}
+      <h3 style="margin-top:12px">¿Qué querés hacer con este plato?</h3>
+      <div class="opciones">
+        <label><input type="radio" name="modoBaja" value="otroDia" onchange="elegirModoBaja(this.value)"> <span><b>Cambiarlo de día</b><br><small class="nota">${subDia}</small></span></label>
+        <label><input type="radio" name="modoBaja" value="${pago ? 'reintegro' : 'baja'}" onchange="elegirModoBaja(this.value)"> <span><b>${pago ? 'Darlo de baja (queda como saldo a favor)' : 'Darlo de baja'}</b><br><small class="nota">${subBaja}</small></span></label>
+      </div>`;
+  }
+  $('bajaPago').innerHTML = h;
+  const todo = $('bajaTodo'); if (todo) todo.checked = !!(pl && pl.todo);
+  validar();
+}
+function elegirModoBaja(m) {
+  S.modoBaja = m;
+  $('secOtroDia').classList.toggle('oculto', m !== 'otroDia');
+  if (m === 'otroDia') {
+    if (!$('fechaDestino').value) {
+      const prox = (S.init.proximos || []).find(x => x.ok && x.fecha !== S.dia.fecha);
+      if (prox) $('fechaDestino').value = prox.fecha;
+    }
+    if ($('fechaDestino').value) cargarOtroDia();   
+  }
+  validar();
+}
+async function cargarOtroDia() {
+  const f = $('fechaDestino').value;
+  S.platoDestino = null; S.diaDestino = null;
+  $('opcOtroDia').innerHTML = ''; $('otroDiaModo').innerHTML = ''; $('buscaOtro').value = ''; $('secOtroPlato').classList.add('oculto');
+  validar();
+  if (!f) { $('otroDiaInfo').innerHTML = ''; return; }
+  if (f === S.dia.fecha) { $('otroDiaInfo').innerHTML = msg('error', 'Elegí un día distinto.'); return; }
+  $('otroDiaInfo').innerHTML = '<p class="nota">Buscando el menú…</p>';
+  try {
+    const d2 = await api('dia', { fecha: f });
+    if ($('fechaDestino').value !== f) return;
+    
+    if (!d2.modificable && !d2.fueraVentana) { $('otroDiaInfo').innerHTML = msg('error', esc(d2.mensaje)); return; }
+    if (d2.actual.platos.length) { $('otroDiaInfo').innerHTML = msg('error', 'Ese día ya tenés plato (' + esc(d2.actual.platos[0].nombre) + '). Elegí otro día.'); return; }
+    S.diaDestino = d2;
+    $('otroDiaInfo').innerHTML = '<h3 style="margin-top:12px">¿Qué plato querés el ' + esc(d2.texto) + '?</h3>';
+    
+    const pl = platoBajaSel();
+    const orig = pl && !pl.todo ? pl.nombre : '';
+    const mismo = orig && d2.opciones.platos.find(p => norm(p.nombre) === norm(orig) && p.disponible);
+    S.mismoPlato = mismo ? mismo.nombre : '';
+    $('otroDiaModo').innerHTML =
+      (mismo
+        ? `<label><input type="radio" name="modoOtro" value="mismo" onchange="elegirModoOtro('mismo')" checked> <span><b>Mantener mi plato</b><br><small class="nota">${esc(orig)}</small></span></label>`
+        : orig ? `<label class="no"><input type="radio" disabled> <span><b>Mantener mi plato</b><br><small class="nota">${esc(orig)} no está en el menú del ${esc(d2.texto)}.</small></span></label>` : '') +
+      `<label><input type="radio" name="modoOtro" value="otro" onchange="elegirModoOtro('otro')" ${mismo ? '' : 'checked'}> <span><b>Elegir otro plato</b></span></label>`;
+    elegirModoOtro(mismo ? 'mismo' : 'otro');
+  } catch (e) { $('otroDiaInfo').innerHTML = msg('error', esc(e.message)); }
+}
+function elegirModoOtro(m) {
+  S.platoDestino = m === 'mismo' ? S.mismoPlato : null;
+  $('secOtroPlato').classList.toggle('oculto', m !== 'otro');
+  if (m === 'otro') { pintarOtroDia(); $('buscaOtro').focus(); }
+  validar();
+}
+/** Lista de platos del día nuevo, filtrada por el buscador. */
+function pintarOtroDia() {
+  const d2 = S.diaDestino;
+  if (!d2) return;
+  const t = norm($('buscaOtro').value).split(/\s+/).filter(Boolean);
+  const lista = d2.opciones.platos.filter(p => t.every(x => norm(p.nombre + ' ' + p.categoria).includes(x)));
+  let h = '', cat = null;
+  lista.forEach(p => {
+    if (p.categoria !== cat) { cat = p.categoria; h += `<div class="cat">${esc(cat)}</div>`; }
+    const tag = p.caliente ? '<span class="tag">caliente</span>' : '';
+    const sel = S.platoDestino === p.nombre ? 'checked' : '';
+    h += p.disponible
+      ? `<label><input type="radio" name="platoDestino" value="${esc(p.nombre)}" ${sel} onchange="S.platoDestino=this.value; validar()"> <span>${esc(p.nombre)}${tag}</span></label>`
+      : `<label class="no"><input type="radio" disabled> <span>${esc(p.nombre)}${tag}<span class="tag gris">cerrado</span></span></label>`;
+  });
+  $('opcOtroDia').innerHTML = h || (d2.opciones.platos.length ? '<p class="nota">No encontré ese plato.</p>' : '<p class="nota">No hay platos cargados en el menú de ese día.</p>');
+}
+/** Lo que se le muestra después de guardar: qué paga (solo Mercado Pago), qué le queda a favor y qué sigue igual. */
+function avisoPago(r) {
+  const lista = r.pagos || [];
+  let h = '';
+  if (r.pagadoConSaldo) {
+    h += msg('ok', '✔ Lo pagaste con tu saldo a favor (' + pesos(r.creditoUsado) + '). Tu pedido quedó confirmado.');
+  } else if (r.aPagar > 0) {
+    const cobrar = lista.filter(p => p.tipo === 'pagar' || p.tipo === 'diferencia');
+    const orig = cobrar.some(p => p.original) ? 'Lo que tenías no estaba pago, así que lo nuevo tampoco. ' : '';
+    const renglones = cobrar.map(p => (p.tipo === 'diferencia' ? 'Diferencia ' + esc(p.antesNombre) + ' → ' : '') + esc(p.nombre) + ': <b>' + pesos(p.monto) + '</b>');
+    if (r.creditoUsado) renglones.push('Saldo a favor: <b>−' + pesos(r.creditoUsado) + '</b>');
+    const det = renglones.length > 1 || r.creditoUsado ? '<small>' + renglones.join('<br>') + '</small><br>' : '';
+    if (r.mp && r.mp.link) {
+      h += `<div class="pagobox">${orig}Para que tu cambio quede confirmado, pagá <b>${pesos(r.aPagar)}</b> con Mercado Pago.<br>${det}
+        <a class="mpbtn" href="${esc(r.mp.link)}" target="_blank" rel="noopener">Pagar ${pesos(r.aPagar)} con Mercado Pago</a><br>
+        <button onclick="verificarPagos(this)">Ya pagué</button></div>`;
+    } else {
+      h += `<div class="pagobox">${orig}Tenés que pagar <b>${pesos(r.aPagar)}</b>, pero no pudimos generar el link de Mercado Pago. Escribinos y te lo mandamos.<br>${botonWa()}</div>`;
+    }
+  }
+  let favor = false;
+  lista.forEach(p => {
+    if (p.tipo === 'sigue_pago') h += msg('ok', 'Lo que tenías estaba pago, así que ' + esc(p.nombre) + ' también queda pago.');
+    else if (p.tipo === 'sin_cargo') h += msg('ok', esc(p.nombre) + ' no tiene costo para vos ese día.');
+    else if (p.tipo === 'pasado') h += msg('ok', 'Tu plato pago pasó al ' + esc(p.fechaTxt) + ' (' + esc(p.nombre) + ') y sigue pago.');
+    else if (p.tipo === 'impago') h += msg('info', (p.que === 'pedido' ? 'Tu pedido' : esc(p.nombre)) + ' no estaba pago, así que no hay nada que devolver.');
+    else if (p.tipo === 'sin_costo') h += msg('info', esc(p.nombre) + ' no tenía costo para vos, así que no hay nada que devolver.');
+    else if (p.tipo === 'a_favor') { favor = true; h += msg('ok', esc(p.nombre) + ' sale ' + pesos(p.monto) + ' menos que ' + esc(p.antesNombre) + ': te quedan <b>' + pesos(p.monto) + ' de saldo a favor</b>.'); }
+    else if (p.tipo === 'credito') { favor = true; h += msg('ok', 'Como ' + esc(p.nombre) + ' ya estaba pago, te quedan <b>' + pesos(p.monto) + ' de saldo a favor</b>. Se descuentan solos en tu próxima compra.'); }
+  });
+  if (favor) {
+    const persona = S.init ? S.init.persona : {};
+    const texto = 'Hola! Soy ' + (persona.nombre || '') + ' ' + (persona.apellido || '') + ' de ' + (persona.empresa || '') +
+      '. Tengo ' + pesos(r.saldo) + ' de saldo a favor en Easy Lunch y prefiero que me lo devuelvan.';
+    h += `<p class="nota">¿Preferís que te devolvamos la plata? <a href="https://wa.me/${esc(r.whatsapp || '5491139042215')}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">Escribinos por WhatsApp</a>.</p>`;
+  }
+  // sin precio cargado: reintegro por WhatsApp como antes
+  const reint = lista.filter(p => p.tipo === 'reintegro');
+  if (reint.length) {
+    const persona = S.init ? S.init.persona : {};
+    const cosas = reint.map(p => p.nombre).join(', ');
+    const texto = 'Hola! Soy ' + (persona.nombre || '') + ' ' + (persona.apellido || '') + ' de ' + (persona.empresa || '') +
+      '. Di de baja ' + cosas + ' del ' + reint[0].fechaTxt + ' que ya estaba pago y quiero pedir el reintegro.';
+    h += `<div class="pagobox">Como ${esc(cosas)} ya estaba pago, escribinos por WhatsApp para el reintegro.<br>
+      <a class="wa" href="https://wa.me/${esc(r.whatsapp || '5491139042215')}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">Pedir el reintegro por WhatsApp</a></div>`;
+  }
+  return h;
+}
+function pesos(n) { return '$' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+/** "Ya pagué": revisa en Mercado Pago y actualiza el pedido y Mis cambios. */
+async function verificarPagos(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Revisando…'; }
+  try {
+    const r = await api('verificarPagos', { vista: $('fecha').value });
+    pintarMisCambios(r.cambios); pintarPendientes(r.pendientes); pintarSaldo(r.saldo);
+    if (r.confirmados) {
+      await cargarDia(r.dia);
+      $('estadoDia').insertAdjacentHTML('afterbegin', msg('ok', '✔ ¡Listo! Recibimos tu pago y tu pedido quedó confirmado.'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (btn) { btn.disabled = false; btn.textContent = 'Todavía no lo vemos acreditado · revisar de nuevo'; }
+  } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Ya pagué'; } }
+}
+function pintarPendientes(p) {
+  S.pendientes = p = p || [];
+  $('pendientes').innerHTML = p.map(x => `<div class="pendiente"><b>Pago pendiente ${pesos(x.monto)}</b><br><small>${esc(x.detalle)}</small><br>
+    <a class="mpbtn" href="${esc(x.link)}" target="_blank" rel="noopener">Pagar con Mercado Pago</a>
+    <button onclick="verificarPagos(this)">Ya pagué</button>
+    ${S.saldo > 0 ? `<button onclick="usarSaldo('${esc(x.ref)}', this)">Usar mi saldo a favor (${pesos(S.saldo)})</button>` : ''}</div>`).join('');
+}
+/** Saldo a favor: se muestra arriba de Mis cambios. */
+function pintarSaldo(n) {
+  if (n === undefined || n === null) return;
+  S.saldo = Number(n) || 0;
+  $('saldo').innerHTML = S.saldo > 0
+    ? `<div class="saldo"><span>Tenés <b>${pesos(S.saldo)}</b> de saldo a favor<small>Se descuenta solo cuando tengas que pagar un cambio.</small></span>${botonWa('Prefiero la devolución')}</div>` : '';
+  if (S.pendientes && S.pendientes.length) pintarPendientes(S.pendientes);
+}
+/** Paga un link pendiente con el saldo a favor (si no alcanza, queda un link nuevo por lo que falta). */
+async function usarSaldo(ref, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  try {
+    const r = await api('usarSaldo', { ref: ref });
+    pintarSaldo(r.saldo); pintarPendientes(r.pendientes); pintarMisCambios(r.cambios);
+    await cargarDia();
+    $('estadoDia').insertAdjacentHTML('afterbegin', r.cobro && r.cobro.pagado
+      ? msg('ok exito', '¡Listo! Lo pagaste con tu saldo a favor y tu pedido quedó confirmado.')
+      : msg('info', 'Usamos ' + pesos(r.cobro ? r.cobro.credito : 0) + ' de tu saldo a favor. Te queda pagar ' + pesos(r.cobro ? r.cobro.aPagar : 0) + ' con Mercado Pago (está en Mis cambios).'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Usar mi saldo a favor'; }
+    $('pendientes').insertAdjacentHTML('afterbegin', msg('error', esc(e.message)));
+  }
+}
+
+function limpiarCambio() {
+  S.tipo = null; S.plato = null; S.modoBaja = ''; S.platoDestino = null; S.diaDestino = null;
+  $('bajaPago').innerHTML = ''; $('secOtroDia').classList.add('oculto'); $('fechaDestino').value = ''; $('opcOtroDia').innerHTML = ''; $('otroDiaInfo').innerHTML = '';
+  $('otroDiaModo').innerHTML = ''; $('buscaOtro').value = ''; $('secOtroPlato').classList.add('oculto'); S.mismoPlato = '';
+  document.querySelectorAll('.acciones button').forEach(b => b.classList.remove('sel'));
+  ['secCambiar', 'secBaja'].forEach(id => $(id).classList.add('oculto'));
+  $('msgGuardar').innerHTML = '';
+  $('btnGuardar').disabled = true;
+}
+
+function validar() {
+  let ok = !!S.tipo && !!S.dia && S.dia.modificable;
+  if (ok && S.tipo === 'BAJA') {
+    const pl = platoBajaSel();
+    ok = !!pl;
+    if (ok) ok = !!S.modoBaja && (S.modoBaja !== 'otroDia' || !!S.platoDestino);
+  }
+  if (ok && S.tipo === 'CAMBIAR') ok = !!S.plato || !!$('selPostre').value || !!$('selBebida').value;
+  $('btnGuardar').disabled = !ok;
+}
+
+async function guardar() {
+  const d = S.dia;
+  const req = { tipo: S.tipo, fecha: d.fecha };
+  const partes = [];
+  let reqs = null;            // cuando da de baja varias cosas sueltas se guardan en más de un paso
+  if (S.tipo === 'BAJA') {
+    const sel = platoBajaSel();
+    if (sel && sel.multi) {
+      reqs = [];
+      sel.items.filter(x => !x.adic).forEach(p => {
+        const r1 = { tipo: 'BAJA', fecha: d.fecha, platoBaja: p.nombre };
+        if (d.paga && p.pagado === 'Sí') r1.modo = 'reintegro';
+        reqs.push(r1);
+      });
+      const adic = sel.items.filter(x => x.adic);
+      if (adic.length) { const r2 = { tipo: 'CAMBIAR', fecha: d.fecha }; adic.forEach(x => { r2[x.adic] = QUITAR; }); reqs.push(r2); }
+    } else if (sel && sel.adic) {
+      // baja de solo el postre o solo la bebida: es un "sacar postre / bebida"
+      req.tipo = 'CAMBIAR'; req[sel.adic] = QUITAR;
+      partes.push('sacar ' + sel.adic + ' (' + sel.nombre + ')');
+    } else {
+      req.platoBaja = sel && !sel.todo ? sel.nombre : '';
+      if (S.modoBaja && S.modoBaja !== 'baja') req.modo = S.modoBaja;
+      if (S.modoBaja === 'otroDia') {
+        req.fechaDestino = $('fechaDestino').value; req.platoDestino = S.platoDestino;
+        partes.push('pasar tu plato del ' + d.texto + ' (' + req.platoBaja + ') al ' + (S.diaDestino ? S.diaDestino.texto : req.fechaDestino) + ' (' + req.platoDestino + ')' +
+          (d.paga ? (sel && sel.pagado === 'Sí' ? ', que sigue pago' : ', que sigue sin pagar') : ''));
+      } else {
+        partes.push('dar de baja ' + (req.platoBaja || 'todo tu pedido'));
+      }
+    }
+  } else if (S.tipo === 'CAMBIAR') {
+    req.plato = S.plato || ''; req.postre = $('selPostre').value; req.bebida = $('selBebida').value;
+    if (req.plato) partes.push((d.actual.platos.length ? 'cambiar tu plato por ' : 'agregar ') + req.plato);
+    [['postre', req.postre], ['bebida', req.bebida]].forEach(([q, v]) => { if (v) partes.push(v === QUITAR ? 'sacar ' + q : q + ': ' + v); });
+  }
+  // ---- resumen ordenado para confirmar: un renglón por cosa, con lo que paga o le queda a favor ----
+  const montoDe = (que, nombre, dia) => {
+    const dd = dia || d;
+    if (que === 'plato') { const o = (dd.opciones.platos || []).find(x => x.nombre === nombre); return o ? o.monto : null; }
+    const t = dd.montos && dd.montos[que]; return t && nombre in t ? t[nombre] : null;
+  };
+  const filas = []; const notas = []; let total = 0; let aFavor = 0; let reintegroWa = false;
+  const fila = (que, texto, derecha, gris) => filas.push(`<li><span class="cf-que">${esc(que)}</span><span>${texto}</span><span class="cf-monto${gris ? ' gris' : ''}">${derecha || ''}</span></li>`);
+  const conocido = m => m !== null && m !== undefined;
+  // m: lo que sale lo nuevo · estabaPago: si lo que reemplaza estaba pago · mAntes: lo que salía lo anterior
+  const precio = (m, estabaPago, mAntes) => {
+    if (!d.paga) return ['', false];
+    if (estabaPago) {
+      if (!conocido(m) || !conocido(mAntes)) return ['sigue pago', true];
+      const dif = m - mAntes;
+      if (dif > 0) { total += dif; return [pesos(dif) + '<br><small class="nota">diferencia</small>', false]; }
+      if (dif < 0) { aFavor -= dif; return [pesos(-dif) + '<br><small class="nota">a tu favor</small>', true]; }
+      return ['sigue pago', true];
+    }
+    if (m === 0) return ['sin cargo', true];
+    if (m) { total += m; return [pesos(m), false]; }
+    return ['a pagar', true];
+  };
+  // baja de algo pago: lo que valía queda a favor
+  const devuelve = montos => {
+    if (montos.some(m => !conocido(m))) { reintegroWa = true; return 'reintegro'; }
+    const s = montos.reduce((a, m) => a + m, 0);
+    aFavor += s;
+    return s ? pesos(s) + '<br><small class="nota">a tu favor</small>' : 'sin costo';
+  };
+  let diaTxt = d.texto;
+  if (S.tipo === 'CAMBIAR') {
+    const act = d.actual.platos[0];
+    const item = (que, Que, nuevo, antes, pagado, mAntes) => {
+      if (!nuevo) return;
+      const pago = d.paga && pagado === 'Sí';
+      if (nuevo === QUITAR) {
+        fila(Que, 'Sacar ' + esc(antes), d.paga ? (pago ? devuelve([mAntes]) : 'no estaba pago') : '', true);
+        return;
+      }
+      const [der, gris] = precio(montoDe(que, nuevo), !!antes && pago, mAntes);
+      fila(Que, (antes ? 'Cambiar por ' : 'Agregar ') + esc(nuevo) + (antes ? `<br><small class="nota">antes: ${esc(antes)}</small>` : ''), der, gris);
+    };
+    item('plato', 'Plato', req.plato, act ? act.nombre : '', act ? act.pagado : '', act ? act.monto : null);
+    item('postre', 'Postre', req.postre, d.actual.postre, d.actual.postrePagado, d.actual.postreMonto);
+    item('bebida', 'Bebida', req.bebida, d.actual.bebida, d.actual.bebidaPagado, d.actual.bebidaMonto);
+  } else if (S.modoBaja === 'otroDia') {
+    const pl = platoBajaSel();
+    const pago = d.paga && pl && pl.pagado === 'Sí';
+    fila('Saca', esc(req.platoBaja) + `<br><small class="nota">${esc(d.texto)}</small>`, '', true);
+    const [der, gris] = precio(montoDe('plato', req.platoDestino, S.diaDestino), pago, pl ? pl.monto : null);
+    fila('Pasa a', esc(req.platoDestino) + `<br><small class="nota">${esc(S.diaDestino ? S.diaDestino.texto : req.fechaDestino)}</small>`, der, gris);
+    diaTxt = 'Cambio de día';
+  } else {
+    const pl = platoBajaSel();
+    const a = d.actual;
+    let der = '';
+    if (d.paga) {
+      if (pl && pl.todo) {
+        const pagos = a.platos.map(comoPagado).filter(p => p.pagado === 'Sí').map(p => p.monto);
+        if (a.postre && a.postrePagado === 'Sí') pagos.push(a.postreMonto);
+        if (a.bebida && a.bebidaPagado === 'Sí') pagos.push(a.bebidaMonto);
+        der = pagos.length ? devuelve(pagos) : 'no estaba pago';
+      } else {
+        der = pl && pl.pagado === 'Sí' ? devuelve([pl.monto]) : 'no estaba pago';
+      }
+    }
+    if (pl && pl.multi) {
+      pl.items.forEach(x => fila('Baja', esc((x.adic === 'postre' ? 'Postre: ' : x.adic === 'bebida' ? 'Bebida: ' : '') + x.nombre),
+        d.paga ? (x.pagado === 'Sí' ? devuelve([x.monto]) : 'no estaba pago') : '', true));
+    } else {
+      const queBaja = pl && pl.adic ? (pl.adic === 'postre' ? 'Postre: ' : 'Bebida: ') + pl.nombre : (req.platoBaja || 'Todo el pedido del día');
+      fila('Baja', esc(queBaja), der, true);
+    }
+  }
+  let html = `<div class="cf-dia">${esc(diaTxt)}</div><ul class="cf-items">${filas.join('')}</ul>`;
+  const saldo = (S.saldo || 0) + aFavor;            // lo que deja a favor este cambio también se usa
+  const usa = Math.min(saldo, total);
+  if (total > 0) {
+    if (usa > 0) {
+      html += `<div class="cf-total cf-sub"><span>Total</span><span>${pesos(total)}</span></div>
+        <div class="cf-total cf-sub favor"><span>Saldo a favor</span><span>−${pesos(usa)}</span></div>`;
+    }
+    html += `<div class="cf-total"><span>${total - usa > 0 ? 'A pagar con Mercado Pago' : 'A pagar'}</span><span>${pesos(total - usa)}</span></div>`;
+    notas.push(total - usa > 0
+      ? 'Al confirmar te mostramos el botón para pagar con Mercado Pago. El cambio queda confirmado cuando se acredita el pago.'
+      : 'Se paga con tu saldo a favor: queda confirmado en el momento.');
+  }
+  if (aFavor > 0 && saldo - usa > 0) {
+    html += `<div class="cf-total favor"><span>Te queda de saldo a favor</span><span>${pesos(saldo - usa)}</span></div>`;
+    notas.push('El saldo a favor se descuenta solo en tu próxima compra. Si preferís la devolución, escribinos por WhatsApp.');
+  }
+  if (reintegroWa) notas.push('Lo que ya estaba pago te lo devolvemos: después te damos el WhatsApp para pedir el reintegro.');
+  if (notas.length) html += `<div class="cf-nota">${notas.join('<br>')}</div>`;
+  if (!await confirmar('Confirmá tu cambio', '', 'Confirmar', S.tipo === 'BAJA' && S.modoBaja !== 'otroDia', html)) return;
+  cargando(true, 'Guardando…');
+  let hechos = 0;
+  try {
+    let r = null, avisos = '';
+    const mensajes = [];
+    for (const q of (reqs || [req])) {
+      r = await api('guardar', Object.assign({ vista: d.fecha }, q));
+      hechos++;
+      mensajes.push(r.mensaje);
+      avisos += avisoPago(r);
+    }
+    await cargarDia(r.dia);                                   // el guardado ya devolvió cómo quedó el día
+    pintarMisCambios(r.cambios); pintarPendientes(r.pendientes); pintarSaldo(r.saldo);
+    $('estadoDia').insertAdjacentHTML('afterbegin', msg('ok exito', '<span><b>¡Listo!</b> ' + esc(mensajes.join(' · ')) + '.</span>') + avisos);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    if (hechos) { try { await cargarDia(); cargarMisCambios(); } catch (x) { } }   
+    let h = msg('error', esc(e.message));
+    if (/FUERA_DE_HORARIO/.test(e.codigo || '')) h += botonWa();
+    if (hechos) $('estadoDia').insertAdjacentHTML('afterbegin', h); else $('msgGuardar').innerHTML = h;   
+  }
+  cargando(false);
+}
+
+
+async function cargarMisCambios() {
+  try {
+    const r = await api('misCambios');
+    pintarMisCambios(r.cambios); pintarSaldo(r.saldo); pintarPendientes(r.pendientes);
+  } catch (e) { $('misCambios').innerHTML = `<li>${msg('error', esc(e.message))}</li>`; }
+}
+function pintarMisCambios(lista) {
+  $('misCambios').innerHTML = lista.length ? lista.map(c => `<li><div><b>${esc(c.fechaTxt)}</b> · ${esc(c.detalle)}<small>Cargado ${esc(c.creado)}</small></div>
+    ${c.anulable ? `<button class="peligro" onclick="anular('${esc(c.id)}')">Anular</button>` : '<small>cerrado</small>'}</li>`).join('')
+    : '<li class="nota">Todavía no hiciste cambios.</li>';
+}
+async function anular(id) {
+  if (!await confirmar('¿Anular este cambio?', 'Tu pedido vuelve a quedar como estaba antes de este cambio.', 'Sí, anular', true)) return;
+  cargando(true, 'Anulando…');
+  try {
+    const r = await api('anular', { id: id, vista: $('fecha').value });
+    pintarMisCambios(r.cambios); pintarSaldo(r.saldo); pintarPendientes(r.pendientes);
+    await cargarDia(r.dia);
+    if (r.devuelto || r.descontado) {
+      $('misCambios').insertAdjacentHTML('beforebegin', msg('info', (r.devuelto ? 'Lo que habías pagado por ese cambio (' + pesos(r.devuelto) + ') te quedó como saldo a favor. ' : '') +
+        (r.descontado ? 'Se descontaron ' + pesos(r.descontado) + ' del saldo a favor que te había dado ese cambio.' : '')));
+    }
+  } catch (e) { $('misCambios').insertAdjacentHTML('beforebegin', msg('error', esc(e.message))); }
+  cargando(false);
+}
+
+// ============ arranque ============
+(async function () {
+  
+  const sso = new URLSearchParams(location.search).get('sso');
+  if (sso) {
+    try { const u = new URL(location.href); u.searchParams.delete('sso'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { }
+    cargando(true, 'Ingresando…');
+    try {
+      const r = await api('loginSSO', { t: sso });
+      guardarToken(r.token);
+      await iniciar();
+      cargando(false);
+      return;
+    } catch (e) {
+      cargando(false);
+      if (e.codigo !== 'SESION') mostrarLogin(e.message + ' Ingresá con tu mail y clave.');
+      return;
+    }
+  }
+  const t = leerToken();
+  if (!t) return mostrarLogin();
+  S.token = t;
+  cargando(true);
+  try { await iniciar(); } catch (e) { if (e.codigo !== 'SESION') mostrarLogin(e.message); }
+  cargando(false);
 })();
 </script>
 </body>
