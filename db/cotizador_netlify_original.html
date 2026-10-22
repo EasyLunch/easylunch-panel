@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=dc276a03-ba7c-49dc-aaa0-6a7f68233448
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Easy Lunch — Cotizador</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green-dark: #1a5c30;
+  --green: #2e8b57;
+  --green-light: #e8f5e9;
+  --green-mid: #a5d6a7;
+  --orange: #e65100;
+  --orange-light: #fff3e0;
+  --red: #b71c1c;
+  --red-light: #ffebee;
+  --grey: #607d8b;
+  --grey-light: #f5f7f8;
+  --border: #dde3e7;
+  --text: #2d3a2d;
+  --text-muted: #78909c;
+  --shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+  background: #eef2ee;
+  color: var(--text);
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+header {
+  background: linear-gradient(135deg, var(--green-dark), var(--green));
+  color: white;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+header h1 { font-size: 1.1rem; font-weight: 700; }
+header .badge {
+  margin-left: auto;
+  background: rgba(255,255,255,0.2);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.75rem;
+}
+.btn-cotizador {
+  background: rgba(255,255,255,0.15);
+  border: 1.5px solid rgba(255,255,255,0.5);
+  color: white;
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s;
+}
+.btn-cotizador:hover { background: rgba(255,255,255,0.28); }
+
+/* ── LAYOUT ── */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  padding: 16px 24px;
+  max-width: 1300px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+/* ── LEFT PANEL ── */
+.left { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── SECTIONS ── */
+.section {
+  background: white;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  padding: 11px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: white;
+  border-bottom: 2px solid var(--green-light);
+  gap: 8px;
+}
+.section-header .icon { font-size: 1rem; }
+.section-header h2 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--green-dark); flex: 1; }
+.section-header .total-badge {
+  background: var(--green-light);
+  color: var(--green-dark);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.section-header .chevron { color: var(--text-muted); font-size: 0.7rem; transition: transform 0.2s; }
+.section-header.collapsed .chevron { transform: rotate(-90deg); }
+.section-body { padding: 12px 16px 14px; }
+.section-body.hidden { display: none; }
+
+/* ── INGRESOS (special) ── */
+.ing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ing-field label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+.ing-field input {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--green-dark);
+  transition: border-color 0.15s;
+}
+.ing-field input:focus { outline: none; border-color: var(--green); }
+.ing-result {
+  display: flex;
+  gap: 10px;
+}
+.ing-chip {
+  background: var(--green-light);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  color: var(--green-dark);
+}
+.ing-chip strong { font-size: 0.95rem; display: block; }
+
+/* ── COST ROWS ── */
+.cost-row {
+  display: grid;
+  grid-template-columns: 1fr 130px 64px 28px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.cost-row input[type=text] {
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 0.82rem;
+  color: var(--text);
+  width: 100%;
+}
+.cost-row input[type=text]:focus { outline: none; border-color: var(--green); }
+.cost-row input[type=number] {
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+  width: 100%;
+  color: var(--text);
+}
+.cost-row input[type=number]:focus { outline: none; border-color: var(--green); }
+.unit-toggle {
+  display: flex;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 30px;
+}
+.unit-toggle button {
+  flex: 1;
+  border: none;
+  background: white;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  padding: 0;
+}
+.unit-toggle button.active {
+  background: var(--green-dark);
+  color: white;
+}
+.del-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ccc;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.del-btn:hover { background: var(--red-light); color: var(--red); }
+
+/* ── EMPLOYEE ROWS ── */
+.emp-row {
+  display: grid;
+  grid-template-columns: 1fr 140px 28px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.emp-row input[type=text] {
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 0.82rem;
+  width: 100%;
+}
+.emp-row input[type=text]:focus { outline: none; border-color: var(--green); }
+.emp-row input[type=number] {
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: right;
+  width: 100%;
+}
+.emp-row input[type=number]:focus { outline: none; border-color: var(--green); }
+.emp-prefix {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+  grid-column: 1 / -1;
+}
+
+/* ── ADD BUTTON ── */
+.add-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: all 0.15s;
+  width: auto;
+}
+.add-btn:hover { border-color: var(--green); color: var(--green); background: var(--green-light); }
+
+/* ── DIVIDER ── */
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 10px 0;
+}
+
+/* ── COL HEADERS ── */
+.col-labels {
+  display: grid;
+  grid-template-columns: 1fr 130px 64px 28px;
+  gap: 6px;
+  padding: 0 0 4px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+
+/* ── RIGHT PANEL ── */
+.right {
+  position: sticky;
+  top: 56px;
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+}
+.results {
+  background: white;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: visible;
+}
+.results-header {
+  background: var(--green-dark);
+  color: white;
+  padding: 12px 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.results-body { padding: 14px 16px; }
+
+.res-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--grey-light);
+  font-size: 0.82rem;
+}
+.res-line:last-child { border-bottom: none; }
+.res-line .rname { color: var(--text-muted); }
+.res-line .rval { font-weight: 600; color: var(--text); }
+.res-line .rval.neg { color: var(--red); }
+.res-line .rval.pos { color: var(--green-dark); }
+.res-line.subtotal { margin-top: 2px; }
+.res-line.subtotal .rname, .res-line.subtotal .rval { color: var(--text); font-weight: 700; font-size: 0.86rem; }
+
+.ebitda-box {
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+  text-align: center;
+}
+.ebitda-box.pos { background: var(--green-light); border: 1.5px solid var(--green-mid); }
+.ebitda-box.neg { background: var(--red-light); border: 1.5px solid #ef9a9a; }
+.ebitda-box .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); }
+.ebitda-box .amount { font-size: 1.6rem; font-weight: 800; margin: 2px 0; }
+.ebitda-box.pos .amount { color: var(--green-dark); }
+.ebitda-box.neg .amount { color: var(--red); }
+.ebitda-box .margin { font-size: 0.78rem; color: var(--text-muted); }
+
+.socio-box {
+  background: var(--orange-light);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.socio-box .label { font-size: 0.72rem; color: var(--orange); text-transform: uppercase; font-weight: 600; }
+.socio-box .val { font-size: 1rem; font-weight: 800; color: var(--orange); }
+
+/* Waterfall */
+.waterfall { margin-top: 12px; }
+.waterfall h3 { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); margin-bottom: 8px; }
+.wf-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 0.72rem; }
+.wf-label { width: 90px; text-align: right; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wf-track { flex: 1; background: var(--grey-light); border-radius: 3px; height: 16px; overflow: hidden; }
+.wf-bar { height: 100%; border-radius: 3px; display: flex; align-items: center; padding: 0 5px; font-size: 0.65rem; font-weight: 700; color: white; white-space: nowrap; min-width: 4px; }
+.bg-green { background: var(--green); }
+.bg-red { background: var(--red); }
+.bg-orange { background: #ef6c00; }
+.bg-grey { background: var(--grey); }
+.bg-purple { background: #6a1b9a; }
+
+.socios-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.socios-ctrl input {
+  width: 48px;
+  border: 1.5px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.break-even {
+  background: var(--grey-light);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+}
+.break-even .be-title { font-weight: 700; color: var(--text-muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.be-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.be-row .be-val { font-weight: 700; color: var(--green-dark); }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.4rem">🥗</span>
+  <h1>Easy Lunch — Cotizador de Sensibilidad</h1>
+  <div class="badge" id="header-ebitda">Calculando...</div>
+  <a class='btn-cotizador' href='/easylunch_cotizador_clientes' target='_blank'>🤝 Cotizar cliente</a>
+</header>
+
+<div class="layout">
+  <!-- ══ LEFT ══ -->
+  <div class="left">
+
+    <!-- INGRESOS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">💰</span>
+        <h2>Ingresos</h2>
+        <span class="total-badge" id="badge-ingresos">$0</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body" id="body-ingresos">
+        <div class="ing-grid">
+          <div class="ing-field">
+            <label>Viandas / día</label>
+            <input type="number" id="ing-viandas" value="120" min="1" oninput="recalc()">
+          </div>
+          <div class="ing-field">
+            <label>Días operativos / mes</label>
+            <input type="number" id="ing-dias" value="21" min="1" max="31" oninput="recalc()">
+          </div>
+          <div class="ing-field">
+            <label>Precio promedio sin IVA ($)</label>
+            <input type="number" id="ing-precio" value="10000" min="0" oninput="recalc()">
+          </div>
+        </div>
+        <div class="ing-result" id="ing-result"></div>
+      </div>
+    </div>
+
+    <!-- COSTOS VARIABLES -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">🥩</span>
+        <h2>Costos Variables</h2>
+        <span class="total-badge" id="badge-cv">$0</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body" id="body-cv">
+        <div class="col-labels">
+          <span>Concepto</span><span style="text-align:right">Valor</span><span style="text-align:center">Unidad</span><span></span>
+        </div>
+        <div id="list-cv"></div>
+        <button class="add-btn" onclick="addRow('cv')">＋ Agregar ítem</button>
+      </div>
+    </div>
+
+    <!-- GASTOS FIJOS INDIRECTOS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">🏢</span>
+        <h2>Gastos Fijos Indirectos</h2>
+        <span class="total-badge" id="badge-gfi">$0</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body" id="body-gfi">
+        <div class="col-labels">
+          <span>Concepto</span><span style="text-align:right">Valor / mes</span><span style="text-align:center">Unidad</span><span></span>
+        </div>
+        <div id="list-gfi"></div>
+        <button class="add-btn" onclick="addRow('gfi')">＋ Agregar ítem</button>
+      </div>
+    </div>
+
+    <!-- GASTOS FIJOS DIRECTOS -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">👨‍🍳</span>
+        <h2>Gastos Fijos Directos (Personal)</h2>
+        <span class="total-badge" id="badge-gfd">$0</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body" id="body-gfd">
+        <p class="emp-prefix">Sueldos brutos mensuales</p>
+        <div id="list-empleados"></div>
+        <button class="add-btn" onclick="addEmpleado()">＋ Agregar empleado</button>
+        <hr class="section-divider">
+        <div class="col-labels" style="grid-template-columns: 1fr 130px 64px 28px;">
+          <span>Cargas y seguros</span><span style="text-align:right">Valor</span><span style="text-align:center">Unidad</span><span></span>
+        </div>
+        <div id="list-gfd"></div>
+        <button class="add-btn" onclick="addRow('gfd')">＋ Agregar ítem</button>
+      </div>
+    </div>
+
+    <!-- IMPOSITIVO -->
+    <div class="section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span class="icon">🧾</span>
+        <h2>Carga Impositiva</h2>
+        <span class="total-badge" id="badge-imp">$0</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="section-body" id="body-imp">
+        <div class="col-labels">
+          <span>Concepto</span><span style="text-align:right">Valor</span><span style="text-align:center">Unidad</span><span></span>
+        </div>
+        <div id="list-imp"></div>
+        <button class="add-btn" onclick="addRow('imp')">＋ Agregar ítem</button>
+      </div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- ══ RIGHT ══ -->
+  <div class="right">
+    <div class="results">
+      <div class="results-header">Resultado mensual</div>
+      <div class="results-body">
+        <div id="ebitda-box" class="ebitda-box pos">
+          <div class="label">EBITDA mensual</div>
+          <div class="amount" id="res-ebitda">$0</div>
+          <div class="margin" id="res-margin">— %</div>
+        </div>
+
+        <div class="socio-box">
+          <div>
+            <div class="label">Por socio</div>
+            <div class="val" id="res-socio">$0</div>
+          </div>
+          <div class="socios-ctrl">
+            <span># socios:</span>
+            <input type="number" id="n-socios" value="2" min="1" max="10" oninput="recalc()">
+          </div>
+        </div>
+
+        <div id="res-lines"></div>
+
+        <div class="waterfall" id="waterfall"></div>
+
+        <div class="break-even" id="break-even-box"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<script>
+// ─────────────────────────────────────────
+// ESTADO
+// ─────────────────────────────────────────
+let uid = 0;
+const nextId = () => ++uid;
+
+// Secciones con datos precargados
+const sections = {
+  cv: [],
+  gfi: [],
+  gfd: [],
+  imp: [],
+};
+const empleados = [];
+
+// ─────────────────────────────────────────
+// DATOS INICIALES
+// ─────────────────────────────────────────
+function initData() {
+  // Costos variables
+  [
+    { name: 'Costo materia prima (elaboración propia)', val: 30, unit: '%' },
+    { name: 'Packaging / bolsas', val: 15, unit: '$' },
+    { name: 'Etiquetas', val: 15, unit: '$' },
+    { name: 'Descartables (cubiertos, vasos, etc.)', val: 0, unit: '$' },
+    { name: 'Aderezos', val: 0, unit: '$' },
+    { name: 'Pan', val: 0, unit: '$' },
+    { name: 'Otros insumos', val: 0, unit: '$' },
+  ].forEach(r => sections.cv.push({ id: nextId(), ...r }));
+
+  // GF Indirectos
+  [
+    { name: 'Alquiler', val: 2500000, unit: '$' },
+    { name: 'Expensas', val: 0, unit: '$' },
+    { name: 'Luz', val: 200000, unit: '$' },
+    { name: 'Gas', val: 100000, unit: '$' },
+    { name: 'Internet / teléfono', val: 30000, unit: '$' },
+    { name: 'Seguros (local)', val: 80000, unit: '$' },
+    { name: 'Desinfección', val: 60000, unit: '$' },
+    { name: 'ABL / Impuestos municipales', val: 0, unit: '$' },
+    { name: 'Honorarios Contador', val: 260000, unit: '$' },
+    { name: 'Honorarios Logística', val: 0, unit: '$' },
+    { name: 'Servicio de motos', val: 1785000, unit: '$' },
+    { name: 'Marketing y comercial', val: 250000, unit: '$' },
+    { name: 'Sistemas / software', val: 100000, unit: '$' },
+    { name: 'Mantenimiento', val: 200000, unit: '$' },
+  ].forEach(r => sections.gfi.push({ id: nextId(), ...r }));
+
+  // GF Directos — cargas y seguros
+  [
+    { name: 'Cargas sociales (sobre sueldos)', val: 25, unit: '%' },
+    { name: 'ART', val: 0, unit: '$' },
+    { name: 'Seguro de AP', val: 0, unit: '$' },
+    { name: 'Otros (obra social, etc.)', val: 0, unit: '$' },
+  ].forEach(r => sections.gfd.push({ id: nextId(), ...r }));
+
+  // Empleados
+  [
+    { id: nextId(), name: 'Jefe de cocina', val: 1800000 },
+    { id: nextId(), name: 'Ayudante de cocina', val: 1850000 },
+  ].forEach(e => empleados.push(e));
+
+  // Impositivo
+  [
+    { name: 'IIBB (Ingresos Brutos)', val: 4.5, unit: '%' },
+    { name: 'Imp. Créditos y Débitos', val: 1.2, unit: '%' },
+    { name: 'IVA neto (saldo técnico)', val: 0, unit: '$' },
+    { name: 'Gastos bancarios', val: 0, unit: '$' },
+    { name: 'Autónomo / Monotributo', val: 240000, unit: '$' },
+    { name: 'Gastos societarios', val: 0, unit: '$' },
+  ].forEach(r => sections.imp.push({ id: nextId(), ...r }));
+}
+
+// ─────────────────────────────────────────
+// RENDER
+// ─────────────────────────────────────────
+function renderAll() {
+  renderSection('cv');
+  renderSection('gfi');
+  renderSection('gfd');
+  renderSection('imp');
+  renderEmpleados();
+  recalc();
+}
+
+function renderSection(key) {
+  const container = document.getElementById('list-' + key);
+  container.innerHTML = sections[key].map(row => rowHTML(row, key)).join('');
+  attachRowEvents(key);
+}
+
+function rowHTML(row, key) {
+  const isPct = row.unit === '%';
+  const step = isPct ? '0.1' : '1000';
+  const placeholder = isPct ? '0.0' : '0';
+  return `<div class="cost-row" id="row-${row.id}">
+    <input type="text" value="${row.name}" placeholder="Concepto"
+      onchange="updateRowName('${key}',${row.id},this.value)">
+    <input type="number" value="${row.val}" min="0" step="${step}" placeholder="${placeholder}"
+      oninput="updateRowVal('${key}',${row.id},this.value)">
+    <div class="unit-toggle">
+      <button class="${!isPct?'active':''}" onclick="setUnit('${key}',${row.id},'$')">$</button>
+      <button class="${isPct?'active':''}" onclick="setUnit('${key}',${row.id},'%')">%</button>
+    </div>
+    <button class="del-btn" onclick="delRow('${key}',${row.id})" title="Eliminar">✕</button>
+  </div>`;
+}
+
+function attachRowEvents(key) { /* events already inline */ }
+
+function renderEmpleados() {
+  const container = document.getElementById('list-empleados');
+  container.innerHTML = empleados.map(e => `
+    <div class="emp-row" id="emp-${e.id}">
+      <input type="text" value="${e.name}" placeholder="Nombre del empleado"
+        onchange="updateEmpName(${e.id},this.value)">
+      <input type="number" value="${e.val}" min="0" step="50000"
+        oninput="updateEmpVal(${e.id},this.value)">
+      <button class="del-btn" onclick="delEmp(${e.id})" title="Eliminar">✕</button>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────
+// ACCIONES
+// ─────────────────────────────────────────
+function addRow(key) {
+  sections[key].push({ id: nextId(), name: '', val: 0, unit: '$' });
+  renderSection(key);
+  // focus new name input
+  const rows = document.querySelectorAll(`#list-${key} .cost-row`);
+  if (rows.length) rows[rows.length-1].querySelector('input[type=text]').focus();
+}
+
+function delRow(key, id) {
+  sections[key] = sections[key].filter(r => r.id !== id);
+  renderSection(key);
+}
+
+function updateRowName(key, id, val) {
+  const r = sections[key].find(r => r.id === id);
+  if (r) r.name = val;
+}
+
+function updateRowVal(key, id, val) {
+  const r = sections[key].find(r => r.id === id);
+  if (r) { r.val = parseFloat(val) || 0; recalc(); }
+}
+
+function setUnit(key, id, unit) {
+  const r = sections[key].find(r => r.id === id);
+  if (r) { r.unit = unit; renderSection(key); recalc(); }
+}
+
+function addEmpleado() {
+  empleados.push({ id: nextId(), name: '', val: 0 });
+  renderEmpleados();
+  const rows = document.querySelectorAll('#list-empleados .emp-row');
+  if (rows.length) rows[rows.length-1].querySelector('input[type=text]').focus();
+}
+
+function delEmp(id) {
+  const idx = empleados.findIndex(e => e.id === id);
+  if (idx >= 0) { empleados.splice(idx, 1); renderEmpleados(); recalc(); }
+}
+
+function updateEmpName(id, val) {
+  const e = empleados.find(e => e.id === id);
+  if (e) e.name = val;
+}
+
+function updateEmpVal(id, val) {
+  const e = empleados.find(e => e.id === id);
+  if (e) { e.val = parseFloat(val) || 0; recalc(); }
+}
+
+// ─────────────────────────────────────────
+// CÁLCULO
+// ─────────────────────────────────────────
+function recalc() {
+  const viandas = parseFloat(document.getElementById('ing-viandas').value) || 0;
+  const dias = parseFloat(document.getElementById('ing-dias').value) || 0;
+  const precio = parseFloat(document.getElementById('ing-precio').value) || 0;
+  const nSocios = parseFloat(document.getElementById('n-socios').value) || 1;
+
+  const ingresos = viandas * dias * precio;
+  const totalViandas = viandas * dias;
+
+  // Costos variables → valor POR VIANDA ($ = por vianda, % = sobre precio)
+  let totalCV = 0;
+  sections.cv.forEach(r => {
+    if (r.unit === '$') totalCV += r.val * totalViandas;
+    else totalCV += (r.val / 100) * ingresos;
+  });
+
+  const cm = ingresos - totalCV;
+  const cmPct = ingresos > 0 ? cm / ingresos : 0;
+
+  // GF Indirectos (todos fijos en $, algunos % de ingresos)
+  let totalGFI = 0;
+  sections.gfi.forEach(r => {
+    if (r.unit === '$') totalGFI += r.val;
+    else totalGFI += (r.val / 100) * ingresos;
+  });
+
+  // Empleados
+  const totalSueldos = empleados.reduce((a, e) => a + e.val, 0);
+
+  // GF Directos (cargas sobre sueldos, etc.)
+  let totalCargasYOtros = 0;
+  sections.gfd.forEach(r => {
+    if (r.unit === '$') totalCargasYOtros += r.val;
+    else totalCargasYOtros += (r.val / 100) * totalSueldos;
+  });
+  const totalGFD = totalSueldos + totalCargasYOtros;
+
+  // Impositivo
+  let totalImp = 0;
+  sections.imp.forEach(r => {
+    if (r.unit === '$') totalImp += r.val;
+    else totalImp += (r.val / 100) * ingresos;
+  });
+
+  const totalGastos = totalCV + totalGFI + totalGFD + totalImp;
+  const ebitda = ingresos - totalGastos;
+  const margin = ingresos > 0 ? ebitda / ingresos : 0;
+  const ebitdaSocio = ebitda / nSocios;
+
+  // Break even
+  const costosFijos = totalGFI + totalGFD + totalImp;
+  const cmUnit = precio > 0 ? (cm / totalViandas || 0) : 0;
+  const beViandas = cmUnit > 0 ? Math.ceil(costosFijos / cmUnit) : 0;
+  const beDia = dias > 0 ? Math.ceil(beViandas / dias) : 0;
+
+  // ── UPDATE UI ──
+  updateIngResult(ingresos, totalViandas, precio);
+  updateBadge('badge-ingresos', ingresos);
+  updateBadge('badge-cv', totalCV);
+  updateBadge('badge-gfi', totalGFI);
+  updateBadge('badge-gfd', totalGFD);
+  updateBadge('badge-imp', totalImp);
+
+  // EBITDA box
+  const box = document.getElementById('ebitda-box');
+  box.className = 'ebitda-box ' + (ebitda >= 0 ? 'pos' : 'neg');
+  document.getElementById('res-ebitda').textContent = fmtM(ebitda);
+  document.getElementById('res-margin').textContent = fmtP(margin) + ' margen';
+  document.getElementById('res-socio').textContent = fmtM(ebitdaSocio);
+  document.getElementById('header-ebitda').textContent = 'EBITDA ' + fmtM(ebitda) + ' · ' + fmtP(margin);
+
+  // Lines
+  const lines = [
+    { name: 'Ingresos brutos', val: ingresos, pos: true },
+    { name: 'Costos variables', val: -totalCV, neg: true },
+    { name: 'Contribución Marginal', val: cm, subtotal: true, extra: fmtP(cmPct) },
+    { name: 'GF Indirectos', val: -totalGFI, neg: true },
+    { name: 'GF Directos (personal)', val: -totalGFD, neg: true },
+    { name: 'Carga impositiva', val: -totalImp, neg: true },
+    { name: 'EBITDA', val: ebitda, subtotal: true },
+    { name: 'EBITDA anual proy.', val: ebitda * 12, subtotal: false },
+  ];
+  document.getElementById('res-lines').innerHTML = lines.map(l => {
+    const cls = l.subtotal ? 'subtotal' : '';
+    const vcls = l.val < 0 ? 'neg' : l.val > 0 ? 'pos' : '';
+    const extra = l.extra ? `<span style="font-size:0.7rem;color:var(--text-muted);margin-left:4px">${l.extra}</span>` : '';
+    return `<div class="res-line ${cls}">
+      <span class="rname">${l.name}</span>
+      <span class="rval ${vcls}">${fmtM(l.val)}${extra}</span>
+    </div>`;
+  }).join('');
+
+  // Waterfall
+  const max = ingresos || 1;
+  const wfItems = [
+    { label: 'Ingresos', val: ingresos, cls: 'bg-green' },
+    { label: 'Costos var.', val: totalCV, cls: 'bg-red' },
+    { label: 'GF Indirec.', val: totalGFI, cls: 'bg-orange' },
+    { label: 'Personal', val: totalGFD, cls: 'bg-grey' },
+    { label: 'Impositivo', val: totalImp, cls: 'bg-purple' },
+    { label: 'EBITDA', val: Math.abs(ebitda), cls: ebitda >= 0 ? 'bg-green' : 'bg-red' },
+  ];
+  document.getElementById('waterfall').innerHTML = `<h3>Cascada</h3>` +
+    wfItems.map(item => {
+      const pct = Math.min(100, item.val / max * 100);
+      return `<div class="wf-row">
+        <div class="wf-label">${item.label}</div>
+        <div class="wf-track">
+          <div class="wf-bar ${item.cls}" style="width:${Math.max(2, pct)}%">${pct > 12 ? fmtM(item.val) : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+  // Break even
+  document.getElementById('break-even-box').innerHTML = `
+    <div class="be-title">Break Even</div>
+    <div class="be-row"><span>Viandas necesarias / mes</span><span class="be-val">${beViandas.toLocaleString('es-AR')}</span></div>
+    <div class="be-row"><span>Viandas necesarias / día</span><span class="be-val">${beDia}</span></div>
+    <div class="be-row"><span>Viandas actuales / día</span><span class="be-val">${viandas}</span></div>
+    <div class="be-row" style="color:${viandas >= beDia ? 'var(--green-dark)' : 'var(--red)'}">
+      <span>Colchón</span>
+      <span class="be-val" style="color:inherit">${viandas >= beDia ? '+' : ''}${viandas - beDia} viandas/día</span>
+    </div>
+    <div class="be-row"><span>CM por vianda</span><span class="be-val">${fmtM(cmUnit)}</span></div>
+  `;
+}
+
+function updateIngResult(ingresos, totalViandas, precio) {
+  document.getElementById('ing-result').innerHTML = `
+    <div class="ing-chip"><label>Viandas / mes</label><strong>${totalViandas.toLocaleString('es-AR')}</strong></div>
+    <div class="ing-chip"><label>Ingresos mensuales</label><strong>${fmtM(ingresos)}</strong></div>
+    <div class="ing-chip"><label>Ingresos anuales</label><strong>${fmtM(ingresos * 12)}</strong></div>
+  `;
+}
+
+// ─────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────
+function fmtM(n) {
+  const abs = Math.round(Math.abs(n));
+  const str = '$' + abs.toLocaleString('es-AR');
+  return n < 0 ? '(' + str + ')' : str;
+}
+function fmtP(n) { return (n * 100).toFixed(1) + '%'; }
+
+function updateBadge(id, val) {
+  document.getElementById(id).textContent = fmtM(val);
+}
+
+function toggleSection(header) {
+  header.classList.toggle('collapsed');
+  const body = header.nextElementSibling;
+  body.classList.toggle('hidden');
+}
+
+// ─────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────
+initData();
+renderAll();
+</script>
+</body>
+</html>
