@@ -983,7 +983,29 @@ function buildSheets(){
           <tbody>${rows}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="q">${st.load}</td><td class="q">${tp}</td><td class="q">${tb}</td>${pr.eta?"<td></td>":""}<td></td>${pr.sign?"<td></td>":""}</tr></tfoot></table>
           <div class="sh-foot"><span>Chofer: ______________________</span><span>Easy Lunch · ${esc(S.config.depotName)}</span></div></section>`);
       }});});
-  return {pages,missing};
+  return {pages:pr.format==="remito"?pages:paginarHojas(pages),missing};
+}
+/* Una hoja de ruta con muchas entregas no entra en un A4: se mide cada hoja y, si se pasa, las filas que sobran
+   siguen en otra hoja (con el mismo encabezado y "Hoja 2 de 2"). El total queda solo en la última. */
+function paginarHojas(pages){
+  if(!pages.length)return pages;
+  const box=document.createElement("div");box.style.cssText="position:absolute;left:-10000px;top:0;width:210mm;visibility:hidden;pointer-events:none";
+  box.innerHTML=pages.join("");document.body.appendChild(box);
+  const lim=box.offsetWidth/210*297+1;const out=[];
+  try{
+    [...box.querySelectorAll(".sheet")].forEach(sh=>{
+      const tb=sh.querySelector("table.sh tbody");
+      if(!tb||sh.offsetHeight<=lim){out.push(sh.outerHTML);return;}
+      const rows=[...tb.children];const tpl=sh.cloneNode(true);tpl.querySelector("table.sh tbody").innerHTML="";
+      const hojas=[];let cur=null;
+      const nueva=()=>{cur=tpl.cloneNode(true);box.appendChild(cur);hojas.push(cur);return cur.querySelector("table.sh tbody");};
+      let body=nueva();
+      rows.forEach(r=>{body.appendChild(r);if(cur.offsetHeight>lim&&body.children.length>1){body.removeChild(r);body=nueva();body.appendChild(r);}});
+      hojas.forEach((h,i)=>{if(i<hojas.length-1){const tf=h.querySelector("table.sh tfoot");if(tf)tf.remove();}
+        const sp=h.querySelector(".sh-title span");if(sp)sp.textContent+=" · Hoja "+(i+1)+" de "+hojas.length;out.push(h.outerHTML);});
+    });
+  }finally{box.remove();}
+  return out;
 }
 function renderHojas(){
   S.print=S.print||{...P0};const pr=S.print;const ALL=vehicles();
