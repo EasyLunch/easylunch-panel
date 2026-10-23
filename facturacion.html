@@ -374,6 +374,9 @@ function isVal(v) {
 function detectPlateType(platoStr) {
     if(!isVal(platoStr)) return null;
     const s=String(platoStr).trim();
+    // Guarniciones: la comanda agrega una fila (y una etiqueta) "Ensalada del día - Guarnición" por cada plato que
+    // viene con ensalada del día (Balance & Fit, Chicken & Fit, milanesas…). Es parte del mismo plato: no se cobra.
+    if(/guarnici[oó]n/i.test(s)) return 'gratis';
     // Check zero-cost plates first
     if((DB.platos_gratis||[]).some(g=>s.toLowerCase().includes(g.toLowerCase()))) return 'gratis';
     if(/^XL\s/i.test(s)) return 'xl';
