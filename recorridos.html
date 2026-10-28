@@ -299,7 +299,9 @@ const km=(a,b)=>hav(a,b)*ROAD_FACTOR;
 const depot=()=>({lat:+S.config.depotLat,lng:+S.config.depotLng});
 const hasLoc=c=>c&&isFinite(c.lat)&&isFinite(c.lng)&&c.lat!==null&&c.lng!==null&&c.lat!==""&&c.lng!=="";
 const qty=(c,day)=>Math.max(0,+((c.qty||{})[day])||0);
-const qx=(c,day)=>{const x=(c&&c.qx&&c.qx[day])||{};return {p:+x.p||0,b:+x.b||0};};
+const qx=(c,day)=>{const x=(c&&c.qx&&c.qx[day])||{};return {p:+x.p||0,b:+x.b||0,r:+x.r||0,rt:x.rt||""};};
+/* Reventa (Nero Catering → HIT Café): productos sin etiqueta que van en la parada de la sede; no cuentan como viandas */
+const revNota=(c,day)=>{const x=qx(c,day);return x.r?x.rt||("REVENTA: "+x.r+" (bolsa, sin etiqueta)"):"";};
 /* postres y bebidas por cliente y día (del sistema), con la misma asociación empresa→cliente que las viandas */
 /* Degustaciones (las carga la app de Modificaciones: clientes "deg_<id>" con deg={fecha,viandas,postres}): solo cuentan la semana de su fecha */
 function degQ(c,days){const g=c&&c.deg;const o={q:{},x:{}};if(!g||!g.fecha)return o;const dk=(days.find(d=>d[1]===g.fecha)||[])[0];if(!dk)return o;if(+g.viandas)o.q[dk]=+g.viandas;if(+g.postres)o.x[dk]={p:+g.postres,b:0};return o;}
@@ -319,7 +321,7 @@ async function aplicarFichasFijas(){const movidos=new Set(),cambios=[];
     if(JSON.stringify(nc)!==JSON.stringify(c)){S.clients[c.id]=nc;cambios.push(nc);}});
   for(const c of cambios){try{await sbUpsert("rutas_clientes",{id:c.id,data:c,updated_at:now()});}catch(e){onWriteErr(e);}}
   return movidos;}
-function extrasPorCliente(extras,days,empMap){const out={};(extras||[]).forEach(e=>{const m=empMap[e.id_empresa];if(!m||m==="_ign"||!S.clients[m])return;const dk=(days.find(d=>d[1]===e.fecha)||[])[0];if(!dk)return;const o=out[m]||(out[m]={});const x=o[dk]||(o[dk]={p:0,b:0});x.p+=e.postres||0;x.b+=e.bebidas||0;});return out;}
+function extrasPorCliente(extras,days,empMap){const out={};(extras||[]).forEach(e=>{const m=empMap[e.id_empresa];if(!m||m==="_ign"||!S.clients[m])return;const dk=(days.find(d=>d[1]===e.fecha)||[])[0];if(!dk)return;const o=out[m]||(out[m]={});const x=o[dk]||(o[dk]={p:0,b:0});x.p+=e.postres||0;x.b+=e.bebidas||0;if(+e.reventa){x.r=(x.r||0)+(+e.reventa);x.rt=[x.rt,e.reventaTxt].filter(Boolean).join(" · ");}});return out;}
 function parseLoc(txt){
   if(!txt)return null;txt=String(txt).trim();
   let m=txt.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||txt.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||txt.match(/[?&](?:q|query|ll|destination)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i)||txt.match(/(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)/);
@@ -664,7 +666,7 @@ function gmapsLinks(t){
 function tripText(t,day,st){
   const C=S.clients;st=st||tripStats(t.stops,day);const dn=DAYS.find(d=>d[0]===day)[2];
   let s=`*Recorrido ${dn} — ${vanName(t.van)}${t.trip>1?" (viaje "+t.trip+")":""}*\nSalida ${min2hm(st.start)} desde ${S.config.depotName}\n`;
-  t.stops.forEach((id,i)=>{const c=C[id];s+=`${i+1}. ${c.name} — ${c.address||""} — ${qty(c,day)} viandas — ~${min2hm(st.etas[i])}${c.notes?" ("+c.notes+")":""}\n`;});
+  t.stops.forEach((id,i)=>{const c=C[id];s+=`${i+1}. ${c.name} — ${c.address||""} — ${qty(c,day)} viandas — ~${min2hm(st.etas[i])}${c.notes?" ("+c.notes+")":""}${revNota(c,day)?" — "+revNota(c,day):""}\n`;});
   s+=`Total: ${st.load} viandas · ${st.km.toFixed(1)} km\n`;gmapsLinks(t).forEach((l,i,a)=>s+=`Mapa${a.length>1?" tramo "+(i+1):""}: ${l}\n`);return s;
 }
 function renderRutas(){
@@ -726,7 +728,7 @@ function renderRutas(){
       h+=`<li class="stop" draggable="${!S.readOnly}" data-t="${ti}" data-i="${i}">
         <span class="n" style="background:${col}">${i+1}</span>
         <div><div class="nm">${esc(c.name)}</div><div class="ad">${esc(c.address||"")}</div>
-          <div class="meta"><span class="num">${qty(c,day)} viandas</span><span class="num">~${min2hm(eta)}</span>${transOk(c,V)?"":`<span class="chip aprox">pide ${TRANS[ctrans(c)].toLowerCase()}</span>`}${late?`<span class="chip late">llega tarde (antes de ${esc(c.before)})</span>`:c.before?`<span class="chip">antes de ${esc(c.before)}</span>`:""}</div></div>
+          <div class="meta"><span class="num">${qty(c,day)} viandas</span>${qx(c,day).r?`<span class="chip" style="background:#ede7f6;color:#5b21b6" title="${esc(revNota(c,day))}">+${qx(c,day).r} reventa</span>`:""}<span class="num">~${min2hm(eta)}</span>${transOk(c,V)?"":`<span class="chip aprox">pide ${TRANS[ctrans(c)].toLowerCase()}</span>`}${late?`<span class="chip late">llega tarde (antes de ${esc(c.before)})</span>`:c.before?`<span class="chip">antes de ${esc(c.before)}</span>`:""}</div></div>
         <div class="acts">
           <button class="btn ghost icon" data-up="${ti}:${i}" aria-label="Subir" ${i===0?"disabled":""}>↑</button>
           <button class="btn ghost icon" data-down="${ti}:${i}" aria-label="Bajar" ${i===t.stops.length-1?"disabled":""}>↓</button>
@@ -971,12 +973,12 @@ function buildSheets(){
           <div class="rm-grid"><div><small>Cliente</small><b>${esc(c.name)}</b></div><div><small>Fecha</small><b>${date}</b></div>
           <div><small>Dirección</small><b>${esc(c.address||"")}</b></div><div><small>Platos · Postres · Bebidas</small><span class="rm-q">${qty(c,k)}</span> <b>· ${qx(c,k).p} · ${qx(c,k).b}</b></div>
           <div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Parada</small><b>${i+1} de ${t.stops.length}${pr.eta?" · ~"+min2hm(st.etas[i]):""}</b></div></div>
-          <div class="rm-ins"><small>Aclaraciones / instrucciones de entrega</small>${esc(c.notes||"")}</div>
+          <div class="rm-ins"><small>Aclaraciones / instrucciones de entrega</small>${revNota(c,k)?`<b>${esc(revNota(c,k))}</b><br>`:""}${esc(c.notes||"")}</div>
           <div class="rm-sign"><div>Recibí conforme (firma)</div><div>Aclaración</div><div>Hora de entrega</div></div></div>`;});
         for(let i=0;i<items.length;i+=2)pages.push(`<section class="sheet half">${items[i]}${items[i+1]?`<div class="cut"></div>${items[i+1]}`:""}</section>`);
       }else{
         const tp=t.stops.reduce((a,id)=>a+qx(C[id],k).p,0),tb=t.stops.reduce((a,id)=>a+qx(C[id],k).b,0);
-        const rows=t.stops.map((id,i)=>{const c=C[id],x=qx(c,k);return `<tr><td class="n">${i+1}</td><td><b>${esc(c.name)}</b></td><td>${esc(c.address||"")}</td><td class="q">${qty(c,k)}</td><td class="q">${x.p||""}</td><td class="q">${x.b||""}</td>${pr.eta?`<td class="h">~${min2hm(st.etas[i])}</td>`:""}<td class="ins"><div class="pre">${esc(c.notes||"")}</div>${c.notes?"":`<div class="lines"></div>`}</td>${pr.sign?`<td class="f"></td>`:""}</tr>`;}).join("");
+        const rows=t.stops.map((id,i)=>{const c=C[id],x=qx(c,k);return `<tr><td class="n">${i+1}</td><td><b>${esc(c.name)}</b></td><td>${esc(c.address||"")}</td><td class="q">${qty(c,k)}</td><td class="q">${x.p||""}</td><td class="q">${x.b||""}</td>${pr.eta?`<td class="h">~${min2hm(st.etas[i])}</td>`:""}<td class="ins">${revNota(c,k)?`<div class="pre"><b>${esc(revNota(c,k))}</b></div>`:""}<div class="pre">${esc(c.notes||"")}</div>${c.notes||revNota(c,k)?"":`<div class="lines"></div>`}</td>${pr.sign?`<td class="f"></td>`:""}</tr>`;}).join("");
         pages.push(`<section class="sheet">${sheetHead("Hoja de ruta",dn+" "+date)}
           <div class="sh-meta"><div><small>Fecha</small><b>${dn} ${date}</b></div><div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Salida</small><b>${min2hm(st.start)} · ${esc(S.config.depotName)}</b></div><div><small>Total</small><b>${st.load} platos · ${tp} postres · ${tb} bebidas · ${t.stops.length} entregas</b></div></div>
           <table class="sh"><thead><tr><th>#</th><th>Cliente</th><th>Dirección</th><th class="q">Platos</th><th class="q">Postres</th><th class="q">Bebidas</th>${pr.eta?"<th>Hora aprox.</th>":""}<th>Aclaraciones / instrucciones</th>${pr.sign?"<th>Firma recibí</th>":""}</tr></thead>
