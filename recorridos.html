@@ -368,10 +368,10 @@ function bestInsert(seq,id){let bi=seq.length,bc=Infinity;for(let i=0;i<=seq.len
 function tripStats(stops,day,startMin){
   const C=S.clients,cfg=S.config,tf=1+(Math.max(0,+cfg.traffic||0)/100);
   const sg=stopsSig(stops),g=GOOG[sg];let tfx=tf;let real=LEGS[sg];if(g&&g.legs.length>=stops.length+(cfg.returnToBase?1:0)){real=g.legs;tfx=1;}
-  const t0=(startMin!=null?startMin:hm2min(cfg.startTime));let t=t0,dist=0,load=0,prev=DK;const etas=[];let exact=!!real;
-  stops.forEach((id,i)=>{const l=real?real[i]:leg(prev,id);dist+=l.m;t+=l.s/60*tfx;etas.push(t);t+=+cfg.serviceMin||0;load+=qty(C[id],day);prev=id;});
+  const t0=(startMin!=null?startMin:hm2min(cfg.startTime));let t=t0,dist=0,load=0,rev=0,prev=DK;const etas=[];let exact=!!real;
+  stops.forEach((id,i)=>{const l=real?real[i]:leg(prev,id);dist+=l.m;t+=l.s/60*tfx;etas.push(t);t+=+cfg.serviceMin||0;const rv=qx(C[id],day).r;load+=qty(C[id],day)+rv;rev+=rv;prev=id;});
   if(cfg.returnToBase&&stops.length){const l=real?real[stops.length]:leg(prev,DK);if(l){dist+=l.m;t+=l.s/60*tfx;}}
-  return {km:dist/1000,load,etas,start:t0,end:t,dur:t-t0,exact,google:tfx===1&&!!g,gAt:g?g.at:null,traffic:g?g.traffic:null};
+  return {km:dist/1000,load,rev,platos:load-rev,etas,start:t0,end:t,dur:t-t0,exact,google:tfx===1&&!!g,gAt:g?g.at:null,traffic:g?g.traffic:null};
 }
 function planStats(r,day){
   const out=[],vEnd={};if(!r)return out;
@@ -438,7 +438,7 @@ function durTxt(m){m=Math.round(m);const h=Math.floor(m/60);return h?h+" h "+Str
 async function optimize(day){
   const C=S.clients,V=dayVehicles(day);const strat=S.config.strategy==="balance"?"balance":"min";
   const ids=Object.keys(C).filter(id=>qty(C[id],day)>0&&hasLoc(C[id]));
-  const load=id=>qty(C[id],day);await ensureMatrix(ids);
+  const load=id=>qty(C[id],day)+qx(C[id],day).r;await ensureMatrix(ids);
   const sd=(a,b)=>(leg(a,b).s+leg(b,a).s)/2;const rl=r=>r.reduce((s,id)=>s+load(id),0);
   const svc=(+S.config.serviceMin||0)*60;const rtime=seq=>seq.length?seqCost(seq)+svc*seq.length:0;
   // qué tipo de vehículo pide cada cliente (si ese día no sale ninguno de ese tipo, se ignora la preferencia)
@@ -667,7 +667,7 @@ function tripText(t,day,st){
   const C=S.clients;st=st||tripStats(t.stops,day);const dn=DAYS.find(d=>d[0]===day)[2];
   let s=`*Recorrido ${dn} — ${vanName(t.van)}${t.trip>1?" (viaje "+t.trip+")":""}*\nSalida ${min2hm(st.start)} desde ${S.config.depotName}\n`;
   t.stops.forEach((id,i)=>{const c=C[id];s+=`${i+1}. ${c.name} — ${c.address||""} — ${qty(c,day)} viandas — ~${min2hm(st.etas[i])}${c.notes?" ("+c.notes+")":""}${revNota(c,day)?" — "+revNota(c,day):""}\n`;});
-  s+=`Total: ${st.load} viandas · ${st.km.toFixed(1)} km\n`;gmapsLinks(t).forEach((l,i,a)=>s+=`Mapa${a.length>1?" tramo "+(i+1):""}: ${l}\n`);return s;
+  s+=`Total: ${st.platos} viandas${st.rev?" + "+st.rev+" reventa":""} · ${st.km.toFixed(1)} km\n`;gmapsLinks(t).forEach((l,i,a)=>s+=`Mapa${a.length>1?" tramo "+(i+1):""}: ${l}\n`);return s;
 }
 function renderRutas(){
   const day=S.day,C=S.clients,dn=DAYS.find(d=>d[0]===day)[2];const r=currentRoute(day);
@@ -713,8 +713,9 @@ function renderRutas(){
       <select class="vsel" data-veh="${ti}" aria-label="Vehículo de este viaje">${ALL.map(v=>`<option value="${v.idx}" ${v.idx===t.van?"selected":""}>${esc(v.name)}</option>`).join("")}${ALL.some(v=>v.idx===t.van)?"":`<option value="${t.van}" selected>${esc(V.name)}</option>`}</select>
       ${t.trip>1?`<span class="t">viaje ${t.trip}</span>`:""}
       <span class="m num">${t.stops.length} paradas · ${st.km.toFixed(1)} km · ${durTxt(st.dur)}${st.exact?"":" (aprox.)"}</span>${st.google?`<span class="chip ok" title="Calculado con el tránsito previsto para el ${esc(dn.toLowerCase())} a las ${min2hm(st.start)}">con tránsito</span>`:(S.config.useGoogle!==false&&!googleMissing&&t.stops.length?`<button class="btn small" data-gtrip="${ti}" title="Reordena y calcula horarios con el tránsito de Google">Actualizar con tránsito</button>`:"")}<span class="spacer"></span>
-      <span class="chip ${st.load>Q?"late":"ok"} num">${st.load}/${Q}</span>
+      <span class="chip ${st.load>Q?"late":"ok"} num" ${st.rev?`title="${st.platos} viandas + ${st.rev} de reventa"`:""}>${st.load}/${Q}</span>
       <div class="load"><i style="width:${pct}%;background:${st.load>Q?"var(--bad-ink)":col}"></i></div>
+      ${st.rev?`<div class="hint" style="flex-basis:100%">Incluye ${st.rev} de reventa (${st.platos} viandas + ${st.rev} wraps en bolsa).</div>`:""}
       ${st.load>Q?`<div class="hint" style="flex-basis:100%;color:var(--bad-ink)">Se pasa de la capacidad de ${esc(V.name)} (${Q} viandas).</div>`:""}
       <div class="row" style="flex-basis:100%">
         ${gmapsLinks(t).map((l,i,a)=>`<a class="btn small" href="${esc(l)}" target="_blank" rel="noopener">Abrir en Google Maps${a.length>1?" · tramo "+(i+1):""}</a>`).join("")}
@@ -980,9 +981,9 @@ function buildSheets(){
         const tp=t.stops.reduce((a,id)=>a+qx(C[id],k).p,0),tb=t.stops.reduce((a,id)=>a+qx(C[id],k).b,0);
         const rows=t.stops.map((id,i)=>{const c=C[id],x=qx(c,k);return `<tr><td class="n">${i+1}</td><td><b>${esc(c.name)}</b></td><td>${esc(c.address||"")}</td><td class="q">${qty(c,k)}</td><td class="q">${x.p||""}</td><td class="q">${x.b||""}</td>${pr.eta?`<td class="h">~${min2hm(st.etas[i])}</td>`:""}<td class="ins">${revNota(c,k)?`<div class="pre"><b>${esc(revNota(c,k))}</b></div>`:""}<div class="pre">${esc(c.notes||"")}</div>${c.notes||revNota(c,k)?"":`<div class="lines"></div>`}</td>${pr.sign?`<td class="f"></td>`:""}</tr>`;}).join("");
         pages.push(`<section class="sheet">${sheetHead("Hoja de ruta",dn+" "+date)}
-          <div class="sh-meta"><div><small>Fecha</small><b>${dn} ${date}</b></div><div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Salida</small><b>${min2hm(st.start)} · ${esc(S.config.depotName)}</b></div><div><small>Total</small><b>${st.load} platos · ${tp} postres · ${tb} bebidas · ${t.stops.length} entregas</b></div></div>
+          <div class="sh-meta"><div><small>Fecha</small><b>${dn} ${date}</b></div><div><small>Transporte</small><b>${esc(vname)}</b></div><div><small>Salida</small><b>${min2hm(st.start)} · ${esc(S.config.depotName)}</b></div><div><small>Total</small><b>${st.platos} platos${st.rev?" + "+st.rev+" reventa":""} · ${tp} postres · ${tb} bebidas · ${t.stops.length} entregas</b></div></div>
           <table class="sh"><thead><tr><th>#</th><th>Cliente</th><th>Dirección</th><th class="q">Platos</th><th class="q">Postres</th><th class="q">Bebidas</th>${pr.eta?"<th>Hora aprox.</th>":""}<th>Aclaraciones / instrucciones</th>${pr.sign?"<th>Firma recibí</th>":""}</tr></thead>
-          <tbody>${rows}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="q">${st.load}</td><td class="q">${tp}</td><td class="q">${tb}</td>${pr.eta?"<td></td>":""}<td></td>${pr.sign?"<td></td>":""}</tr></tfoot></table>
+          <tbody>${rows}</tbody><tfoot><tr><td></td><td colspan="2">Total</td><td class="q">${st.platos}</td><td class="q">${tp}</td><td class="q">${tb}</td>${pr.eta?"<td></td>":""}<td></td>${pr.sign?"<td></td>":""}</tr></tfoot></table>
           <div class="sh-foot"><span>Chofer: ______________________</span><span>Easy Lunch · ${esc(S.config.depotName)}</span></div></section>`);
       }});});
   return {pages:pr.format==="remito"?pages:paginarHojas(pages),missing};
