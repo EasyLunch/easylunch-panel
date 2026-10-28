@@ -3,7 +3,7 @@
 //
 // GET /api/pedidos?desde=2026-09-28&hasta=2026-10-02
 // respuesta: { desde, hasta, filas: [{ id_empresa, empresa, fecha, viandas }], total,
-//             extras: [{ id_empresa, empresa, fecha, postres, bebidas }], ajustes: { ok, aplicados, actualizado } }
+//             extras: [{ id_empresa, empresa, fecha, postres, bebidas, reventa?, reventaTxt? }], ajustes: { ok, aplicados, actualizado } }
 // viandas = pedidos con plato. extras = postres y bebidas (incluye los pedidos de solo postre o solo bebida).
 //
 // Cambios cargados en la app de Modificaciones (altas, bajas, cambios de día/sede, temporales, impagos sacados,
@@ -154,8 +154,23 @@ export default async function handler(req, res) {
       ajustes.aplicados++
     }
 
+    // Reventa (Nero Catering y otros): productos sin etiqueta que van a una sede que ese día tiene pedidos.
+    // No son viandas: van como nota en la parada (extras.reventa / extras.reventaTxt).
+    for (const x of (aj && Array.isArray(aj.reventa) ? aj.reventa : [])) {
+      if (!okFecha(x.fecha)) continue
+      const fecha = diaEntrega(x.fecha, mapaFinde)
+      if (fecha < desde || fecha > hasta) continue
+      const n = parseInt(x.reventa, 10) || 0
+      if (!n) continue
+      const key = x.id_empresa + '|' + fecha
+      const e = ext.get(key) || { id_empresa: String(x.id_empresa), empresa: String(x.empresa || '').trim(), fecha, postres: 0, bebidas: 0 }
+      e.reventa = (e.reventa || 0) + n
+      e.reventaTxt = [e.reventaTxt, String(x.reventaTxt || '').trim()].filter(Boolean).join(' · ')
+      ext.set(key, e)
+    }
+
     const filas = [...agg.values()].filter(f => f.viandas > 0).sort(orden)
-    const extras = [...ext.values()].filter(e => e.postres > 0 || e.bebidas > 0).sort(orden)
+    const extras = [...ext.values()].filter(e => e.postres > 0 || e.bebidas > 0 || e.reventa > 0).sort(orden)
     return res.status(200).json({ desde, hasta, filas, total: filas.reduce((a, f) => a + f.viandas, 0), extras, ajustes })
   } catch (e) {
     return res.status(500).json({ error: 'interno', message: String((e && e.message) || e) })
