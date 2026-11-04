@@ -81,7 +81,7 @@
     <div class="logo" style="font-size:20px;font-weight:800;margin-bottom:4px">Easy Lunch</div>
     <p class="muted" style="margin-bottom:18px">Carga de Costos & Gastos</p>
     <label>Usuario</label>
-    <input id="lu" type="text" autocomplete="username" placeholder="usuario@easylunch.com.ar">
+    <input id="lu" type="text" autocomplete="username" placeholder="Tu usuario del panel">
     <div style="height:10px"></div>
     <label>Contraseña</label>
     <input id="lp" type="password" autocomplete="current-password" placeholder="•••••">
@@ -210,7 +210,7 @@
 
 <script>
 // ─── Versión visible (para saber qué build corre el celu) ──────────────────
-const BUILD = 'v8.2 · 08-09'
+const BUILD = 'v8.3 · 04-11'
 // ─── Config Supabase (misma base que Producción / Recetario) ───────────────
 const SB = 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
@@ -237,16 +237,40 @@ async function sbInsert(t, rows, ret){ const r = await fetchT(`${SB}/${t}`, { me
 async function sbPatch(t, filtro, body){ const r = await fetchT(`${SB}/${t}?${filtro}`, { method:'PATCH', headers:H, body:JSON.stringify(body) }); if(!r.ok) throw new Error(await r.text()) }
 async function sbUpsert(t, rows){ const r = await fetchT(`${SB}/${t}`, { method:'POST', headers:{ ...H, Prefer:'resolution=merge-duplicates' }, body:JSON.stringify(sbRows(rows)) }); if(!r.ok) throw new Error(await r.text()) }
 
-// ─── Auth (mismo esquema que el panel) ─────────────────────────────────────
-const USERS = {
-  'pbronstein@easylunch.com.ar': 'Viel912',
-  'easylunch': 'Viel912',
-  'info@easylunch.com.ar': 'Viel912'
+// ─── Auth: usuarios del panel central (Supabase, tabla panel_usuarios) ─────
+// Entra quien sea administrador o tenga habilitada la tarjeta "costos" en Usuarios.
+// Comparte la sesión con el panel (misma clave el_panel_token): si ya entraste al panel, no pide clave.
+const TOKEN_KEY = 'el_panel_token', TARJETA = 'costos'
+async function rpc(fn, args){
+  const r = await fetchT(`${SB}/rpc/${fn}`, { method:'POST', headers:H, body:JSON.stringify(args||{}) })
+  const t = await r.text(); let d = null; try{ d = t ? JSON.parse(t) : null }catch(e){}
+  if(!r.ok) throw new Error((d && (d.message || d.hint)) || ('Error ' + r.status))
+  if(d && d.error) throw new Error(d.error)
+  return d
 }
-function doLogin(){
-  const u=document.getElementById('lu').value.trim().toLowerCase(), p=document.getElementById('lp').value
-  if(USERS[u] && USERS[u]===p){ localStorage.setItem('el_auth','ok'); localStorage.setItem('el_user',u); start() }
-  else { document.getElementById('lerr').style.display='block' }
+function getTok(){ try{ return localStorage.getItem(TOKEN_KEY) }catch(e){ return null } }
+function setTok(t){ try{ t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY) }catch(e){} }
+function loginErr(msg){ const e = document.getElementById('lerr'); e.textContent = msg; e.style.display = msg ? 'block' : 'none' }
+function tieneAcceso(u){ return !!u && (u.admin || (u.tarjetas || []).indexOf(TARJETA) !== -1) }
+function entrar(u){
+  if(!tieneAcceso(u)){ loginErr('Tu usuario no tiene habilitada la tarjeta "Carga de Costos & Gastos". Pedile acceso a un administrador.'); return }
+  try{ localStorage.setItem('el_user', u.usuario); localStorage.removeItem('el_auth') }catch(e){}
+  start()
+}
+async function doLogin(){
+  const u = document.getElementById('lu').value.trim().toLowerCase(), p = document.getElementById('lp').value
+  if(!u || !p){ loginErr('Completá usuario y contraseña.'); return }
+  loginErr('')
+  try{
+    const r = await rpc('panel_login', { p_usuario:u, p_pass:p })
+    setTok(r.token); document.getElementById('lp').value = ''
+    entrar(r.usuario)
+  }catch(err){ loginErr(err.message); document.getElementById('lp').value = '' }
+}
+async function gate(){
+  const t = getTok(); if(!t) return
+  try{ const u = await rpc('panel_sesion', { p_token:t }); if(u) entrar(u); else setTok(null) }
+  catch(e){ loginErr('No se pudo conectar con el servidor. Revisá la conexión y recargá.') }
 }
 
 // ─── Estado ────────────────────────────────────────────────────────────────
@@ -777,7 +801,7 @@ function reset(){
 }
 
 // init
-if(localStorage.getItem('el_auth')==='ok') start()
+gate()
 document.getElementById('lp')&&document.getElementById('lp').addEventListener('keydown',e=>{ if(e.key==='Enter')doLogin() })
 </script>
 </body>
