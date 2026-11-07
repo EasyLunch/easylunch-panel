@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#059669">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Producción EL">
+<link rel="icon" href="icons/logo.png">
+<link rel="apple-touch-icon" href="icons/logo.png">
+<title>Producción · Easy Lunch</title>
+<style>
+:root{
+  --verde:#059669; --verde-osc:#047857; --verde-cl:#d1fae5;
+  --tinta:#1e293b; --gris:#64748b; --borde:#e2e8f0; --fondo:#f4f6f8; --blanco:#fff;
+  --ambar:#b45309; --ambar-cl:#fef3c7; --rojo:#b91c1c;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--fondo);color:var(--tinta);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px}
+button,input{font:inherit;color:inherit}
+.hidden{display:none!important}
+
+/* ---------- Header ---------- */
+header.top{position:sticky;top:0;z-index:20;background:var(--verde);color:#fff;padding:10px 16px 12px;padding-top:calc(10px + env(safe-area-inset-top))}
+.top-row{display:flex;align-items:center;gap:10px}
+.top-row img{width:34px;height:34px;border-radius:8px;background:#fff;object-fit:contain}
+.top-row h1{font-size:18px;margin:0;flex:1;line-height:1.1}
+.top-row h1 small{display:block;font-size:12px;font-weight:400;opacity:.85}
+.icon-btn{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:10px;width:40px;height:40px;font-size:18px;cursor:pointer}
+.search{margin-top:10px;position:relative}
+.search input{width:100%;border:0;border-radius:12px;padding:12px 40px 12px 40px;font-size:16px;outline:none}
+.search .lupa{position:absolute;left:13px;top:50%;transform:translateY(-50%);opacity:.5}
+.search .clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;font-size:18px;padding:6px 10px;opacity:.5;cursor:pointer}
+
+/* ---------- Chips ---------- */
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 16px 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:1px solid var(--borde);background:#fff;border-radius:999px;padding:8px 13px;font-size:14px;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.chip .n{opacity:.6;font-size:12px;margin-left:3px}
+.filtros{display:flex;justify-content:space-between;align-items:center;padding:6px 16px;color:var(--gris);font-size:13px}
+.toggle{display:flex;align-items:center;gap:6px;cursor:pointer}
+.toggle input{width:18px;height:18px;accent-color:var(--verde)}
+
+/* ---------- Lista ---------- */
+.lista{padding:4px 16px 40px;display:grid;gap:10px}
+.card{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid var(--borde);border-radius:14px;padding:12px;cursor:pointer;text-align:left;width:100%}
+.card:active{transform:scale(.99)}
+.card .em{flex:0 0 46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:24px}
+.card .tx{flex:1;min-width:0}
+.card .nm{font-weight:600;font-size:15px;line-height:1.25}
+.card .meta{font-size:12.5px;color:var(--gris);margin-top:3px}
+.card .go{color:var(--gris);font-size:20px}
+.vacio{text-align:center;color:var(--gris);padding:40px 20px}
+.estado{margin:12px 16px 0;padding:10px 12px;border-radius:10px;font-size:13px;background:var(--ambar-cl);color:var(--ambar)}
+
+/* ---------- Detalle ---------- */
+#detalle{position:fixed;inset:0;z-index:30;background:var(--fondo);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.det-head{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--borde);padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top))}
+.det-row{display:flex;gap:10px;align-items:flex-start}
+.back{border:0;background:var(--fondo);border-radius:10px;width:40px;height:40px;font-size:20px;flex:0 0 40px;cursor:pointer}
+.det-title{flex:1;min-width:0}
+.det-title h2{font-size:17px;margin:2px 0 6px;line-height:1.25}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.badge{font-size:12px;padding:3px 9px;border-radius:999px;background:var(--fondo);color:var(--tinta);font-weight:500}
+.badge.tray{background:var(--tinta);color:#fff}
+.badge.tray.cl{background:#e0f2fe;color:#075985}
+.porc{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.porc label{font-size:13px;color:var(--gris);font-weight:600}
+.stepper{display:flex;align-items:center;border:1px solid var(--borde);border-radius:12px;overflow:hidden}
+.stepper button{border:0;background:var(--fondo);width:42px;height:40px;font-size:20px;cursor:pointer}
+.stepper input{width:64px;border:0;text-align:center;font-size:18px;font-weight:700;height:40px;outline:none;-moz-appearance:textfield}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.quick{display:flex;gap:6px}
+.quick button{border:1px solid var(--borde);background:#fff;border-radius:9px;padding:7px 10px;font-size:13px;cursor:pointer}
+.quick button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
+.tabs{display:flex;gap:4px;margin-top:10px;background:var(--fondo);padding:4px;border-radius:12px}
+.tabs button{flex:1;border:0;background:none;padding:9px 4px;border-radius:9px;font-size:14px;font-weight:600;color:var(--gris);cursor:pointer}
+.tabs button.on{background:#fff;color:var(--tinta);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.det-body{padding:14px 16px 60px;display:grid;gap:14px}
+.box{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px}
+.box h3{margin:0 0 10px;font-size:15px;display:flex;align-items:center;gap:8px}
+.box h3 .sub{font-weight:400;color:var(--gris);font-size:12.5px;margin-left:auto}
+.ilus svg{width:100%;height:auto;display:block}
+.nota{font-size:12.5px;color:var(--gris);margin-top:8px;line-height:1.4}
+.pasos{margin:0;padding:0;list-style:none;counter-reset:p}
+.pasos li{counter-increment:p;position:relative;padding:8px 0 8px 40px;border-top:1px solid var(--borde);line-height:1.4;font-size:15px}
+.pasos li:first-child{border-top:0}
+.pasos li::before{content:counter(p);position:absolute;left:0;top:7px;width:28px;height:28px;border-radius:50%;background:var(--verde);color:#fff;font-weight:700;display:grid;place-items:center;font-size:14px}
+.pasos b{white-space:nowrap}
+.texto-receta{white-space:pre-wrap;line-height:1.5;font-size:15px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kpi{background:var(--fondo);border-radius:12px;padding:10px;text-align:center}
+.kpi .v{font-size:18px;font-weight:700}
+.kpi .l{font-size:11.5px;color:var(--gris);margin-top:2px}
+
+/* tablas */
+.tabla{width:100%;border-collapse:collapse;font-size:14px}
+.tabla th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--gris);text-align:right;font-weight:600;padding:4px 4px 6px;border-bottom:1px solid var(--borde)}
+.tabla th:first-child{text-align:left}
+.tabla td{padding:9px 4px;border-bottom:1px solid var(--borde);text-align:right;vertical-align:top}
+.tabla td:first-child{text-align:left}
+.tabla tr:last-child td{border-bottom:0}
+.tabla .num{font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tabla .crudo{color:var(--ambar)}
+.tabla .mini{display:block;font-size:11.5px;color:var(--gris);font-weight:400;margin-top:2px}
+.tag{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:6px;background:var(--fondo);color:var(--gris);margin:2px 3px 0 0;font-weight:500}
+.tag.c{background:var(--ambar-cl);color:var(--ambar)}
+.tag.k{background:var(--verde-cl);color:var(--verde-osc)}
+.prep{border:1px solid var(--borde);border-radius:12px;margin-top:10px;overflow:hidden}
+.prep summary{list-style:none;cursor:pointer;padding:11px 12px;display:flex;align-items:center;gap:10px;background:#fafbfc}
+.prep summary::-webkit-details-marker{display:none}
+.prep summary .pn{flex:1;font-weight:600;font-size:14.5px}
+.prep summary .pt{font-weight:700;color:var(--verde-osc);white-space:nowrap}
+.prep summary .ar{color:var(--gris);transition:transform .15s}
+.prep[open] summary .ar{transform:rotate(90deg)}
+.prep .pb{padding:4px 12px 10px}
+.leyenda{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--gris);margin-bottom:6px}
+.leyenda span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.leyenda .lc::before{background:var(--ambar)}
+.leyenda .lk::before{background:var(--verde)}
+.loading{display:grid;place-items:center;padding:60px 20px;color:var(--gris);gap:12px}
+.spin{width:30px;height:30px;border:3px solid var(--borde);border-top-color:var(--verde);border-radius:50%;animation:s 0.8s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+@media (min-width:720px){ .lista{grid-template-columns:1fr 1fr} .det-body{max-width:760px;margin:0 auto} .det-head>*{max-width:728px;margin-left:auto;margin-right:auto} }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-row">
+    <img src="icons/logo.png" alt="" onerror="this.style.display='none'">
+    <h1>Guía de producción<small id="sub-head">Easy Lunch · cocina</small></h1>
+    <button class="icon-btn" id="btn-refresh" title="Actualizar recetas">⟳</button>
+  </div>
+  <div class="search">
+    <span class="lupa">🔍</span>
+    <input id="q" type="search" placeholder="Buscar plato… (ej: wrap cesar)" autocomplete="off">
+    <button class="clear hidden" id="q-clear" aria-label="Borrar">✕</button>
+  </div>
+</header>
+
+<div class="chips" id="chips"></div>
+<div class="filtros">
+  <span id="contador"></span>
+  <label class="toggle"><input type="checkbox" id="solo-rot" checked> Solo en rotación</label>
+</div>
+<div id="estado"></div>
+<div class="lista" id="lista"><div class="loading"><div class="spin"></div>Cargando recetas…</div></div>
+
+<div id="detalle" class="hidden">
+  <div class="det-head">
+    <div class="det-row">
+      <button class="back" id="btn-back" aria-label="Volver">←</button>
+      <div class="det-title">
+        <h2 id="d-nombre"></h2>
+        <div class="badges" id="d-badges"></div>
+      </div>
+    </div>
+    <div class="porc">
+      <label>Porciones</label>
+      <div class="stepper">
+        <button id="p-menos" aria-label="Menos">−</button>
+        <input id="p-n" type="number" inputmode="numeric" min="1" value="1">
+        <button id="p-mas" aria-label="Más">+</button>
+      </div>
+      <div class="quick" id="quick"></div>
+    </div>
+    <div class="tabs" id="tabs">
+      <button data-t="armado" class="on">🧩 Armado</button>
+      <button data-t="ingredientes">⚖️ Ingredientes</button>
+      <button data-t="total">🧾 Producción</button>
+    </div>
+  </div>
+  <div class="det-body" id="d-body"></div>
+</div>
+
+<script>
+/* =====================================================================
+   Easy Lunch · Guía de producción (produccion.html)
+   Lee el recetario en vivo desde la misma base Supabase que recetario.html.
+   La URL y la clave pública se toman automáticamente de recetario.html
+   (mismo sitio). Si alguna vez querés fijarlas acá, completá estas dos:
+   ===================================================================== */
+const SB_MANUAL  = ''   // ej: 'https://xxxx.supabase.co/rest/v1'
+const KEY_MANUAL = ''   // clave anon pública
+
+const CACHE_KEY = 'el_produccion_cache_v1'
+const PESO = new Set(['g','kg','ml','lt'])
+const TIPOS = [
+  { v:'clasico',     l:'Clásico',     e:'🍽', c:'#dbeafe', t:'#1d4ed8' },
+  { v:'vegetariano', l:'Vegetariano', e:'🌿', c:'#dcfce7', t:'#15803d' },
+  { v:'ensalada',    l:'Ensalada',    e:'🥗', c:'#ecfccb', t:'#4d7c0f' },
+  { v:'sandwich',    l:'Sándwich',    e:'🥪', c:'#fef9c3', t:'#a16207' },
+  { v:'wrap',        l:'Wrap',        e:'🌯', c:'#fef3c7', t:'#b45309' },
+  { v:'tarta',       l:'Tarta',       e:'🥧', c:'#ffedd5', t:'#c2410c' },
+  { v:'postre',      l:'Postre',      e:'🍮', c:'#fce7f3', t:'#be185d' },
+  { v:'sin-tacc',    l:'Sin TACC',    e:'🌾', c:'#f3e8ff', t:'#7e22ce' },
+]
+const TIPO_MAP = Object.fromEntries(TIPOS.map(t => [t.v, t]))
+const PROT = { vegetariano:'🌿 Vegetariano', vacuna:'🥩 Vacuna', cerdo:'🐷 Cerdo', pollo:'🍗 Pollo', pescado:'🐟 Pescado', cordero:'🐑 Cordero', otra:'📋 Otra' }
+
+let platos = [], insMap = {}, srMap = {}
+let filtroTipo = 'todos', N = 1, tabActual = 'armado', platoActual = null, wakeLock = null
+
+const $ = id => document.getElementById(id)
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+const toG = (c, u) => (u === 'kg' || u === 'lt') ? c * 1000 : c
+const yieldFactor = (m, v) => (1 - (+m || 0) / 100) * (1 + (+v || 0) / 100)
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+
+function fmtG(g, liq){
+  if(!isFinite(g)) return '–'
+  const a = Math.abs(g)
+  if(a >= 1000){ const k = g / 1000; return (a >= 10000 ? k.toFixed(1) : k.toFixed(2)).replace('.', ',').replace(/,0+$/, '') + (liq ? ' l' : ' kg') }
+  if(a > 0 && a < 10) return (Math.round(g * 10) / 10).toString().replace('.', ',') + (liq ? ' ml' : ' g')
+  return Math.round(g) + (liq ? ' ml' : ' g')
+}
+function fmtU(n){
+  const r = Math.round(n * 100) / 100
+  return r.toString().replace('.', ',')
+}
+
+/* ---------- Conexión ---------- */
+let SB = SB_MANUAL, KEY = KEY_MANUAL
+async function config(){
+  if(SB && KEY) return
+  const html = await fetch('recetario.html', { cache:'no-store' }).then(r => r.text())
+  const a = html.match(/const\s+SB\s*=\s*['"`]([^'"`]+)['"`]/)
+  const b = html.match(/const\s+KEY\s*=\s*['"`]([^'"`]+)['"`]/)
+  if(!a || !b) throw new Error('No encontré la conexión a Supabase en recetario.html. Completá SB_MANUAL y KEY_MANUAL en produccion.html.')
+  SB = a[1]; KEY = b[1]
+}
+async function sbGet(q){
+  const r = await fetch(`${SB}/${q}`, { headers:{ apikey:KEY, Authorization:'Bearer ' + KEY } })
+  if(!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+
+function armarDatos(d){
+  insMap = Object.fromEntries(d.insumos.map(i => [i.id, i]))
+  srMap = Object.fromEntries(d.subrecetas.map(s => [s.id, { ...s, ingredientes: d.srIngs.filter(i => i.subreceta_id === s.id) }]))
+  platos = d.platos
+    .map(p => ({ ...p, ingredientes: d.plIngs.filter(i => i.plato_id === p.id) }))
+    .filter(p => p.ingredientes.length)
+  platos.forEach(p => { p._a = analizar(p) })
+}
+
+async function cargar(forzar){
+  let cache = null
+  try{ cache = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null') }catch(e){}
+  if(cache && !forzar && !platos.length){
+    armarDatos(cache.d); render(); setEstado('', cache.t)
+  }
+  try{
+    await config()
+    const [insumos, subrecetas, srIngs, pls, plIngs] = await Promise.all([
+      sbGet('insumos?select=*&order=nombre'),
+      sbGet('subrecetas?select=*&order=nombre'),
+      sbGet('subreceta_ingredientes?select=*'),
+      sbGet('platos?select=*&order=nombre'),
+      sbGet('plato_ingredientes?select=*'),
+    ])
+    const d = { insumos, subrecetas, srIngs, platos: pls, plIngs }
+    armarDatos(d)
+    const t = Date.now()
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify({ t, d })) }catch(e){}
+    setEstado('', t)
+    render()
+    if(platoActual){ const p = platos.find(x => x.id === platoActual.id); if(p){ platoActual = p; renderDetalle() } }
+  }catch(err){
+    console.error(err)
+    if(platos.length) setEstado('Sin conexión: mostrando la última copia guardada.', cache && cache.t)
+    else { $('lista').innerHTML = `<div class="vacio">No se pudieron cargar las recetas.<br><small>${esc(err.message)}</small></div>`; setEstado('') }
+  }
+}
+function setEstado(msg, t){
+  $('estado').innerHTML = msg ? `<div class="estado">${esc(msg)}</div>` : ''
+  if(t){
+    const d = new Date(t)
+    $('sub-head').textContent = 'Recetas actualizadas ' + d.toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' }) + ' ' + d.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })
+  }
+}
+
+/* =====================================================================
+   Clasificación visual de ingredientes (para la ilustración)
+   ===================================================================== */
+const VIS = {
+  tortilla:{ tex:'disc',   f:'#ecd09a', f2:'#d9b46f', rol:'base',  n:'tortilla' },
+  pan:     { tex:'bun',    f:'#d99a4e', f2:'#f1d19b', rol:'base',  n:'pan' },
+  masa:    { tex:'disc',   f:'#e6b971', f2:'#c98f45', rol:'base',  n:'masa' },
+  hoja:    { tex:'leaf',   f:'#5aa845', f2:'#9fd27f', rol:'hoja' },
+  rucula:  { tex:'leaf',   f:'#3f7f2f', f2:'#79b55a', rol:'hoja' },
+  tomate:  { tex:'slice',  f:'#e2483d', f2:'#f6a39b', rol:'verdura' },
+  zanahoria:{tex:'shred',  f:'#f08a24', f2:'#fde3c4', rol:'verdura' },
+  cebolla: { tex:'rings',  f:'#a35a9e', f2:'#f3e3f1', rol:'verdura' },
+  verdeo:  { tex:'shred',  f:'#4c9a3a', f2:'#e6f4dc', rol:'verdura' },
+  palta:   { tex:'smooth', f:'#9cc96b', f2:'#d6eab5', rol:'verdura' },
+  choclo:  { tex:'dot',    f:'#f2c230', f2:'#fbecb0', rol:'verdura' },
+  morron:  { tex:'strip',  f:'#d63a2f', f2:'#f8d1cc', rol:'verdura' },
+  verdura: { tex:'cube',   f:'#6bab4f', f2:'#e3f1d8', rol:'verdura' },
+  hongo:   { tex:'cube',   f:'#a88a6a', f2:'#efe5d9', rol:'verdura' },
+  remolacha:{tex:'cube',   f:'#9b2449', f2:'#f3d4de', rol:'verdura' },
+  huevo:   { tex:'egg',    f:'#f7c948', f2:'#ffffff', rol:'prot' },
+  pollo:   { tex:'strip',  f:'#d9a066', f2:'#f3dcc0', rol:'prot' },
+  cerdo:   { tex:'strip',  f:'#b9774f', f2:'#ecd2c0', rol:'prot' },
+  jamon:   { tex:'fold',   f:'#eaa1a1', f2:'#f9dede', rol:'prot' },
+  carne:   { tex:'strip',  f:'#7d4027', f2:'#d9b8a8', rol:'prot' },
+  pescado: { tex:'strip',  f:'#f0c79c', f2:'#fbeee0', rol:'prot' },
+  cordero: { tex:'strip',  f:'#8f4f33', f2:'#dfc0b0', rol:'prot' },
+  milanesa:{ tex:'crumb',  f:'#c98a3c', f2:'#e9bf7a', rol:'prot' },
+  queso:   { tex:'shred',  f:'#f2cf4a', f2:'#fff6d1', rol:'queso' },
+  quesoB:  { tex:'smooth', f:'#fbf6e8', f2:'#ffffff', rol:'queso' },
+  salsa:   { tex:'drip',   f:'#f1e3b8', f2:'#fff9e8', rol:'salsa' },
+  bbq:     { tex:'drip',   f:'#6b2d1a', f2:'#9c4a2e', rol:'salsa' },
+  roja:    { tex:'drip',   f:'#c0392b', f2:'#e57466', rol:'salsa' },
+  verdeS:  { tex:'drip',   f:'#4f7a2c', f2:'#86ad5d', rol:'salsa' },
+  mostaza: { tex:'drip',   f:'#e1b12c', f2:'#f3d578', rol:'salsa' },
+  arroz:   { tex:'dot',    f:'#ffffff', f2:'#efe9da', rol:'guarn' },
+  legumbre:{ tex:'dot',    f:'#a0703f', f2:'#e9d8c2', rol:'guarn' },
+  papa:    { tex:'cube',   f:'#f2c75c', f2:'#fbecc0', rol:'guarn' },
+  batata:  { tex:'cube',   f:'#e8873a', f2:'#f8d3b0', rol:'guarn' },
+  pure:    { tex:'smooth', f:'#f5dc8f', f2:'#fbefc8', rol:'guarn' },
+  calabaza:{ tex:'smooth', f:'#f0a43c', f2:'#fbd9a6', rol:'guarn' },
+  pasta:   { tex:'shred',  f:'#f2cf7e', f2:'#fbefcf', rol:'guarn' },
+  aceituna:{ tex:'dot',    f:'#3b3a2e', f2:'#e9e6d9', rol:'verdura' },
+  limon:   { tex:'lemon',  f:'#f6d743', f2:'#fff7c2', rol:'extra' },
+  tarta:   { tex:'tarta',  f:'#e3b064', f2:'#f6e2a4', rol:'prot' },
+  postre:  { tex:'smooth', f:'#e8b4c8', f2:'#f8e1ea', rol:'otro' },
+  otro:    { tex:'cube',   f:'#c9b48f', f2:'#f1e9da', rol:'otro' },
+}
+const REGLAS = [
+  [/tortilla|wrap|rapidit|lavash|pionono/, 'tortilla'],
+  [/\bpan\b|pan de|baguet|ciabatta|figaza|brioche|\bbun\b|mignon|lactal|focaccia|chipa/, 'pan'],
+  [/tarta|quiche|empanada|pascualina/, 'tarta'],
+  [/masa|tapa|hojaldre|disco/, 'masa'],
+  [/rucula|espinaca|kale|berro|radicchio/, 'rucula'],
+  [/lechuga|verdes|hojas|mix|repollo|criolla|morada|mesclun|salad|ensalad/, 'hoja'],
+  [/tomate|cherry/, 'tomate'],
+  [/zanahoria/, 'zanahoria'],
+  [/verdeo|puerro|ciboulette|perejil|cilantro/, 'verdeo'],
+  [/cebolla/, 'cebolla'],
+  [/palta|guacamole/, 'palta'],
+  [/choclo|maiz/, 'choclo'],
+  [/morron|pimiento|aji\b/, 'morron'],
+  [/champi|hongo|gírgola|girgola/, 'hongo'],
+  [/remolacha/, 'remolacha'],
+  [/huevo/, 'huevo'],
+  [/milanesa|rebozad|empanad|nugget|crispy|apanad/, 'milanesa'],
+  [/jamon|fiambre|salame|mortadela|lomito/, 'jamon'],
+  [/pollo|pechuga|suprema|pata y muslo|muslo|ave\b/, 'pollo'],
+  [/cerdo|bondiola|panceta|bacon|carre|pechito|matambrito/, 'cerdo'],
+  [/cordero/, 'cordero'],
+  [/pescado|merluza|salmon|atun|abadejo|lenguado|langostino|camaron|mariscos/, 'pescado'],
+  [/carne|vacun|nalga|peceto|bife|osobuco|roast|vacio|picada|hamburguesa|albondiga|bola de lomo|cuadril|colita|entrana|lomo|ternera|asado|cuadrada/, 'carne'],
+  [/ricota|crema de queso|queso crema|philadelphia|feta|cottage|queso blanco/, 'quesoB'],
+  [/queso|sardo|parmesano|mozzarella|muzza|cheddar|tybo|reggianito|cremoso|provolone|danbo|gouda|fontina|pategras/, 'queso'],
+  [/bbq|barbacoa|barbecue|teriyaki|agridulce|soja/, 'bbq'],
+  [/pesto|chimichurri|criolla verde|salsa verde/, 'verdeS'],
+  [/ketchup|fileto|pomodoro|salsa de tomate|tuco|bolognesa|roja|arrabiata|pure de tomate/, 'roja'],
+  [/mostaza|honey|miel/, 'mostaza'],
+  [/salsa|aderezo|mayo|alioli|dip|vinagreta|crema|yogur|hummus|cesar|tzatziki|ranch|tahini/, 'salsa'],
+  [/arroz|quinoa|cous|trigo|burgol|cebada|mijo/, 'arroz'],
+  [/lenteja|garbanzo|poroto|legumbre|arveja/, 'legumbre'],
+  [/batata|boniato/, 'batata'],
+  [/pure/, 'pure'],
+  [/calabaza|zapallo|anco|cabutia/, 'calabaza'],
+  [/papa|rusti|noisette/, 'papa'],
+  [/fideo|pasta|penne|tallarin|ravioli|sorrentino|noqui|ñoqui|lasagn|spaghetti|tirabuzon|mostachol/, 'pasta'],
+  [/aceituna/, 'aceituna'],
+  [/limon|lima/, 'limon'],
+  [/brocoli|chaucha|zucchini|zapallito|berenjena|pepino|apio|coliflor|verdura|vegetal|wok|salteado|ratatouille|caponata/, 'verdura'],
+  [/flan|budin|mousse|torta|brownie|alfajor|postre|chocotorta|cheesecake|fruta|gelatina|yogur con/, 'postre'],
+]
+const CAT_VIS = { verduras:'verdura', ave:'pollo', cerdo:'cerdo', vacuno:'carne', pescado:'pescado', cordero:'cordero', lacteos:'queso', aderezos:'salsa', harinas:'masa' }
+const FAM_VIS = { salsa:'salsa', aderezo:'salsa', guarnicion:'papa', principal:'carne' }
+
+function visDe(nombre, cat, fam){
+  const n = norm(nombre)
+  for(const [re, k] of REGLAS) if(re.test(n)) return { k, ...VIS[k] }
+  const k = CAT_VIS[norm(cat)] || FAM_VIS[norm(fam)] || 'otro'
+  return { k, ...VIS[k] }
+}
+const esPackNombre = (n, cat) => /packaging|film|bandeja|descartable|servilleta|cubiert|tenedor|etiqueta|bolsa|tapa plastica|^\s*10[2-5]\s*$|^\s*445\s*$|ensaladera|potecito/.test(norm(n)) || /descartables/.test(norm(cat))
+const esCupNombre = n => /\bdip\b|pote|vasito|ramekin/.test(norm(n))
+const esCondimento = (n, cat) => /condimento/.test(norm(cat)) || /^(sal|pimienta|oregano|aceite|ajo en polvo|pimenton|comino|nuez moscada|aji molido|provenzal|vinagre)\b/.test(norm(n))
+
+/* =====================================================================
+   Cálculo de la receta
+   - crudo = true  → la cantidad cargada es en crudo (bruto); lo que queda
+                     listo = cantidad × (1 − merma%) × (1 + variación cocción%)
+   - crudo = false → la cantidad cargada es lo que va listo/cocido;
+                     el crudo a pesar = cantidad ÷ ese mismo factor
+   ===================================================================== */
+function lineaIns(ins, cant, unidad, crudo){
+  const base = { ins, id: ins.id, nombre: String(ins.nombre || '').trim(), cat: ins.categoria,
+    pack: esPackNombre(ins.nombre, ins.categoria) || esCupNombre(ins.nombre),
+    cup: esCupNombre(ins.nombre), cond: esCondimento(ins.nombre, ins.categoria),
+    merma: +ins.merma_crudo || 0, coc: +ins.variacion_coccion || 0 }
+  if(PESO.has(unidad)){
+    const g = toG(cant, unidad), yf = yieldFactor(ins.merma_crudo, ins.variacion_coccion)
+    const liq = unidad === 'ml' || unidad === 'lt'
+    return crudo
+      ? { ...base, peso:true, liq, crudoCargado:true,  bruto:g, listo:g * yf }
+      : { ...base, peso:true, liq, crudoCargado:false, listo:g, bruto: yf > 0 ? g / yf : g }
+  }
+  return { ...base, peso:false, unidades:cant, listo: cant * (+ins.gramaje || 0), bruto: cant * (+ins.gramaje || 0) }
+}
+function factorSub(sr, cant, unidad){
+  const ru = sr.unidad_rendimiento || 'unidad', rend = +sr.rendimiento || 1
+  const lotes = () => sr.ingredientes.reduce((s, si) => { const ins = insMap[si.insumo_id]; if(!ins) return s; const l = lineaIns(ins, si.cantidad, si.unidad, si.crudo); return s + (l.pack ? 0 : l.listo) }, 0)
+  if(PESO.has(unidad)){
+    const need = toG(cant, unidad)
+    if(PESO.has(ru)) return need / toG(rend, ru)
+    if(+sr.gramaje_unidad) return need / (+sr.gramaje_unidad * rend)
+    const b = lotes(); return b > 0 ? need / b : 1
+  }
+  if(!PESO.has(ru)) return cant / rend
+  if(+sr.gramaje_unidad) return (cant * sr.gramaje_unidad) / toG(rend, ru)
+  return cant / rend
+}
+
+function analizar(p){
+  const porc = +p.porciones || 1
+  const comps = []
+  for(const ing of p.ingredientes){
+    const cant = (+ing.cantidad || 0) / porc
+    if(ing.tipo === 'insumo'){
+      const ins = insMap[ing.ref_id]
+      if(!ins){ comps.push({ tipo:'falta', nombre:'(insumo borrado)' }); continue }
+      const l = lineaIns(ins, cant, ing.unidad, ing.crudo)
+      comps.push({ tipo:'ins', nombre: l.nombre, line: l, listoG: l.listo, pack: l.pack, cup: l.cup, cond: l.cond, vis: visDe(ins.nombre, ins.categoria) })
+    } else {
+      const sr = srMap[ing.ref_id]
+      if(!sr){ comps.push({ tipo:'falta', nombre:'(sub-receta borrada)' }); continue }
+      const f = factorSub(sr, cant, ing.unidad)
+      const lines = sr.ingredientes.map(si => { const ins = insMap[si.insumo_id]; if(!ins) return null
+        const l = lineaIns(ins, (+si.cantidad || 0) * f, si.unidad, si.crudo)
+        if(l.cup && !l.peso) l.unidades = Math.max(1, Math.ceil(l.unidades - 1e-6))   // un dip/pote entero por vianda
+        return l }).filter(Boolean)
+      const food = lines.filter(l => !l.pack)
+      const pack = /packaging|descartable/.test(norm(sr.nombre)) || (lines.length > 0 && food.length === 0)
+      const cup = lines.some(l => l.cup)
+      let listoG
+      if(PESO.has(ing.unidad)) listoG = toG(cant, ing.unidad)
+      else if(+sr.gramaje_unidad) listoG = cant * sr.gramaje_unidad
+      else listoG = food.reduce((s, l) => s + l.listo, 0)
+      const expand = !pack && !PESO.has(ing.unidad) && norm(sr.familia) === 'base'
+      comps.push({ tipo:'sub', nombre: String(sr.nombre || '').trim(), sr, f, lines, listoG, pack, cup, expand,
+        cantTxt: PESO.has(ing.unidad) ? fmtG(toG(cant, ing.unidad)) : fmtU(cant) + ' u.',
+        vis: visDe(sr.nombre, '', sr.familia) })
+    }
+  }
+  const packs = comps.filter(c => c.pack)
+  let bandeja = null
+  for(const c of packs){
+    const n = norm(c.nombre)
+    const m = n.match(/(\d{3})/)
+    if(/ensaladera/.test(n)){ bandeja = { txt:'Ensaladera', tipo:'bowl' }; break }
+    if(m){ bandeja = { txt:'Bandeja ' + m[1], num:m[1], negra: m[1] === '445' }; break }
+    const inner = (c.lines || []).map(l => norm(l.nombre)).join(' ')
+    const m2 = inner.match(/\b(10[2-5]|445)\b/)
+    if(m2){ bandeja = { txt:'Bandeja ' + m2[1], num:m2[1], negra: m2[1] === '445' }; break }
+  }
+  const film = packs.some(c => /film/.test(norm(c.nombre)) || (c.lines || []).some(l => /film/.test(norm(l.nombre))))
+  const pesoVianda = comps.filter(c => !c.pack && c.tipo !== 'falta').reduce((s, c) => s + (c.listoG || 0), 0)
+  const n = norm(p.nombre)
+  let layout = 'tray'
+  if(p.tipo === 'wrap' || /^wrap|\bwrap\b/.test(n)) layout = 'wrap'
+  else if(p.tipo === 'sandwich' || /sandwich|sándwich|tostado|focaccia|baguet|ciabatta|lomito|hamburguesa al pan/.test(n)) layout = 'sandwich'
+  else if(p.tipo === 'ensalada' || /^ensalada|bowl/.test(n) || (bandeja && bandeja.tipo === 'bowl')) layout = 'bowl'
+  else if(p.tipo === 'postre') layout = 'postre'
+  return { comps, bandeja, film, pesoVianda, layout }
+}
+
+/* Capas "de armado": lo que se ve en el plato (ingredientes de la base expandidos) */
+function piezas(a){
+  const out = []
+  for(const c of a.comps){
+    if(c.pack || c.tipo === 'falta') continue
+    if(c.tipo === 'sub' && c.expand){
+      for(const l of c.lines){ if(l.pack || l.cond) continue
+        out.push({ nombre:l.nombre, g:l.listo, u: l.peso ? null : l.unidades, liq:l.liq, vis: visDe(l.nombre, l.cat), de:c.nombre, sub:false, cup:false }) }
+    } else if(c.tipo === 'sub'){
+      out.push({ nombre:c.nombre, g:c.listoG, vis:c.vis, sub:true, cup:c.cup, fam: norm(c.sr.familia) })
+    } else {
+      if(c.cond) continue
+      out.push({ nombre:c.nombre, g:c.listoG, u: c.line.peso ? null : c.line.unidades, liq:c.line.liq, vis:c.vis, sub:false, cup:false })
+    }
+  }
+  return out
+}
+const pesoTxt = x => x.u != null ? (fmtU(x.u) + ' u.' + (x.g ? ' (' + fmtG(x.g) + ')' : '')) : fmtG(x.g, x.liq)
+
+/* =====================================================================
+   Ilustración SVG
+   ===================================================================== */
+function rng(seedStr){
+  let h = 1779033703 ^ seedStr.length
+  for(let i = 0; i < seedStr.length; i++){ h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19 }
+  return () => { h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296 }
+}
+let clipN = 0
+function shade(hex, amt){
+  const n = parseInt(hex.slice(1), 16)
+  let r = (n >> 16) + amt, g = (n >> 8 & 255) + amt, b = (n & 255) + amt
+  r = Math.max(0, Math.min(255, r)); g = Math.max(0, Math.min(255, g)); b = Math.max(0, Math.min(255, b))
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
+}
+/* Rellena una región (clipPath) con la textura del ingrediente */
+function textura(v, clipId, b, seed){
+  const r = rng(seed + v.k), { x, y, w, h } = b, A = w * h
+  const R = (a, z) => a + r() * (z - a)
+  let s = `<g clip-path="url(#${clipId})"><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${v.f2}"/>`
+  const n = k => Math.max(4, Math.round(A / k))
+  switch(v.tex){
+    case 'leaf': {
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${shade(v.f, 25)}"/>`
+      for(let i = 0; i < n(240); i++){ const cx = R(x, x + w), cy = R(y, y + h), rx = R(10, 18), ry = R(5, 9), a = R(0, 180)
+        s += `<g transform="rotate(${a.toFixed(0)} ${cx.toFixed(1)} ${cy.toFixed(1)})"><ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="${i % 3 ? v.f : v.f2}" stroke="${shade(v.f, -30)}" stroke-width=".6"/><line x1="${(cx - rx * .8).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx + rx * .8).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${shade(v.f2, 20)}" stroke-width="1"/></g>` }
+      break }
+    case 'strip': {
+      for(let i = 0; i < n(300); i++){ const cx = R(x - 10, x + w), cy = R(y, y + h), ww = R(26, 44), hh = R(8, 12), a = R(-30, 30)
+        s += `<g transform="rotate(${a.toFixed(0)} ${cx.toFixed(1)} ${cy.toFixed(1)})"><rect x="${cx.toFixed(1)}" y="${(cy - hh / 2).toFixed(1)}" width="${ww.toFixed(1)}" height="${hh.toFixed(1)}" rx="${(hh / 2).toFixed(1)}" fill="${v.f}" stroke="${shade(v.f, -35)}" stroke-width=".8"/><line x1="${(cx + ww * .3).toFixed(1)}" y1="${(cy - hh / 2 + 1).toFixed(1)}" x2="${(cx + ww * .3 - 3).toFixed(1)}" y2="${(cy + hh / 2 - 1).toFixed(1)}" stroke="${shade(v.f, -55)}" stroke-width="1.6" opacity=".55"/><line x1="${(cx + ww * .65).toFixed(1)}" y1="${(cy - hh / 2 + 1).toFixed(1)}" x2="${(cx + ww * .65 - 3).toFixed(1)}" y2="${(cy + hh / 2 - 1).toFixed(1)}" stroke="${shade(v.f, -55)}" stroke-width="1.6" opacity=".55"/></g>` }
+      break }
+    case 'crumb': {
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${v.f}"/>`
+      for(let i = 0; i < n(18); i++) s += `<circle cx="${R(x, x + w).toFixed(1)}" cy="${R(y, y + h).toFixed(1)}" r="${R(.8, 1.8).toFixed(1)}" fill="${i % 2 ? shade(v.f, -40) : v.f2}"/>`
+      break }
+    case 'fold': {
+      for(let i = 0; i < n(500); i++){ const cx = R(x, x + w), cy = R(y, y + h), rr = R(12, 18)
+        s += `<path d="M${(cx - rr).toFixed(1)} ${cy.toFixed(1)} Q${cx.toFixed(1)} ${(cy - rr).toFixed(1)} ${(cx + rr).toFixed(1)} ${cy.toFixed(1)} Q${cx.toFixed(1)} ${(cy + rr * .6).toFixed(1)} ${(cx - rr).toFixed(1)} ${cy.toFixed(1)}Z" fill="${v.f}" stroke="${shade(v.f, -40)}" stroke-width=".8"/>` }
+      break }
+    case 'shred': {
+      for(let i = 0; i < n(28); i++){ const cx = R(x, x + w), cy = R(y, y + h), l = R(5, 12), a = R(0, Math.PI)
+        s += `<line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(cx + Math.cos(a) * l).toFixed(1)}" y2="${(cy + Math.sin(a) * l).toFixed(1)}" stroke="${i % 4 ? v.f : shade(v.f, -30)}" stroke-width="2.6" stroke-linecap="round"/>` }
+      break }
+    case 'dot': {
+      for(let i = 0; i < n(16); i++) s += `<ellipse cx="${R(x, x + w).toFixed(1)}" cy="${R(y, y + h).toFixed(1)}" rx="${R(1.6, 2.6).toFixed(1)}" ry="${R(1.2, 2).toFixed(1)}" fill="${v.f}" stroke="${shade(v.f2, -40)}" stroke-width=".4"/>`
+      break }
+    case 'cube': {
+      for(let i = 0; i < n(85); i++){ const cx = R(x, x + w), cy = R(y, y + h), z = R(6, 10), a = R(0, 90)
+        s += `<rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${z.toFixed(1)}" height="${z.toFixed(1)}" rx="2" fill="${i % 3 ? v.f : shade(v.f, -20)}" stroke="${shade(v.f, -45)}" stroke-width=".5" transform="rotate(${a.toFixed(0)} ${cx.toFixed(1)} ${cy.toFixed(1)})"/>` }
+      break }
+    case 'slice': {
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${shade(v.f2, 10)}"/>`
+      for(let i = 0; i < n(330); i++){ const cx = R(x, x + w), cy = R(y, y + h), rr = R(8, 12)
+        s += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${rr.toFixed(1)}" fill="${v.f}" stroke="${shade(v.f, -40)}" stroke-width=".8"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(rr * .55).toFixed(1)}" fill="${v.f2}"/><circle cx="${(cx - 2).toFixed(1)}" cy="${(cy - 1).toFixed(1)}" r="1.1" fill="#fff4c2"/><circle cx="${(cx + 2).toFixed(1)}" cy="${(cy + 1.5).toFixed(1)}" r="1.1" fill="#fff4c2"/>` }
+      break }
+    case 'rings': {
+      for(let i = 0; i < n(110); i++) s += `<circle cx="${R(x, x + w).toFixed(1)}" cy="${R(y, y + h).toFixed(1)}" r="${R(5, 9).toFixed(1)}" fill="none" stroke="${v.f}" stroke-width="2.2"/>`
+      break }
+    case 'drip': case 'smooth': {
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${v.f}"/>`
+      for(let i = 0; i < n(700); i++){ const cx = R(x, x + w), cy = R(y, y + h)
+        s += `<path d="M${(cx - 14).toFixed(1)} ${cy.toFixed(1)} q7 -6 14 0 t14 0" fill="none" stroke="${v.f2}" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>` }
+      break }
+    case 'egg': {
+      for(let i = 0; i < n(450); i++){ const cx = R(x, x + w), cy = R(y, y + h)
+        s += `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" rx="12" ry="9" fill="#fff" stroke="#e5e0d0" stroke-width=".8"/><circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5" fill="${v.f}"/>` }
+      break }
+    case 'lemon': {
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${v.f2}"/>`
+      for(let i = 0; i < 6; i++) s += `<line x1="${x + w / 2}" y1="${y + h / 2}" x2="${(x + w / 2 + Math.cos(i * Math.PI / 3) * w).toFixed(1)}" y2="${(y + h / 2 + Math.sin(i * Math.PI / 3) * h).toFixed(1)}" stroke="${v.f}" stroke-width="2"/>`
+      break }
+    case 'disc': case 'bun': case 'tarta': default: {
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${v.f}"/>`
+      for(let i = 0; i < n(260); i++) s += `<ellipse cx="${R(x, x + w).toFixed(1)}" cy="${R(y, y + h).toFixed(1)}" rx="${R(3, 7).toFixed(1)}" ry="${R(2, 4).toFixed(1)}" fill="${v.f2}" opacity=".7"/>`
+    }
+  }
+  return s + '</g>'
+}
+function ellipsePath(cx, cy, rx, ry, wobble, seed){
+  const r = rng(seed), pts = 36
+  let d = ''
+  for(let i = 0; i <= pts; i++){
+    const a = i / pts * Math.PI * 2, k = 1 + (wobble ? (r() - .5) * wobble : 0)
+    const px = cx + Math.cos(a) * rx * k, py = cy + Math.sin(a) * ry * k
+    d += (i ? 'L' : 'M') + px.toFixed(1) + ' ' + py.toFixed(1)
+  }
+  return d + 'Z'
+}
+function corta(s, n){ s = String(s); return s.length > n ? s.slice(0, n - 1) + '…' : s }
+
+/* Vista "explotada" estilo fast food: capas flotando con su gramaje */
+function svgStack(capas, opts){
+  const esp = 52, H = capas.length * esp + 46, W = 360, cx = 112
+  let defs = '', body = ''
+  capas.forEach((c, i) => {
+    const cy = H - 30 - i * esp
+    const v = c.vis
+    const isBase = v.rol === 'base'
+    const rx = isBase ? 104 : (v.rol === 'salsa' ? 84 : 92), ry = isBase ? 22 : 17
+    const wob = v.tex === 'leaf' ? .22 : (v.tex === 'drip' ? .12 : (v.tex === 'disc' ? .03 : .08))
+    const id = 'c' + (++clipN)
+    let shape
+    if(c.top){ // tapa de pan
+      shape = `M${cx - rx} ${cy + 8} Q${cx - rx} ${cy - 30} ${cx} ${cy - 32} Q${cx + rx} ${cy - 30} ${cx + rx} ${cy + 8} Q${cx} ${cy + 18} ${cx - rx} ${cy + 8}Z`
+    } else shape = ellipsePath(cx, cy, rx, ry, wob, c.nombre + i)
+    defs += `<clipPath id="${id}"><path d="${shape}"/></clipPath>`
+    // espesor / sombra
+    body += `<ellipse cx="${cx}" cy="${cy + 9}" rx="${rx * .96}" ry="${ry * .8}" fill="#000" opacity=".10"/>`
+    if(isBase || v.tex === 'bun') body += `<path d="${shape}" transform="translate(0 5)" fill="${shade(v.f, -35)}"/>`
+    body += textura(v, id, { x: cx - rx - 8, y: cy - ry - 34, w: rx * 2 + 16, h: ry * 2 + 50 }, c.nombre + i)
+    body += `<path d="${shape}" fill="none" stroke="${shade(v.f, -50)}" stroke-width="1.1" opacity=".6"/>`
+    if(c.top) body += [[-30, -14], [0, -20], [28, -12], [-8, -8], [18, -24]].map(([dx, dy]) => `<ellipse cx="${cx + dx}" cy="${cy + dy}" rx="3" ry="1.6" fill="#fbf1d8"/>`).join('')
+    // etiqueta
+    if(!c.top || opts.labelTop){
+      const lx = 232, ly = cy - 2
+      body += `<line x1="${cx + rx + 4}" y1="${cy}" x2="${lx - 6}" y2="${ly}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3"/>`
+      body += `<circle cx="${cx + rx + 3}" cy="${cy}" r="2.5" fill="#64748b"/>`
+      body += `<text x="${lx}" y="${ly - 2}" font-size="12.5" fill="#1e293b" font-weight="600">${esc(corta(c.nombre, 17))}</text>`
+      body += `<text x="${lx}" y="${ly + 13}" font-size="12.5" fill="#047857" font-weight="700">${esc(c.txt || '')}</text>`
+    }
+  })
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Armado por capas"><defs>${defs}</defs>${body}</svg>`
+}
+
+/* Vista desde arriba de la bandeja con zonas */
+function svgTray(zonas, extras, bandeja){
+  const W = 360, H = 250
+  const negra = bandeja && bandeja.negra
+  const trayF = negra ? '#1f2937' : '#e6f0f5', trayS = negra ? '#0b1220' : '#94b3c5'
+  let defs = '', body = ''
+  body += `<rect x="16" y="18" width="328" height="210" rx="24" fill="${trayF}" stroke="${trayS}" stroke-width="2.5"/>`
+  body += `<rect x="26" y="28" width="308" height="190" rx="18" fill="${negra ? '#111827' : '#f3f8fb'}" stroke="${negra ? '#374151' : '#bcd3df'}" stroke-width="1.2"/>`
+  if(!negra) body += `<path d="M40 40 Q90 30 150 36" stroke="#fff" stroke-width="4" fill="none" opacity=".8" stroke-linecap="round"/>`
+  const X = 34, Y = 36, Wd = 292, Hd = 174, gap = 6
+  const regs = []
+  if(zonas.length === 1) regs.push({ x:X, y:Y, w:Wd, h:Hd })
+  else if(zonas.length === 2) { const w1 = Wd * .58; regs.push({ x:X, y:Y, w:w1 - gap / 2, h:Hd }, { x:X + w1 + gap / 2, y:Y, w:Wd - w1 - gap / 2, h:Hd }) }
+  else if(zonas.length > 2) {
+    const w1 = Wd * .54; regs.push({ x:X, y:Y, w:w1 - gap / 2, h:Hd })
+    const resto = zonas.slice(1), tot = resto.reduce((s, z) => s + Math.max(z.g || 0, 20), 0)
+    let yy = Y
+    resto.forEach((z, i) => { const hh = i === resto.length - 1 ? (Y + Hd - yy) : Math.max(42, Hd * Math.max(z.g || 0, 20) / tot - gap / 2); regs.push({ x:X + w1 + gap / 2, y:yy, w:Wd - w1 - gap / 2, h:hh }); yy += hh + gap })
+  }
+  zonas.forEach((z, i) => {
+    const b = regs[i], id = 'c' + (++clipN)
+    const rr = 14
+    defs += `<clipPath id="${id}"><rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${rr}"/></clipPath>`
+    if(z.dibujo === 'wrapRoll'){
+      body += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${rr}" fill="${negra ? '#1f2937' : '#eaf2f6'}"/>`
+      const r = Math.min(b.w / 4.6, b.h / 2.6), cy = b.y + b.h / 2
+      ;[b.x + b.w * .3, b.x + b.w * .72].forEach((cx, k) => {
+        body += `<circle cx="${cx + 3}" cy="${cy + 5}" r="${r}" fill="#000" opacity=".12"/>`
+        const cols = z.relleno.length ? z.relleno : ['#5aa845', '#d9a066']
+        body += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${VIS.tortilla.f}" stroke="${shade(VIS.tortilla.f, -40)}" stroke-width="1.2"/>`
+        cols.slice(0, 4).forEach((c, j) => { const a0 = j / Math.min(cols.length, 4) * Math.PI * 2, a1 = (j + 1) / Math.min(cols.length, 4) * Math.PI * 2, ri = r * .78
+          body += `<path d="M${cx} ${cy} L${(cx + Math.cos(a0) * ri).toFixed(1)} ${(cy + Math.sin(a0) * ri).toFixed(1)} A${ri} ${ri} 0 0 1 ${(cx + Math.cos(a1) * ri).toFixed(1)} ${(cy + Math.sin(a1) * ri).toFixed(1)}Z" fill="${c}"/>` })
+        body += `<circle cx="${cx}" cy="${cy}" r="${r * .78}" fill="none" stroke="${shade(VIS.tortilla.f, -25)}" stroke-width="2.5"/>`
+      })
+    } else if(z.dibujo === 'sandwich'){
+      body += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${rr}" fill="${negra ? '#1f2937' : '#eaf2f6'}"/>`
+      const mx = b.x + b.w / 2, my = b.y + b.h / 2, s = Math.min(b.w, b.h) * .42
+      ;[[-1, -6], [1, 6]].forEach(([d, rot]) => {
+        const ox = mx + d * s * .55
+        body += `<g transform="rotate(${rot} ${ox} ${my})"><path d="M${ox - s * .5} ${my + s * .8} L${ox + s * .5} ${my + s * .8} L${ox + s * .5} ${my - s * .6} Q${ox} ${my - s * 1.05} ${ox - s * .5} ${my - s * .6}Z" fill="${VIS.pan.f}" stroke="${shade(VIS.pan.f, -40)}" stroke-width="1.2"/><path d="M${ox - s * .4} ${my + s * .7} L${ox + s * .4} ${my + s * .7} L${ox + s * .4} ${my - s * .5} Q${ox} ${my - s * .9} ${ox - s * .4} ${my - s * .5}Z" fill="${VIS.pan.f2}"/></g>`
+      })
+    } else if(z.dibujo === 'tarta'){
+      body += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${rr}" fill="${negra ? '#1f2937' : '#eaf2f6'}"/>`
+      const px = b.x + b.w * .12, py = b.y + b.h * .82, qx = b.x + b.w * .88, qy = b.y + b.h * .82, tx = b.x + b.w * .5, ty = b.y + b.h * .14
+      const id2 = 'c' + (++clipN)
+      defs += `<clipPath id="${id2}"><path d="M${px} ${py} L${qx} ${qy} L${tx} ${ty}Z"/></clipPath>`
+      body += textura(VIS.tarta, id2, { x:b.x, y:b.y, w:b.w, h:b.h }, z.nombre)
+      body += `<path d="M${px} ${py} L${qx} ${qy}" stroke="${shade(VIS.tarta.f, -40)}" stroke-width="8" stroke-linecap="round"/><path d="M${px} ${py} L${tx} ${ty} L${qx} ${qy}" fill="none" stroke="${shade(VIS.tarta.f, -30)}" stroke-width="2"/>`
+    } else {
+      body += textura(z.vis, id, b, z.nombre + i)
+      body += `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${rr}" fill="none" stroke="${shade(z.vis.f, -40)}" stroke-width="1" opacity=".5"/>`
+    }
+    // etiqueta
+    const txt = corta(z.nombre, b.w > 150 ? 22 : 13), sub = z.txt || ''
+    const tw = Math.min(b.w - 12, Math.max(txt.length, sub.length) * 6.6 + 16)
+    const lx = b.x + b.w / 2 - tw / 2, ly = b.y + b.h - 40
+    body += `<rect x="${lx}" y="${ly}" width="${tw}" height="34" rx="9" fill="#fff" opacity=".94" stroke="#cbd5e1"/>`
+    body += `<text x="${b.x + b.w / 2}" y="${ly + 14}" font-size="11.5" text-anchor="middle" fill="#1e293b" font-weight="600">${esc(txt)}</text>`
+    body += `<text x="${b.x + b.w / 2}" y="${ly + 28}" font-size="11.5" text-anchor="middle" fill="#047857" font-weight="700">${esc(sub)}</text>`
+  })
+  // extras: dips / salsas aparte y limón
+  extras.forEach((e, i) => {
+    const cx = 50 + i * 112, cy = 262
+    if(e.tipo === 'cup'){
+      body += `<circle cx="${cx}" cy="${cy}" r="27" fill="#fff" stroke="#94a3b8" stroke-width="2"/><circle cx="${cx}" cy="${cy}" r="20" fill="${e.vis.f}"/><path d="M${cx - 10} ${cy - 5} q5 -4 10 0 t10 0" stroke="${e.vis.f2}" stroke-width="2.4" fill="none"/>`
+    } else {
+      body += `<path d="M${cx - 18} ${cy + 6} A20 20 0 0 1 ${cx + 18} ${cy + 6}Z" fill="${VIS.limon.f}" stroke="#c9a400" stroke-width="1.5"/><path d="M${cx - 13} ${cy + 4} A14 14 0 0 1 ${cx + 13} ${cy + 4}Z" fill="${VIS.limon.f2}"/>`
+    }
+    body += `<text x="${cx + 34}" y="${cy - 4}" font-size="11" fill="#1e293b" font-weight="600" text-anchor="start">${esc(corta(e.nombre, 11))}</text><text x="${cx + 34}" y="${cy + 11}" font-size="11" fill="#047857" font-weight="700">${esc(e.txt)}</text>`
+  })
+  const label = bandeja ? bandeja.txt + (negra ? ' (negra)' : '') : 'Bandeja'
+  body += `<text x="30" y="13" font-size="11.5" fill="#64748b" font-weight="600">${esc(label)} · vista desde arriba</text>`
+  const HH = extras.length ? H + 72 : H + 6
+  return `<svg viewBox="0 0 ${W} ${HH}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bandeja armada"><defs>${defs}</defs>${body}</svg>`
+}
+
+function svgBowl(items, cups){
+  const W = 360, H = 270, cx = 160, cy = 138, R = 108
+  let defs = '', body = ''
+  body += `<ellipse cx="${cx}" cy="${cy + 8}" rx="${R + 14}" ry="${R + 10}" fill="#000" opacity=".08"/>`
+  body += `<circle cx="${cx}" cy="${cy}" r="${R + 10}" fill="#eef5f8" stroke="#94b3c5" stroke-width="2.5"/>`
+  const base = items.filter(x => x.vis.rol === 'hoja'), tops = items.filter(x => x.vis.rol !== 'hoja')
+  if(base.length){ const id = 'c' + (++clipN); defs += `<clipPath id="${id}"><circle cx="${cx}" cy="${cy}" r="${R}"/></clipPath>`; body += textura(base[0].vis, id, { x:cx - R, y:cy - R, w:R * 2, h:R * 2 }, base[0].nombre) }
+  const tot = tops.reduce((s, t) => s + Math.max(t.g || 0, 15), 0)
+  let a = -Math.PI / 2
+  const labels = []
+  tops.forEach((t, i) => {
+    const da = Math.max(t.g || 0, 15) / tot * Math.PI * 2, a1 = a + da, ri = base.length ? R * .78 : R
+    const id = 'c' + (++clipN)
+    const p = tops.length === 1 ? `M${cx - ri} ${cy} A${ri} ${ri} 0 1 1 ${cx + ri} ${cy} A${ri} ${ri} 0 1 1 ${cx - ri} ${cy}Z`
+      : `M${cx} ${cy} L${(cx + Math.cos(a) * ri).toFixed(1)} ${(cy + Math.sin(a) * ri).toFixed(1)} A${ri} ${ri} 0 ${da > Math.PI ? 1 : 0} 1 ${(cx + Math.cos(a1) * ri).toFixed(1)} ${(cy + Math.sin(a1) * ri).toFixed(1)}Z`
+    defs += `<clipPath id="${id}"><path d="${p}"/></clipPath>`
+    body += textura(t.vis, id, { x:cx - R, y:cy - R, w:R * 2, h:R * 2 }, t.nombre + i)
+    body += `<path d="${p}" fill="none" stroke="#fff" stroke-width="2"/>`
+    const am = a + da / 2
+    labels.push({ t, x: cx + Math.cos(am) * ri * .62, y: cy + Math.sin(am) * ri * .62 })
+    a = a1
+  })
+  labels.forEach((l, i) => {
+    body += `<circle cx="${l.x.toFixed(1)}" cy="${l.y.toFixed(1)}" r="10" fill="#fff" stroke="#1e293b" stroke-width="1.2"/><text x="${l.x.toFixed(1)}" y="${(l.y + 4).toFixed(1)}" font-size="11" text-anchor="middle" font-weight="700" fill="#1e293b">${i + 1}</text>`
+  })
+  cups.forEach((c, i) => {
+    const x = 318, y = 60 + i * 74
+    body += `<circle cx="${x}" cy="${y}" r="26" fill="#fff" stroke="#94a3b8" stroke-width="2"/><circle cx="${x}" cy="${y}" r="19" fill="${c.vis.f}"/><text x="${x}" y="${y + 42}" font-size="10.5" text-anchor="middle" fill="#1e293b" font-weight="600">${esc(corta(c.nombre, 12))}</text><text x="${x}" y="${y + 55}" font-size="10.5" text-anchor="middle" fill="#047857" font-weight="700">${esc(c.txt)}</text>`
+  })
+  const leyenda = (base.length ? [`Base: ${base.map(b => b.nombre + ' ' + b.txt).join(', ')}`] : []).concat(tops.map((t, i) => `${i + 1}. ${t.nombre} · ${t.txt}`))
+  return { svg:`<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ensalada armada"><defs>${defs}</defs>${body}</svg>`, leyenda }
+}
+
+/* Decide qué dibujar según el tipo de plato */
+function ilustracion(p){
+  const a = p._a, pz = piezas(a)
+  pz.forEach(x => x.txt = pesoTxt(x))
+  const esCup = x => x.cup
+  const esLimon = x => x.vis.k === 'limon'
+  let html = ''
+  if(a.layout === 'wrap' || a.layout === 'sandwich' || a.layout === 'postre'){
+    // dentro: lo que va armado; afuera: guarniciones, dips, limón
+    const dentro = pz.filter(x => !esCup(x) && !esLimon(x) && !(x.sub && (x.fam === 'guarnicion' || x.fam === 'otro')))
+    const afuera = pz.filter(x => !dentro.includes(x))
+    const orden = { base:0, hoja:1, verdura:2, guarn:2.5, prot:3, otro:3.5, queso:4, salsa:5, extra:6 }
+    const capas = dentro.slice().sort((x, y) => (orden[x.vis.rol] ?? 3.5) - (orden[y.vis.rol] ?? 3.5))
+    if(a.layout === 'sandwich'){
+      const pan = capas.find(c => c.vis.rol === 'base')
+      if(pan) capas.push({ ...pan, top:true, nombre:pan.nombre + ' (tapa)', txt:'' })
+    }
+    html += `<div class="box ilus"><h3>🧩 Armado por capas <span class="sub">de abajo hacia arriba · por vianda</span></h3>${svgStack(capas, {})}</div>`
+    if(a.layout !== 'postre'){
+      const relleno = capas.filter(c => c.vis.rol !== 'base' && !c.top).map(c => c.vis.f)
+      const zonas = [{ nombre: p.nombre.split(/[,+]/)[0].trim(), txt: fmtG(capas.filter(c => !c.top).reduce((s, c) => s + (c.g || 0), 0)), dibujo: a.layout === 'wrap' ? 'wrapRoll' : 'sandwich', relleno }]
+      afuera.filter(x => !esCup(x) && !esLimon(x)).forEach(x => zonas.push({ nombre:x.nombre, txt:x.txt, g:x.g, vis:x.vis }))
+      const extras = afuera.filter(x => esCup(x) || esLimon(x)).map(x => ({ ...x, tipo: esCup(x) ? 'cup' : 'limon' }))
+      html += `<div class="box ilus"><h3>📦 Así va en la ${esc(a.bandeja ? a.bandeja.txt.toLowerCase() : 'bandeja')}</h3>${svgTray(zonas, extras.slice(0, 3), a.bandeja)}</div>`
+    }
+  } else if(a.layout === 'bowl'){
+    const items = pz.filter(x => !esCup(x) && !(x.vis.rol === 'salsa'))
+    const cups = pz.filter(x => esCup(x) || x.vis.rol === 'salsa')
+    const r = svgBowl(items, cups.slice(0, 3))
+    html += `<div class="box ilus"><h3>🥗 Armado de la ensalada <span class="sub">vista desde arriba · por vianda</span></h3>${r.svg}<div class="nota">${r.leyenda.map(esc).join('<br>')}</div></div>`
+  } else {
+    const extras = pz.filter(x => esCup(x) || esLimon(x) || (x.vis.rol === 'salsa' && (x.g || 0) <= 60)).map(x => ({ ...x, tipo: esLimon(x) ? 'limon' : 'cup' }))
+    const resto = pz.filter(x => !extras.find(e => e.nombre === x.nombre))
+    const peso = x => x.g || 0
+    const rolOrd = { prot:0, otro:1, guarn:2, verdura:3, hoja:4, queso:5, salsa:6, base:7 }
+    resto.sort((x, y) => (x.sub === y.sub ? 0 : x.sub ? -1 : 1) || (rolOrd[x.vis.rol] ?? 1) - (rolOrd[y.vis.rol] ?? 1) || peso(y) - peso(x))
+    let zonas = resto.slice(0, 4).map(x => ({ nombre:x.nombre, txt:x.txt, g:x.g, vis:x.vis, dibujo: x.vis.k === 'tarta' ? 'tarta' : null }))
+    if(resto.length > 4){ const otros = resto.slice(3); zonas = zonas.slice(0, 3); zonas.push({ nombre: otros.map(o => o.nombre).join(' + '), txt: fmtG(otros.reduce((s, o) => s + peso(o), 0)), g: otros.reduce((s, o) => s + peso(o), 0), vis: otros[0].vis }) }
+    if(!zonas.length) zonas = [{ nombre:p.nombre, txt:fmtG(a.pesoVianda), vis:VIS.otro }]
+    html += `<div class="box ilus"><h3>📦 Así va en la ${esc(a.bandeja ? a.bandeja.txt.toLowerCase() : 'bandeja')} <span class="sub">por vianda</span></h3>${svgTray(zonas, extras.slice(0, 3), a.bandeja)}</div>`
+  }
+  return html
+}
+
+/* Pasos de armado sugeridos (si la receta no tiene paso a paso cargado) */
+function pasosSugeridos(p){
+  const a = p._a, pz = piezas(a)
+  pz.forEach(x => x.txt = pesoTxt(x))
+  const B = s => `<b>${esc(s)}</b>`
+  const bandeja = a.bandeja ? a.bandeja.txt.toLowerCase() : (a.layout === 'bowl' ? 'la ensaladera' : 'la bandeja')
+  const pasos = []
+  const cierre = () => { pasos.push(`Cerrá ${a.film ? 'con film' : 'la bandeja'}, etiquetá y llevá a cámara.`) }
+  if(a.layout === 'wrap' || a.layout === 'sandwich'){
+    const base = pz.find(x => x.vis.rol === 'base')
+    const dentro = pz.filter(x => x !== base && !x.cup && x.vis.k !== 'limon' && !(x.sub && (x.fam === 'guarnicion' || x.fam === 'otro')))
+    const afuera = pz.filter(x => x !== base && !dentro.includes(x))
+    const orden = { hoja:1, verdura:2, guarn:2.5, prot:3, otro:3.5, queso:4, salsa:5 }
+    dentro.sort((x, y) => (orden[x.vis.rol] ?? 3.5) - (orden[y.vis.rol] ?? 3.5))
+    if(base) pasos.push(a.layout === 'wrap' ? `Apoyá ${B(base.nombre.toLowerCase())} (${base.txt}) abierta sobre la tabla.` : `Abrí el ${B(base.nombre.toLowerCase())} (${base.txt}) y apoyá la base.`)
+    dentro.forEach(x => {
+      const v = x.vis.rol
+      if(v === 'hoja') pasos.push(`Hacé una cama pareja de ${B(x.nombre)}: ${B(x.txt)}.`)
+      else if(v === 'salsa') pasos.push(`Agregá ${B(x.nombre)}: ${B(x.txt)} distribuida en todo el largo.`)
+      else if(v === 'prot') pasos.push(`Sumá ${B(x.nombre)}: ${B(x.txt)}${a.layout === 'wrap' ? ' en una línea en el centro' : ''}.`)
+      else pasos.push(`Agregá ${B(x.nombre)}: ${B(x.txt)}.`)
+    })
+    pasos.push(a.layout === 'wrap' ? 'Doblá los laterales hacia adentro y enrollá bien firme.' : 'Tapá con la otra mitad del pan y presioná suave.')
+    const extras = afuera.map(x => `${B(x.nombre)} (${x.txt}${x.cup ? ', en dip' : ''})`)
+    pasos.push(`Ubicá en ${B(bandeja)}${extras.length ? ' y completá con ' + extras.join(', ') : ''}.`)
+    cierre()
+  } else if(a.layout === 'bowl'){
+    const hojas = pz.filter(x => x.vis.rol === 'hoja'), salsas = pz.filter(x => x.cup || x.vis.rol === 'salsa'), tops = pz.filter(x => !hojas.includes(x) && !salsas.includes(x))
+    if(hojas.length) pasos.push(`Base de hojas en ${B(bandeja)}: ${hojas.map(h => B(h.nombre) + ' ' + B(h.txt)).join(' + ')}.`)
+    tops.forEach(t => pasos.push(`Ubicá ${B(t.nombre)}: ${B(t.txt)} en su sector (sin mezclar).`))
+    salsas.forEach(s => pasos.push(`${B(s.nombre)}: ${B(s.txt)} aparte, en dip.`))
+    cierre()
+  } else {
+    const extras = pz.filter(x => x.cup || x.vis.k === 'limon' || (x.vis.rol === 'salsa' && (x.g || 0) <= 60))
+    const resto = pz.filter(x => !extras.includes(x))
+    resto.forEach((x, i) => pasos.push(i === 0 ? `Pesá ${B(x.txt)} de ${B(x.nombre)} y ubicalo del lado izquierdo de ${B(bandeja)}.` : `Sumá ${B(x.txt)} de ${B(x.nombre)}${i === 1 ? ' del lado derecho' : ''}.`))
+    extras.forEach(x => pasos.push(x.vis.k === 'limon' ? `Terminá con ${B(x.nombre)} (${x.txt}).` : `${B(x.nombre)}: ${B(x.txt)}${x.cup ? ' en dip' : ''}.`))
+    pasos.push(`Controlá el peso total: ${B(fmtG(a.pesoVianda))} por vianda.`)
+    cierre()
+  }
+  return pasos
+}
+
+/* =====================================================================
+   Lista principal
+   ===================================================================== */
+function render(){
+  const soloRot = $('solo-rot').checked
+  const q = norm($('q').value).trim().split(/\s+/).filter(Boolean)
+  const base = platos.filter(p => !soloRot || p.en_rotacion !== false)
+  const cuenta = {}; base.forEach(p => cuenta[p.tipo] = (cuenta[p.tipo] || 0) + 1)
+  $('chips').innerHTML = `<button class="chip ${filtroTipo === 'todos' ? 'on' : ''}" data-t="todos">Todos<span class="n">${base.length}</span></button>` +
+    TIPOS.filter(t => cuenta[t.v]).map(t => `<button class="chip ${filtroTipo === t.v ? 'on' : ''}" data-t="${t.v}">${t.e} ${t.l}<span class="n">${cuenta[t.v]}</span></button>`).join('')
+  const lista = base.filter(p => (filtroTipo === 'todos' || p.tipo === filtroTipo) && q.every(w => norm(p.nombre).includes(w)))
+  $('contador').textContent = lista.length + (lista.length === 1 ? ' plato' : ' platos')
+  if(!lista.length){ $('lista').innerHTML = `<div class="vacio">No encontré platos${q.length ? ' para “' + esc($('q').value) + '”' : ''}.${soloRot ? '<br><small>Probá destildar “Solo en rotación”.</small>' : ''}</div>`; return }
+  $('lista').innerHTML = lista.map(p => {
+    const t = TIPO_MAP[p.tipo] || { e:'🍽', c:'#f1f5f9', l:p.tipo || 'Plato' }
+    const a = p._a
+    const meta = [t.l, a.bandeja ? a.bandeja.txt : null, fmtG(a.pesoVianda) + ' por vianda'].filter(Boolean).join(' · ')
+    return `<button class="card" data-id="${p.id}"><div class="em" style="background:${t.c}">${t.e}</div><div class="tx"><div class="nm">${esc(p.nombre)}</div><div class="meta">${esc(meta)}</div></div><div class="go">›</div></button>`
+  }).join('')
+}
+
+/* =====================================================================
+   Detalle
+   ===================================================================== */
+function abrir(id, push){
+  const p = platos.find(x => x.id === id); if(!p) return
+  platoActual = p; tabActual = 'armado'
+  if(push) history.pushState({ id }, '', '#/p/' + id)
+  $('detalle').classList.remove('hidden'); $('detalle').scrollTop = 0
+  document.body.style.overflow = 'hidden'
+  renderDetalle()
+  try{ if('wakeLock' in navigator) navigator.wakeLock.request('screen').then(w => wakeLock = w).catch(() => {}) }catch(e){}
+}
+function cerrar(){
+  platoActual = null
+  $('detalle').classList.add('hidden'); document.body.style.overflow = ''
+  try{ wakeLock && wakeLock.release(); wakeLock = null }catch(e){}
+}
+function renderDetalle(){
+  const p = platoActual; if(!p) return
+  const a = p._a, t = TIPO_MAP[p.tipo] || { e:'🍽', l:p.tipo || 'Plato' }
+  $('d-nombre').textContent = p.nombre
+  const b = [`<span class="badge">${t.e} ${esc(t.l)}</span>`]
+  if(p.proteina && PROT[p.proteina]) b.push(`<span class="badge">${PROT[p.proteina]}</span>`)
+  b.push(a.bandeja ? `<span class="badge tray ${a.bandeja.negra ? '' : 'cl'}">📦 ${esc(a.bandeja.txt)}${a.bandeja.negra ? ' negra' : ''}</span>` : `<span class="badge">📦 sin bandeja cargada</span>`)
+  b.push(`<span class="badge">⚖️ ${fmtG(a.pesoVianda)} por vianda</span>`)
+  $('d-badges').innerHTML = b.join('')
+  $('p-n').value = N
+  $('quick').innerHTML = [10, 20, 50, 100].map(q => `<button data-q="${q}" class="${N === q ? 'on' : ''}">${q}</button>`).join('')
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.t === tabActual))
+  const body = $('d-body')
+  if(tabActual === 'armado') body.innerHTML = vistaArmado(p)
+  else if(tabActual === 'ingredientes') body.innerHTML = vistaIngredientes(p)
+  else body.innerHTML = vistaTotal(p)
+}
+
+function vistaArmado(p){
+  const a = p._a
+  let h = ilustracion(p)
+  if(p.descripcion && p.descripcion.trim()) h += `<div class="box"><h3>📝 Paso a paso de la receta</h3><div class="texto-receta">${esc(p.descripcion.trim())}</div></div>`
+  const pasos = pasosSugeridos(p)
+  h += `<div class="box"><h3>👩‍🍳 Armado ${p.descripcion ? 'rápido' : ''}<span class="sub">por vianda</span></h3><ol class="pasos">${pasos.map(x => `<li>${x}</li>`).join('')}</ol>
+    ${p.descripcion ? '' : '<div class="nota">Pasos generados a partir de la receta. Para pasos propios, cargalos en el recetario → “Paso a paso / Descripción”.</div>'}</div>`
+  const notas = a.comps.filter(c => c.tipo === 'sub' && !c.pack && c.sr.descripcion && c.sr.descripcion.trim())
+  if(notas.length) h += `<div class="box"><h3>💡 Notas de las preparaciones</h3>${notas.map(c => `<p class="texto-receta" style="margin:0 0 10px"><b>${esc(c.nombre)}:</b> ${esc(c.sr.descripcion.trim())}</p>`).join('')}</div>`
+  if(N > 1) h += `<div class="nota" style="text-align:center">Para las cantidades de ${N} porciones mirá las pestañas ⚖️ Ingredientes y 🧾 Producción.</div>`
+  return h
+}
+
+function filaIns(l, k){
+  if(!l.peso) return `<tr><td>${esc(l.nombre)}</td><td class="num">${fmtU(l.unidades * k)} u.</td><td class="num">${l.listo ? fmtG(l.listo * k) : '–'}</td></tr>`
+  const tags = []
+  if(l.merma) tags.push(`<span class="tag">merma ${l.merma}%</span>`)
+  if(l.coc) tags.push(`<span class="tag">cocción ${l.coc > 0 ? '+' : ''}${l.coc}%</span>`)
+  tags.push(l.crudoCargado ? '<span class="tag c">receta en crudo</span>' : '<span class="tag k">receta en cocido/limpio</span>')
+  const igual = Math.abs(l.bruto - l.listo) < 0.5
+  return `<tr><td>${esc(l.nombre)}<span class="mini">${tags.join('')}</span></td>
+    <td class="num crudo">${fmtG(l.bruto * k, l.liq)}</td>
+    <td class="num">${igual ? '=' : fmtG(l.listo * k, l.liq)}</td></tr>`
+}
+const thead = `<tr><th>Insumo</th><th>Crudo / bruto</th><th>Listo</th></tr>`
+const leyenda = `<div class="leyenda"><span class="lc">Crudo: lo que pesás antes de limpiar/cocinar</span><span class="lk">Listo: lo que queda para armar</span></div>`
+
+function vistaIngredientes(p){
+  const a = p._a, k = N
+  let h = `<div class="box"><div class="kpis">
+    <div class="kpi"><div class="v">${N}</div><div class="l">porciones</div></div>
+    <div class="kpi"><div class="v">${fmtG(a.pesoVianda)}</div><div class="l">por vianda</div></div>
+    <div class="kpi"><div class="v">${fmtG(a.pesoVianda * N)}</div><div class="l">total listo</div></div></div></div>`
+  // Lo que se arma directo
+  const directos = []
+  a.comps.forEach(c => {
+    if(c.pack || c.tipo === 'falta') return
+    if(c.tipo === 'ins') directos.push(c.line)
+    if(c.tipo === 'sub' && c.expand) c.lines.filter(l => !l.pack).forEach(l => directos.push({ ...l, de:c.nombre }))
+  })
+  const preps = a.comps.filter(c => c.tipo === 'sub' && !c.pack && !c.expand)
+  if(preps.length){
+    h += `<div class="box"><h3>🍳 Preparaciones <span class="sub">tocá para ver la receta</span></h3>${leyenda}`
+    preps.forEach((c, i) => {
+      const sr = c.sr, totalListo = c.listoG * k
+      const ru = sr.unidad_rendimiento || 'unidad'
+      const rendTxt = PESO.has(ru) ? fmtG(toG(+sr.rendimiento || 0, ru)) : `${fmtU(+sr.rendimiento || 1)} ${ru}`
+      const veces = c.f * k
+      h += `<details class="prep" ${i === 0 && preps.length < 3 ? 'open' : ''}><summary><span class="ar">›</span><span class="pn">${esc(c.nombre)}<span class="mini" style="font-weight:400;color:var(--gris);font-size:12px;display:block">${esc(c.cantTxt)} por vianda · receta base rinde ${esc(rendTxt)}</span></span><span class="pt">${fmtG(totalListo)}</span></summary>
+        <div class="pb"><div class="nota" style="margin:2px 0 6px">Hacer <b>×${fmtU(veces)}</b> la receta base.</div><table class="tabla">${thead}${c.lines.map(l => filaIns(l, k)).join('')}</table>
+        ${sr.descripcion ? `<div class="nota">💡 ${esc(sr.descripcion)}</div>` : ''}</div></details>`
+    })
+    h += `</div>`
+  }
+  if(directos.length){
+    h += `<div class="box"><h3>🧩 Insumos para el armado <span class="sub">${N} porc.</span></h3>${preps.length ? '' : leyenda}<table class="tabla">${thead}${directos.map(l => filaIns(l, k)).join('')}</table></div>`
+  }
+  const packs = a.comps.filter(c => c.pack)
+  if(packs.length){
+    const filas = []
+    packs.forEach(c => { if(c.tipo === 'ins') filas.push(c.line); else c.lines.forEach(l => filas.push(l)) })
+    h += `<div class="box"><h3>📦 Packaging</h3><table class="tabla"><tr><th>Ítem</th><th>Cantidad</th><th></th></tr>${filas.map(l => `<tr><td>${esc(l.nombre)}</td><td class="num">${l.peso ? fmtG(l.bruto * k) : fmtU(l.unidades * k)}</td><td></td></tr>`).join('')}</table></div>`
+  }
+  const faltan = a.comps.filter(c => c.tipo === 'falta')
+  if(faltan.length) h += `<div class="estado" style="margin:0">⚠️ Esta receta tiene ${faltan.length} ingrediente(s) que ya no existen en el recetario. Avisale a quien carga las recetas.</div>`
+  return h
+}
+
+function vistaTotal(p){
+  const a = p._a, k = N, tot = {}
+  const sumar = l => {
+    const key = l.id + (l.peso ? '' : '_u')
+    const t = tot[key] || (tot[key] = { nombre:l.nombre, cat:l.cat || '', peso:l.peso, liq:l.liq, pack:l.pack, bruto:0, listo:0, u:0, merma:l.merma, coc:l.coc })
+    t.bruto += l.bruto * k; t.listo += l.listo * k; t.u += (l.unidades || 0) * k
+  }
+  a.comps.forEach(c => { if(c.tipo === 'ins') sumar(c.line); if(c.tipo === 'sub') c.lines.forEach(sumar) })
+  const arr = Object.values(tot)
+  const comida = arr.filter(t => !t.pack).sort((x, y) => (x.cat || '').localeCompare(y.cat || '') || x.nombre.localeCompare(y.nombre))
+  const pack = arr.filter(t => t.pack)
+  const totalBruto = comida.filter(t => t.peso).reduce((s, t) => s + t.bruto, 0)
+  let h = `<div class="box"><div class="kpis">
+    <div class="kpi"><div class="v">${N}</div><div class="l">porciones</div></div>
+    <div class="kpi"><div class="v" style="color:var(--ambar)">${fmtG(totalBruto)}</div><div class="l">total crudo</div></div>
+    <div class="kpi"><div class="v" style="color:var(--verde-osc)">${fmtG(a.pesoVianda * N)}</div><div class="l">total listo</div></div></div>
+    <div class="nota">Lista consolidada: suma cada insumo de todas las preparaciones del plato. Usala para sacar de cámara / pedir mercadería.</div></div>`
+  let cat = null, filas = ''
+  comida.forEach(t => {
+    if(t.cat !== cat){ cat = t.cat; filas += `<tr><td colspan="3" style="padding-top:14px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--gris);font-weight:700">${esc(cap((cat || 'otros').replace(/_/g, ' ')))}</td></tr>` }
+    if(!t.peso){ filas += `<tr><td>${esc(t.nombre)}</td><td class="num crudo">${fmtU(t.u)} u.</td><td class="num">${t.listo ? fmtG(t.listo) : '–'}</td></tr>`; return }
+    const tags = [t.merma ? `merma ${t.merma}%` : '', t.coc ? `cocción ${t.coc > 0 ? '+' : ''}${t.coc}%` : ''].filter(Boolean).map(x => `<span class="tag">${x}</span>`).join('')
+    filas += `<tr><td>${esc(t.nombre)}${tags ? `<span class="mini">${tags}</span>` : ''}</td><td class="num crudo">${fmtG(t.bruto, t.liq)}</td><td class="num">${Math.abs(t.bruto - t.listo) < .5 ? '=' : fmtG(t.listo, t.liq)}</td></tr>`
+  })
+  h += `<div class="box"><h3>🧾 Total de insumos <span class="sub">${N} porciones</span></h3>${leyenda}<table class="tabla">${thead}${filas}</table></div>`
+  if(pack.length) h += `<div class="box"><h3>📦 Packaging</h3><table class="tabla"><tr><th>Ítem</th><th>Cantidad</th><th></th></tr>${pack.map(t => `<tr><td>${esc(t.nombre)}</td><td class="num">${t.peso ? fmtG(t.bruto) : fmtU(t.u)}</td><td></td></tr>`).join('')}</table></div>`
+  return h
+}
+
+/* =====================================================================
+   Eventos
+   ===================================================================== */
+$('q').addEventListener('input', () => { $('q-clear').classList.toggle('hidden', !$('q').value); render() })
+$('q-clear').onclick = () => { $('q').value = ''; $('q-clear').classList.add('hidden'); render(); $('q').focus() }
+$('solo-rot').onchange = render
+$('chips').onclick = e => { const b = e.target.closest('.chip'); if(!b) return; filtroTipo = b.dataset.t; render() }
+$('lista').onclick = e => { const c = e.target.closest('.card'); if(c) abrir(c.dataset.id, true) }
+$('btn-back').onclick = () => { if(location.hash.startsWith('#/p/')) history.back(); else cerrar() }
+$('btn-refresh').onclick = () => { $('btn-refresh').textContent = '…'; cargar(true).finally(() => $('btn-refresh').textContent = '⟳') }
+$('tabs').onclick = e => { const b = e.target.closest('button'); if(!b) return; tabActual = b.dataset.t; renderDetalle(); $('detalle').scrollTop = 0 }
+const setN = v => { N = Math.max(1, Math.min(9999, Math.round(+v || 1))); renderDetalle() }
+$('p-menos').onclick = () => setN(N - 1)
+$('p-mas').onclick = () => setN(N + 1)
+$('p-n').addEventListener('change', e => setN(e.target.value))
+$('p-n').addEventListener('focus', e => e.target.select())
+$('quick').onclick = e => { const b = e.target.closest('button'); if(b) setN(b.dataset.q) }
+window.addEventListener('popstate', () => {
+  const m = location.hash.match(/^#\/p\/(.+)$/)
+  if(m) abrir(m[1], false); else cerrar()
+})
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && platoActual && 'wakeLock' in navigator) navigator.wakeLock.request('screen').then(w => wakeLock = w).catch(() => {})
+})
+
+cargar().then(() => {
+  const m = location.hash.match(/^#\/p\/(.+)$/)
+  if(m) abrir(m[1], false)
+})
+</script>
+</body>
+</html>
