@@ -1340,10 +1340,11 @@ function vistaArmado(p){
       <div class="nota">Controlá vencimiento y que la etiqueta diga <b>Sin TACC</b>. Guardalo separado del resto para evitar contaminación cruzada.</div></div>`
   }
   const foto = fotoDe(p)
-  let h = boxEmplatado(p)
+  let h = ''
+  h += foto ? `<div class="box"><div class="foto"><img src="${esc(foto.img)}" alt="${esc(p.nombre)}" loading="lazy" onerror="this.closest('.box').remove()"><div class="cap">📸 ${foto.exacta ? 'Foto del plato en la app de pedidos' : 'Foto de referencia: ' + esc(foto.nombre)}</div></div><div class="nota" style="margin-top:0">Así se ve en la app de pedidos (emplatado).</div></div>` : ''
+  h += boxEmplatado(p)
   h += boxBandeja(p)
   h += boxArmado(p)
-  h += foto ? `<div class="box"><div class="foto"><img src="${esc(foto.img)}" alt="${esc(p.nombre)}" loading="lazy" onerror="this.closest('.box').remove()"><div class="cap">📸 ${foto.exacta ? 'Foto del plato en la app de pedidos' : 'Foto de referencia: ' + esc(foto.nombre)}</div></div><div class="nota" style="margin-top:0">Así se ve en la app de pedidos (emplatado).</div></div>` : ''
   const notas = a.comps.filter(c => c.tipo === 'sub' && !c.pack && c.sr.descripcion && c.sr.descripcion.trim())
   if(notas.length) h += `<div class="box"><h3>💡 Notas de las preparaciones</h3>${notas.map(c => `<p class="texto-receta" style="margin:0 0 10px"><b>${esc(c.nombre)}:</b> ${esc(c.sr.descripcion.trim())}</p>`).join('')}</div>`
   if(N > 1) h += `<div class="nota" style="text-align:center">Las cantidades para ${N} porciones están en ⚖️ Ingredientes y 🧾 Producción.</div>`
