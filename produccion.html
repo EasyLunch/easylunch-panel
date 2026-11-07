@@ -519,7 +519,7 @@ function analizar(p){
       const ins = insMap[ing.ref_id]
       if(!ins){ comps.push({ tipo:'falta', nombre:'(insumo borrado)' }); continue }
       const l = lineaIns(ins, cant, ing.unidad)
-      comps.push({ tipo:'ins', nombre:l.nombre, line:l, g:l.g, pack:l.pack, cup:l.cup, cond:l.cond, vis: visDe(l.nombre, ins.categoria) })
+      comps.push({ tipo:'ins', rowId: ing.id, nombre:l.nombre, line:l, g:l.g, pack:l.pack, cup:l.cup, cond:l.cond, vis: visDe(l.nombre, ins.categoria) })
     } else {
       const sr = srMap[ing.ref_id]
       if(!sr){ comps.push({ tipo:'falta', nombre:'(sub-receta borrada)' }); continue }
@@ -536,7 +536,7 @@ function analizar(p){
       else if(+sr.gramaje_unidad) g = cant * sr.gramaje_unidad
       else g = food.reduce((s, l) => s + l.g, 0)
       const expand = !pack && !PESO.has(ing.unidad) && norm(sr.familia) === 'base'
-      comps.push({ tipo:'sub', nombre, sr, f, lines, g, pack, cup: lines.some(l => l.cup), expand,
+      comps.push({ tipo:'sub', rowId: ing.id, nombre, sr, f, lines, g, pack, cup: lines.some(l => l.cup), expand,
         cantTxt: PESO.has(ing.unidad) ? fmtG(toG(cant, ing.unidad)) : fmtU(cant) + ' u.', vis: visDe(nombre, '', sr.familia) })
     }
   }
@@ -1149,7 +1149,7 @@ function pasosSugeridos(p){
   const B = s => `<b>${esc(s)}</b>`
   const bandeja = a.bandeja ? a.bandeja.txt.toLowerCase() : (a.layout === 'bowl' ? 'la ensaladera' : 'la bandeja')
   const pasos = []
-  const cierre = () => pasos.push(`Cerrá ${a.film ? 'con film' : 'la bandeja'}, etiquetá y llevá a cámara.`)
+  const cierre = () => pasos.push('Termosellá, etiquetá y llevá a heladera.')
   if(a.guarnicion){
     pz.forEach(x => pasos.push(`Prepará ${B(x.nombre)}: ${B(x.txt)} por vianda.`))
     pasos.push('Se ubica en la bandeja del plato principal, al lado del principal.')
@@ -1223,7 +1223,7 @@ function render(){
    ===================================================================== */
 function abrir(id, push){
   const p = platos.find(x => x.id === id); if(!p) return
-  platoActual = p; tabActual = 'armado'; empPrevia = null; alertaEmp = ''
+  platoActual = p; tabActual = 'armado'; empPrevia = null; alertaEmp = ''; editBandeja = false; editArmado = false; msgEd = ''; borrador = null
   if(push) history.pushState({ id }, '', '#/p/' + id)
   $('detalle').classList.remove('hidden'); $('detalle').scrollTop = 0
   document.body.style.overflow = 'hidden'
@@ -1255,6 +1255,81 @@ function renderDetalle(){
   else body.innerHTML = vistaTotal(p)
 }
 
+/* ---------- Edición: bandeja y pasos de armado ---------- */
+let editBandeja = false, editArmado = false, guardandoEd = false, msgEd = '', borrador = null
+const packsDisponibles = () => Object.values(srMap).filter(s => /packaging/.test(norm(s.nombre))).sort((x, y) => norm(x.nombre).localeCompare(norm(y.nombre)))
+const nombreBandeja = sr => { const n = norm(sr.nombre), m = n.match(/(\d{3})/); return /ensaladera/.test(n) ? 'Ensaladera' : (m ? 'Bandeja ' + m[1] : sr.nombre) }
+async function sbEscribir(metodo, ruta, body){
+  await config()
+  const r = await fetch(`${SB}/${ruta}`, { method: metodo, headers:{ apikey:KEY, Authorization:'Bearer ' + KEY, 'Content-Type':'application/json', Prefer:'return=minimal' }, body: body ? JSON.stringify(body) : undefined })
+  if(!r.ok) throw new Error(await r.text())
+}
+function boxBandeja(p){
+  const a = p._a
+  const actual = a.comps.find(c => c.tipo === 'sub' && c.pack && /packaging/.test(norm(c.nombre)))
+  let h = `<div class="box"><h3>📦 Bandeja <span class="sub">${a.bandeja ? esc(a.bandeja.txt) + (a.bandeja.negra ? ' negra' : '') : 'sin bandeja cargada'}</span></h3>`
+  if(!editBandeja){
+    h += `<div class="nota" style="margin-top:0">Si ves que el plato va mejor en otra bandeja, cambiala acá: se actualiza también en el recetario (packaging del plato).</div><div class="btn-row"><button class="btn sec" data-ed="bandeja">✏️ Cambiar bandeja</button></div>`
+  } else {
+    const ops = packsDisponibles()
+    h += `<div style="display:grid;gap:8px">${ops.map(sr => `<label class="toggle" style="padding:10px 12px;border:1px solid var(--borde);border-radius:12px;font-size:15px;color:var(--tinta)"><input type="radio" name="bj" value="${sr.id}" ${actual && actual.sr.id === sr.id ? 'checked' : ''}> ${esc(nombreBandeja(sr))} <small style="color:var(--gris);margin-left:auto">${esc(sr.nombre)}</small></label>`).join('')}
+      <label class="toggle" style="padding:10px 12px;border:1px solid var(--borde);border-radius:12px;font-size:15px;color:var(--tinta)"><input type="radio" name="bj" value="" ${actual ? '' : 'checked'}> Sin bandeja propia</label></div>
+      <div class="nota">¿Falta una bandeja (por ej. la 445)? Creá la sub-receta “packaging 445” en el recetario y aparece acá.</div>
+      <div class="btn-row"><button class="btn sec" data-ed="cancelar">Cancelar</button><button class="btn pri" data-ed="guardar-bandeja">${guardandoEd ? 'Guardando…' : '✓ Guardar bandeja'}</button></div>`
+  }
+  if(msgEd) h += `<div class="estado" style="margin:10px 0 0">${esc(msgEd)}</div>`
+  return h + `</div>`
+}
+function pasosTexto(p){
+  if(p.descripcion && p.descripcion.trim()) return p.descripcion.trim()
+  const tmp = document.createElement('div')
+  return pasosSugeridos(p).map(x => { tmp.innerHTML = x; return tmp.textContent }).join('\n')
+}
+function boxArmado(p){
+  const propio = !!(p.descripcion && p.descripcion.trim())
+  if(editArmado){
+    return `<div class="box"><h3>✏️ Editar armado <span class="sub">un paso por renglón</span></h3>
+      <textarea id="ed-pasos" style="width:100%;min-height:220px;border:1px solid var(--borde);border-radius:12px;padding:10px;font:inherit;font-size:15px;line-height:1.45">${esc(borrador ?? pasosTexto(p))}</textarea>
+      <div class="nota">Se guarda en el recetario como “Paso a paso / Descripción” del plato, así lo ve todo el equipo.</div>
+      <div class="btn-row"><button class="btn sec" data-ed="cancelar">Cancelar</button><button class="btn pri" data-ed="guardar-armado">${guardandoEd ? 'Guardando…' : '✓ Guardar armado'}</button></div></div>`
+  }
+  const pasos = propio ? p.descripcion.trim().split(/\n+/).map(x => x.replace(/^\s*(\d+[\.\)-]|[-•*])\s*/, '').trim()).filter(Boolean).map(esc) : pasosSugeridos(p)
+  return `<div class="box"><h3>👩‍🍳 Armado <span class="sub">por vianda</span></h3><ol class="pasos">${pasos.map(x => `<li>${x}</li>`).join('')}</ol>
+    ${propio ? '' : '<div class="nota">Pasos generados automáticamente a partir de la receta. Editalos para dejarlos como los hacen ustedes.</div>'}
+    <div class="btn-row"><button class="btn sec" data-ed="armado">✏️ Editar armado</button></div></div>`
+}
+async function guardarBandeja(){
+  const p = platoActual; if(!p || guardandoEd) return
+  const sel = document.querySelector('input[name="bj"]:checked'); const nuevo = sel ? sel.value : ''
+  const actuales = p._a.comps.filter(c => c.tipo === 'sub' && c.pack && /packaging/.test(norm(c.nombre)))
+  guardandoEd = true; msgEd = ''; renderDetalle()
+  try{
+    if(nuevo){
+      if(actuales.length) await sbEscribir('PATCH', 'plato_ingredientes?id=eq.' + encodeURIComponent(actuales[0].rowId), { ref_id: nuevo })
+      else await sbEscribir('POST', 'plato_ingredientes', [{ id: crypto.randomUUID(), plato_id: p.id, tipo:'subreceta', ref_id: nuevo, cantidad: 1, unidad:'unidad', crudo: null }])
+      for(const c of actuales.slice(1)) await sbEscribir('DELETE', 'plato_ingredientes?id=eq.' + encodeURIComponent(c.rowId))
+    } else {
+      for(const c of actuales) await sbEscribir('DELETE', 'plato_ingredientes?id=eq.' + encodeURIComponent(c.rowId))
+    }
+    editBandeja = false
+    await cargar(true)
+  }catch(e){ console.error(e); msgEd = 'No se pudo cambiar la bandeja. Probá de nuevo.' }
+  guardandoEd = false; renderDetalle()
+}
+async function guardarArmado(){
+  const p = platoActual; if(!p || guardandoEd) return
+  const txt = borrador ?? (($('ed-pasos') || {}).value)
+  if(txt == null) return
+  const limpio = txt.split('\n').map(x => x.trim()).filter(Boolean).join('\n')
+  guardandoEd = true; msgEd = ''; renderDetalle()
+  try{
+    await sbEscribir('PATCH', 'platos?id=eq.' + encodeURIComponent(p.id), { descripcion: limpio || null })
+    p.descripcion = limpio || null
+    editArmado = false; borrador = null
+  }catch(e){ console.error(e); msgEd = 'No se pudo guardar el armado. Probá de nuevo.'; editArmado = false }
+  guardandoEd = false; renderDetalle()
+}
+
 function vistaArmado(p){
   const a = p._a
   if(a.envasado){
@@ -1266,11 +1341,9 @@ function vistaArmado(p){
   }
   const foto = fotoDe(p)
   let h = boxEmplatado(p)
-  h += foto ? `<div class="box"><div class="foto"><img src="${esc(foto.img)}" alt="${esc(p.nombre)}" loading="lazy" onerror="this.closest('.box').remove()"><div class="cap">📸 ${foto.exacta ? 'Foto del plato' : 'Foto de referencia: ' + esc(foto.nombre)}</div></div><div class="nota" style="margin-top:0">Así se ve emplatado. Abajo, cómo va en la ${esc(a.bandeja ? a.bandeja.txt.toLowerCase() : 'bandeja')} y los gramos de cada parte.</div></div>` : ''
-  h += ilustracion(p)
-  if(p.descripcion && p.descripcion.trim()) h += `<div class="box"><h3>📝 Paso a paso de la receta</h3><div class="texto-receta">${esc(p.descripcion.trim())}</div></div>`
-  h += `<div class="box"><h3>👩‍🍳 Armado ${p.descripcion ? 'rápido' : ''}<span class="sub">por vianda</span></h3><ol class="pasos">${pasosSugeridos(p).map(x => `<li>${x}</li>`).join('')}</ol>
-    ${p.descripcion ? '' : '<div class="nota">Pasos generados a partir de la receta. Para pasos propios, cargalos en el recetario → “Paso a paso / Descripción”.</div>'}</div>`
+  h += boxBandeja(p)
+  h += boxArmado(p)
+  h += foto ? `<div class="box"><div class="foto"><img src="${esc(foto.img)}" alt="${esc(p.nombre)}" loading="lazy" onerror="this.closest('.box').remove()"><div class="cap">📸 ${foto.exacta ? 'Foto del plato en la app de pedidos' : 'Foto de referencia: ' + esc(foto.nombre)}</div></div><div class="nota" style="margin-top:0">Así se ve en la app de pedidos (emplatado).</div></div>` : ''
   const notas = a.comps.filter(c => c.tipo === 'sub' && !c.pack && c.sr.descripcion && c.sr.descripcion.trim())
   if(notas.length) h += `<div class="box"><h3>💡 Notas de las preparaciones</h3>${notas.map(c => `<p class="texto-receta" style="margin:0 0 10px"><b>${esc(c.nombre)}:</b> ${esc(c.sr.descripcion.trim())}</p>`).join('')}</div>`
   if(N > 1) h += `<div class="nota" style="text-align:center">Las cantidades para ${N} porciones están en ⚖️ Ingredientes y 🧾 Producción.</div>`
@@ -1365,6 +1438,18 @@ $('d-body').addEventListener('click', e => {
   if(acc === 'sacar'){ alertaEmp = ''; $('cam').value = ''; $('cam').click() }
   if(acc === 'cancelar'){ empPrevia = null; renderDetalle() }
   if(acc === 'guardar') guardarEmp()
+})
+$('d-body').addEventListener('input', e => { if(e.target.id === 'ed-pasos') borrador = e.target.value })
+$('d-body').addEventListener('click', e => {
+  const b = e.target.closest('[data-ed]'); if(!b) return
+  const acc = b.dataset.ed
+  if(acc === 'guardar-armado'){ const v = ($('ed-pasos') || {}).value; guardarArmado(v); return }
+  msgEd = ''
+  if(acc === 'bandeja'){ editBandeja = true; editArmado = false }
+  if(acc === 'armado'){ editArmado = true; editBandeja = false }
+  if(acc === 'cancelar'){ editBandeja = false; editArmado = false; borrador = null }
+  if(acc === 'guardar-bandeja'){ guardarBandeja(); return }
+  renderDetalle()
 })
 $('cam').addEventListener('change', async e => {
   const f = e.target.files && e.target.files[0]; if(!f) return
