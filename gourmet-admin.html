@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gourmet · Administración</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--bg:#F5F5F5;--surface:#fff;--ink:#212121;--muted:#666;--line:#E0E0E0;--green:#32952E;--green-2:#2A7F27;--gold:#138E03;--gold-soft:#E7F4E4;--danger:#E53935;--ok:#138E03}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Roboto,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:Montserrat,system-ui,sans-serif;font-weight:600;margin:0}
+button{font:inherit;cursor:pointer} input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.btn{border:0;border-radius:7px;text-transform:uppercase;font-size:12px;letter-spacing:.5px;box-shadow:0 2px 5px rgba(0,0,0,.16);font-family:Montserrat,sans-serif;padding:9px 18px;background:var(--green);color:#fff;font-weight:600;white-space:nowrap}
+.btn:hover{background:var(--green-2)} .btn:disabled{opacity:.5}
+.btn.ghost{background:#EEEEEE;color:#1E1E1E;border:1px solid var(--line);box-shadow:none;border-radius:4px} .btn.ghost:hover{border-color:var(--ink)}
+.btn.gold{background:var(--gold)} .btn.small{padding:5px 12px;font-size:12px}
+.btn.danger{background:#fff;color:var(--danger);border:1px solid #E7C9C4}
+.input{width:100%;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 11px;outline:none}
+.input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+textarea.input{resize:vertical}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field>label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.field small{color:var(--muted);font-size:12px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.muted{color:var(--muted)}
+
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.45)),url('https://app.easylunch.com.ar/assets/img/home/inicio-desktop.jpg') center/cover,url('gourmet-assets/fondo-login.jpg') center/cover,#333}
+.lcard{background:#fff;border-radius:18px;padding:34px;width:100%;max-width:380px;box-shadow:0 10px 30px rgba(0,0,0,.07)}
+.lcard h1{font-size:24px;margin:6px 0 20px;font-weight:600}
+.lcard .lhead{background:#F5F5F5;margin:-34px -34px 22px;padding:22px;border-radius:18px 18px 0 0;text-align:center}
+.lcard .lhead .logo{height:46px}
+.err{color:var(--danger);font-size:13px;min-height:18px;margin-bottom:8px}
+
+.shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+aside.side{background:#fff;color:var(--ink);border-right:1px solid var(--line);padding:24px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.side .brand{margin:-24px -14px 14px;padding:14px 18px;background:#F5F5F5;text-align:left;border-bottom:1px solid var(--line)}
+.side .brand .logo{height:40px;display:block}
+.side .brand span{display:block;font-family:Montserrat,sans-serif;font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#32952E;margin-top:4px}
+.nav-g{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#999;font-family:Montserrat,sans-serif;font-weight:600;padding:14px 10px 6px}
+.nav{display:block;width:100%;text-align:left;background:none;border:0;color:#424242;font-weight:500;padding:8px 12px;border-radius:9px;margin-bottom:2px}
+.nav:hover{background:#F1F5EF} .nav.on{background:#E8F4E7;color:#32952E;font-weight:600;box-shadow:inset 3px 0 0 #32952E}
+.side .foot{margin-top:auto;font-size:12px;color:#888;padding:0 10px}
+.side .foot button{background:none;border:0;color:#138E03;padding:0;font-weight:600}
+main{padding:28px 32px 80px;min-width:0}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.head h1{font-size:28px;line-height:1.15;font-weight:600}
+.toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+.toolbar .field{margin:0}
+.panel{background:#fff;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.05);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:rgba(0,0,0,.6);text-align:left;font-weight:600;font-family:Roboto,sans-serif;padding:11px 14px;background:#EEEEEE;border-bottom:1px solid var(--line)}
+td{padding:11px 14px;border-bottom:1px solid #F0EBE2;vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer} tr.click:hover td{background:#F3F8F1}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.st{display:inline-block;border-radius:8px;padding:2px 9px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;background:#EEE9DF;color:var(--muted)}
+.st.confirmado{background:#E5EEE8;color:var(--ok)} .st.en_produccion{background:var(--gold-soft);color:#0F7402}
+.st.despachado,.st.entregado{background:#E4E9F0;color:#3A5373} .st.cancelado{background:#F3E2DF;color:var(--danger)}
+.st.off{background:#F3E2DF;color:var(--danger)}
+select.st-sel{border:1px solid var(--line);border-radius:8px;padding:4px 6px;background:#fff;font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 6px 20px rgba(0,0,0,.05)}
+.kpi small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.kpi b{display:block;font-family:Montserrat,sans-serif;font-size:28px;line-height:1.2;font-weight:700;color:#32952E}
+.items{margin:0;padding:0;list-style:none;font-size:13px}
+.items li{padding:2px 0}
+.items small{color:var(--muted)}
+.thumb{width:56px;height:42px;border-radius:8px;background:#EEE7DA center/cover;flex:0 0 auto}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.pcard{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.05);cursor:pointer}
+.pcard .ph{aspect-ratio:16/10;background:#EEE7DA center/cover;display:flex;align-items:center;justify-content:center;color:#B9AE99;font-family:Montserrat,sans-serif;font-size:20px}
+.pcard .b{padding:12px 14px} .pcard h3{font-size:16px;line-height:1.25}
+.checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
+.checks label{display:flex;gap:8px;align-items:center;font-size:13px}
+.ep-row{display:grid;grid-template-columns:24px 1fr 130px;gap:10px;align-items:center;padding:6px 4px;border-bottom:1px solid #F0EBE2}
+.overlay{position:fixed;inset:0;background:rgba(20,18,14,.5);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+.modal{background:var(--bg);border-radius:16px;width:100%;max-width:860px;padding:26px 28px}
+.modal h2{font-size:24px;margin-bottom:16px}
+.mfoot{display:flex;justify-content:space-between;gap:10px;margin-top:18px;flex-wrap:wrap}
+.photo,.photo.field{display:flex;flex-direction:row;gap:14px;align-items:center}
+.photo .ph{width:160px;height:110px;border-radius:10px;background:#EEE7DA center/cover;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#B9AE99}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;z-index:90}
+.toast.bad{background:var(--danger)}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.group{background:#fff;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.05);padding:16px 18px;margin-bottom:14px}
+.group h3{font-size:19px}
+@media (max-width:900px){.shell{grid-template-columns:1fr}aside.side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;gap:4px;padding:12px}.side .brand,.nav-g,.side .foot{display:none}.nav{width:auto}main{padding:20px 16px 80px}.panel{overflow-x:auto}}
+@media print{aside.side,.toolbar,.noprint{display:none!important}.shell{display:block}main{padding:0}.panel,.group,.kpi{box-shadow:none;border:1px solid #ddd}}
+</style>
+</head>
+<body>
+
+<section id="login" hidden>
+  <form class="lcard" id="lForm">
+    <div class="lhead"><img class="logo" alt="Easy Lunch" src="https://app.easylunch.com.ar/assets/img/upload/XOn7H9LwQB.webp" onerror="this.onerror=null;this.src='gourmet-assets/logo-easylunch-color.png'"></div>
+    <div class="eyebrow">Platos Gourmet</div>
+    <h1>Administración</h1>
+    <div class="field"><label>Email</label><input class="input" id="lEmail" type="email" required></div>
+    <div class="field"><label>Contraseña</label><input class="input" id="lPass" type="password" required></div>
+    <div class="err" id="lErr"></div>
+    <button class="btn" style="width:100%">Entrar</button>
+  </form>
+</section>
+
+<div class="shell" id="app" hidden>
+  <aside class="side">
+    <div class="brand"><img class="logo" alt="Easy Lunch" src="https://app.easylunch.com.ar/assets/img/upload/XOn7H9LwQB.webp" onerror="this.onerror=null;this.src='gourmet-assets/logo-easylunch-color.png'"><span>Gourmet · Admin</span></div>
+    <div class="nav-g">Operación</div>
+    <button class="nav on" data-v="pedidos">Pedidos</button>
+    <button class="nav" data-v="produccion">Producción</button>
+    <button class="nav" data-v="despacho">Despacho y etiquetas</button>
+    <button class="nav" data-v="facturacion">Facturación</button>
+    <div class="nav-g">Catálogo</div>
+    <button class="nav" data-v="platos">Platos</button>
+    <button class="nav" data-v="guarniciones">Guarniciones</button>
+    <div class="nav-g">Clientes</div>
+    <button class="nav" data-v="empresas">Empresas</button>
+    <button class="nav" data-v="usuarios">Usuarios</button>
+    <button class="nav" data-v="ajustes">Ajustes</button>
+    <div class="foot"><div id="me"></div><button id="logout">Salir</button></div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<div class="overlay" id="ov" hidden><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* =====================================================================
+   CONFIGURACIÓN — mismos valores que usa el panel (recetario.html)
+   ===================================================================== */
+const SUPABASE_URL      = 'https://xlwcozznliafhouhqjzl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg';
+const API_USUARIOS      = '/api/gourmet-usuario';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => n == null || n === '' ? '—' : '$ ' + Number(n).toLocaleString('es-AR', {maximumFractionDigits:0});
+const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'], DIAS_L=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const ESTADOS = {confirmado:'Confirmado', en_produccion:'En producción', despachado:'Despachado', entregado:'Entregado', cancelado:'Cancelado'};
+const PROTEINAS = ['vacuna','pollo','pescado','cerdo','cordero','vegetariano','otra'];
+const D = { empresas:[], platos:[], guarniciones:[], pg:[], ep:[], usuarios:[], config:{} };
+let VIEW = 'pedidos';
+
+function toast(m, bad){ const t=$('#toast'); t.textContent=m; t.className='toast'+(bad?' bad':''); t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true,3500); }
+const hoyAR = () => new Date(Date.now()-3*3600e3).toISOString().slice(0,10);
+const addDays = (s,n) => { const d=new Date(s+'T12:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); };
+const fF = s => { const d=new Date(s+'T12:00:00Z'); return `${DIAS[d.getUTCDay()]} ${d.getUTCDate()} ${MESES[d.getUTCMonth()]}`; };
+const fFL = s => { const d=new Date(s+'T12:00:00Z'); return `${DIAS_L[d.getUTCDay()]} ${d.getUTCDate()} de ${MESES[d.getUTCMonth()]}`; };
+const nextDelivery = () => { let d=addDays(hoyAR(),1); const dias=D.config.dias_entrega||[1,2,3,4,5]; for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00Z').getUTCDay()||7; if(dias.includes(w)) return d; d=addDays(d,1);} return d; };
+const lines = t => String(t||'').split(/\n+/).map(s=>s.replace(/^\s*(\d+[\.\)]|[-•])\s*/,'').trim()).filter(Boolean);
+const empName = id => D.empresas.find(e=>e.id===id)?.nombre || '—';
+function csv(name, rows){
+  const s = rows.map(r => r.map(v => { v = v==null ? '' : String(v); return /[";\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; }).join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿'+s], {type:'text/csv;charset=utf-8'})); a.download = name; a.click();
+}
+async function q(promise, okMsg){ const { data, error } = await promise; if (error){ toast(error.message, true); throw error; } if (okMsg) toast(okMsg); return data; }
+
+/* ---------------- MODAL ---------------- */
+function openModal(html){ $('#modal').innerHTML = html; $('#ov').hidden=false; document.body.style.overflow='hidden'; }
+function closeModal(){ $('#ov').hidden=true; document.body.style.overflow=''; }
+$('#ov').addEventListener('mousedown', e => { if (e.target.id==='ov') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+function confirmBtn(btn, fn){ if (btn.dataset.sure!=='1'){ const t=btn.textContent; btn.dataset.sure='1'; btn.textContent='¿Seguro? Tocá de nuevo'; setTimeout(()=>{btn.dataset.sure='';btn.textContent=t;},4000); return; } fn(); }
+
+/* ---------------- AUTH ---------------- */
+async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) return showLogin();
+  const ok = await sb.rpc('gourmet_es_admin');
+  if (!ok.data){ await sb.auth.signOut(); showLogin('Este usuario no es administrador.'); return; }
+  $('#login').hidden=true; $('#app').hidden=false; $('#me').textContent = session.user.email;
+  await loadBase(); go(VIEW);
+}
+function showLogin(msg){ $('#login').hidden=false; $('#app').hidden=true; $('#lErr').textContent = msg||''; }
+$('#lForm').onsubmit = async e => { e.preventDefault();
+  const { error } = await sb.auth.signInWithPassword({ email:$('#lEmail').value.trim(), password:$('#lPass').value });
+  if (error) return $('#lErr').textContent='Email o contraseña incorrectos.'; init(); };
+$('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function loadBase(){
+  const [e,p,g,pg,ep,u,c] = await Promise.all([
+    sb.from('gourmet_empresas').select('*').order('nombre'),
+    sb.from('gourmet_platos').select('*').order('orden').order('nombre'),
+    sb.from('gourmet_guarniciones').select('*').order('orden').order('nombre'),
+    sb.from('gourmet_plato_guarniciones').select('*'),
+    sb.from('gourmet_empresa_platos').select('*'),
+    sb.from('gourmet_usuarios').select('*').order('nombre'),
+    sb.from('gourmet_config').select('*'),
+  ]);
+  D.empresas=e.data||[]; D.platos=p.data||[]; D.guarniciones=g.data||[]; D.pg=pg.data||[]; D.ep=ep.data||[]; D.usuarios=u.data||[];
+  D.config = Object.fromEntries((c.data||[]).map(r=>[r.clave, r.valor]));
+}
+
+function go(v){ VIEW=v; $$('.nav').forEach(n=>n.classList.toggle('on', n.dataset.v===v)); (VIEWS[v]||VIEWS.pedidos)(); window.scrollTo({top:0}); }
+$$('.nav').forEach(n => n.onclick = () => go(n.dataset.v));
+
+async function fetchPedidos({desde, hasta, empresa, estado, sinCancelados}){
+  let qy = sb.from('gourmet_pedidos').select('*, gourmet_usuarios(nombre,email), gourmet_pedido_items(*)')
+    .gte('fecha_entrega', desde).lte('fecha_entrega', hasta).order('fecha_entrega').order('numero');
+  if (empresa) qy = qy.eq('empresa_id', empresa);
+  if (estado) qy = qy.eq('estado', estado);
+  if (sinCancelados) qy = qy.neq('estado', 'cancelado');
+  return await q(qy);
+}
+const empOptions = (sel, todas='Todas las empresas') => `<option value="">${todas}</option>` + D.empresas.map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.nombre)}</option>`).join('');
+
+/* =====================================================================
+   VISTAS
+   ===================================================================== */
+const F = { desde:null, hasta:null, empresa:'', estado:'', fecha:null, mes:null };
+const VIEWS = {};
+
+/* ---------------- PEDIDOS ---------------- */
+VIEWS.pedidos = async () => {
+  F.desde ||= hoyAR(); F.hasta ||= addDays(hoyAR(), 7);
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Operación</div><h1>Pedidos</h1></div>
+      <div style="display:flex;gap:8px"><button class="btn ghost" id="xCsv">Exportar CSV</button></div></div>
+    <div class="toolbar">
+      <div class="field"><label>Desde</label><input type="date" class="input" id="fDesde" value="${F.desde}"></div>
+      <div class="field"><label>Hasta</label><input type="date" class="input" id="fHasta" value="${F.hasta}"></div>
+      <div class="field"><label>Empresa</label><select class="input" id="fEmp">${empOptions(F.empresa)}</select></div>
+      <div class="field"><label>Estado</label><select class="input" id="fEst"><option value="">Todos</option>${Object.entries(ESTADOS).map(([k,v])=>`<option value="${k}" ${F.estado===k?'selected':''}>${v}</option>`).join('')}</select></div>
+      <div class="field" style="margin-left:auto"><label>Pasar los visibles a</label>
+        <div style="display:flex;gap:6px"><select class="input" id="bulkEst">${Object.entries(ESTADOS).filter(([k])=>k!=='cancelado').map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select><button class="btn ghost" id="bulkGo">Aplicar</button></div></div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="panel" id="tbl"><div class="empty">Cargando…</div></div>`;
+  const reload = async () => {
+    F.desde=$('#fDesde').value; F.hasta=$('#fHasta').value; F.empresa=$('#fEmp').value; F.estado=$('#fEst').value;
+    const rows = await fetchPedidos(F);
+    const act = rows.filter(r=>r.estado!=='cancelado');
+    $('#kpis').innerHTML = `
+      <div class="kpi"><small>Pedidos</small><b>${act.length}</b></div>
+      <div class="kpi"><small>Platos</small><b>${act.reduce((a,r)=>a+r.total_unidades,0)}</b></div>
+      <div class="kpi"><small>Empresas</small><b>${new Set(act.map(r=>r.empresa_id)).size}</b></div>
+      <div class="kpi"><small>Monto</small><b>${money(act.reduce((a,r)=>a+Number(r.total),0))}</b></div>`;
+    if (!rows.length){ $('#tbl').innerHTML = '<div class="empty">No hay pedidos en este rango.</div>'; return; }
+    $('#tbl').innerHTML = `<table><thead><tr><th>#</th><th>Entrega</th><th>Empresa</th><th>Detalle</th><th class="num">Platos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody>
+      ${rows.map(r => `<tr>
+        <td>${r.numero}</td><td>${fF(r.fecha_entrega)}</td>
+        <td><b>${esc(empName(r.empresa_id))}</b><br><small class="muted">${esc(r.gourmet_usuarios?.nombre||r.gourmet_usuarios?.email||'')}</small></td>
+        <td><ul class="items">${r.gourmet_pedido_items.map(i=>`<li>${i.cantidad} × ${esc(i.plato_nombre)}${i.guarnicion_nombre?` <small>/ ${esc(i.guarnicion_nombre)}</small>`:''}${i.para_quien?` <small>· ${esc(i.para_quien)}</small>`:''}</li>`).join('')}</ul>${r.notas?`<small class="muted">Nota: ${esc(r.notas)}</small>`:''}</td>
+        <td class="num">${r.total_unidades}</td><td class="num">${money(r.total)}${r.facturado?'<br><small class="muted">facturado</small>':''}</td>
+        <td><select class="st-sel" data-id="${r.id}">${Object.entries(ESTADOS).map(([k,v])=>`<option value="${k}" ${r.estado===k?'selected':''}>${v}</option>`).join('')}</select></td>
+      </tr>`).join('')}</tbody></table>`;
+    $$('.st-sel').forEach(s => s.onchange = async () => { await q(sb.from('gourmet_pedidos').update({estado:s.value, updated_at:new Date().toISOString()}).eq('id', s.dataset.id), 'Estado actualizado'); reload(); });
+    $('#xCsv').onclick = () => csv(`pedidos_gourmet_${F.desde}_${F.hasta}.csv`, [['Pedido','Entrega','Empresa','Solicitante','Plato','Guarnición','Cantidad','Para quién','Precio unit.','Subtotal','Estado','Notas'],
+      ...rows.flatMap(r => r.gourmet_pedido_items.map(i => [r.numero, r.fecha_entrega, empName(r.empresa_id), r.gourmet_usuarios?.nombre||'', i.plato_nombre, i.guarnicion_nombre||'', i.cantidad, i.para_quien||'', i.precio_unit??'', i.subtotal, ESTADOS[r.estado], r.notas||'']))]);
+    $('#bulkGo').onclick = e => confirmBtn(e.target, async () => {
+      const ids = rows.filter(r=>r.estado!=='cancelado').map(r=>r.id); if (!ids.length) return;
+      await q(sb.from('gourmet_pedidos').update({estado:$('#bulkEst').value, updated_at:new Date().toISOString()}).in('id', ids), `${ids.length} pedidos actualizados`); reload(); });
+  };
+  ['#fDesde','#fHasta','#fEmp','#fEst'].forEach(s => $(s).onchange = reload);
+  reload();
+};
+
+/* ---------------- PRODUCCIÓN ---------------- */
+VIEWS.produccion = async () => {
+  F.fecha ||= nextDelivery();
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Operación</div><h1>Producción</h1><div class="muted" id="pSub"></div></div>
+      <div class="noprint" style="display:flex;gap:8px"><button class="btn ghost" id="pCsv">CSV</button><button class="btn" onclick="print()">Imprimir</button></div></div>
+    <div class="toolbar"><div class="field"><label>Fecha de entrega</label><input type="date" class="input" id="pF" value="${F.fecha}"></div></div>
+    <div id="pBody"><div class="empty">Cargando…</div></div>`;
+  const reload = async () => {
+    F.fecha = $('#pF').value;
+    const rows = await fetchPedidos({ desde:F.fecha, hasta:F.fecha, sinCancelados:true });
+    $('#pSub').textContent = `Entrega ${fFL(F.fecha)} · ${rows.length} pedidos`;
+    const comb = {}, porPlato = {}, porGuar = {};
+    rows.forEach(r => r.gourmet_pedido_items.forEach(i => {
+      const k = i.plato_nombre+'|'+(i.guarnicion_nombre||''); comb[k] = (comb[k]||0)+i.cantidad;
+      porPlato[i.plato_nombre] = (porPlato[i.plato_nombre]||0)+i.cantidad;
+      if (i.guarnicion_nombre) porGuar[i.guarnicion_nombre] = (porGuar[i.guarnicion_nombre]||0)+i.cantidad;
+    }));
+    const total = Object.values(porPlato).reduce((a,b)=>a+b,0);
+    if (!total){ $('#pBody').innerHTML = '<div class="empty">No hay platos para producir en esta fecha.</div>'; return; }
+    const rec = n => D.platos.find(p=>p.nombre===n)?.receta_ref, recG = n => D.guarniciones.find(g=>g.nombre===n)?.receta_ref;
+    $('#pBody').innerHTML = `
+      <div class="kpis"><div class="kpi"><small>Total platos</small><b>${total}</b></div><div class="kpi"><small>Variedades</small><b>${Object.keys(porPlato).length}</b></div><div class="kpi"><small>Pedidos</small><b>${rows.length}</b></div></div>
+      <div class="row" style="align-items:start;gap:16px">
+        <div class="panel"><table><thead><tr><th>Principal</th><th>Receta</th><th class="num">Porciones</th></tr></thead><tbody>
+          ${Object.entries(porPlato).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<tr><td><b>${esc(n)}</b></td><td class="muted">${esc(rec(n)||'—')}</td><td class="num"><b>${c}</b></td></tr>`).join('')}</tbody></table></div>
+        <div class="panel"><table><thead><tr><th>Guarnición</th><th>Receta</th><th class="num">Porciones</th></tr></thead><tbody>
+          ${Object.entries(porGuar).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`<tr><td><b>${esc(n)}</b></td><td class="muted">${esc(recG(n)||'—')}</td><td class="num"><b>${c}</b></td></tr>`).join('') || '<tr><td colspan="3" class="muted">Sin guarniciones</td></tr>'}</tbody></table></div>
+      </div>
+      <h3 style="font-size:24px;margin:22px 0 10px">Armado (plato + guarnición)</h3>
+      <div class="panel"><table><thead><tr><th>Plato</th><th>Guarnición</th><th class="num">Cantidad</th></tr></thead><tbody>
+        ${Object.entries(comb).sort().map(([k,c])=>{ const [p,g]=k.split('|'); return `<tr><td>${esc(p)}</td><td>${esc(g||'—')}</td><td class="num"><b>${c}</b></td></tr>`; }).join('')}</tbody></table></div>`;
+    $('#pCsv').onclick = () => csv(`produccion_gourmet_${F.fecha}.csv`, [['Fecha','Plato','Guarnición','Cantidad'], ...Object.entries(comb).map(([k,c])=>{ const [p,g]=k.split('|'); return [F.fecha,p,g,c]; })]);
+  };
+  $('#pF').onchange = reload; reload();
+};
+
+/* ---------------- DESPACHO ---------------- */
+VIEWS.despacho = async () => {
+  F.fecha ||= nextDelivery();
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Operación</div><h1>Despacho</h1><div class="muted" id="dSub"></div></div>
+      <div class="noprint" style="display:flex;gap:8px"><button class="btn ghost" id="dLbl">Imprimir etiquetas</button><button class="btn ghost" id="dCsv">CSV para recorridos</button><button class="btn" onclick="print()">Imprimir hoja</button></div></div>
+    <div class="toolbar"><div class="field"><label>Fecha de entrega</label><input type="date" class="input" id="dF" value="${F.fecha}"></div></div>
+    <div id="dBody"><div class="empty">Cargando…</div></div>`;
+  const reload = async () => {
+    F.fecha = $('#dF').value;
+    const rows = await fetchPedidos({ desde:F.fecha, hasta:F.fecha, sinCancelados:true });
+    const byEmp = {}; rows.forEach(r => (byEmp[r.empresa_id] ||= []).push(r));
+    const total = rows.reduce((a,r)=>a+r.total_unidades,0);
+    $('#dSub').textContent = `Entrega ${fFL(F.fecha)} · ${Object.keys(byEmp).length} empresas · ${total} platos`;
+    if (!rows.length){ $('#dBody').innerHTML = '<div class="empty">No hay entregas en esta fecha.</div>'; return; }
+    $('#dBody').innerHTML = Object.entries(byEmp).map(([eid, ps]) => { const e = D.empresas.find(x=>x.id===eid)||{};
+      return `<div class="group">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h3>${esc(e.nombre)}</h3>
+          <div class="muted">${esc([e.direccion, e.piso_oficina, e.localidad].filter(Boolean).join(' · '))}</div>
+          <div class="muted">${esc([e.horario_entrega && 'Horario: '+e.horario_entrega, e.contacto_nombre, e.contacto_tel].filter(Boolean).join(' · '))}</div></div>
+          <div style="text-align:right"><b style="font-family:Montserrat,sans-serif;font-size:30px">${ps.reduce((a,r)=>a+r.total_unidades,0)}</b><br><small class="muted">platos</small></div></div>
+        <table style="margin-top:10px"><thead><tr><th>Pedido</th><th>Plato</th><th>Guarnición</th><th class="num">Cant.</th><th>Para</th></tr></thead><tbody>
+        ${ps.flatMap(r => r.gourmet_pedido_items.map(i => `<tr><td>#${r.numero}</td><td>${esc(i.plato_nombre)}</td><td>${esc(i.guarnicion_nombre||'—')}</td><td class="num">${i.cantidad}</td><td>${esc(i.para_quien||'')}</td></tr>`)).join('')}
+        </tbody></table>${ps.filter(r=>r.notas).map(r=>`<div class="muted" style="margin-top:6px">#${r.numero}: ${esc(r.notas)}</div>`).join('')}</div>`; }).join('');
+    $('#dCsv').onclick = () => csv(`recorridos_gourmet_${F.fecha}.csv`, [['Fecha','Empresa','Dirección','Localidad','Piso/Oficina','Horario','Contacto','Teléfono','Viandas','Categoría'],
+      ...Object.entries(byEmp).map(([eid, ps]) => { const e=D.empresas.find(x=>x.id===eid)||{}; return [F.fecha,e.nombre,e.direccion,e.localidad,e.piso_oficina,e.horario_entrega,e.contacto_nombre,e.contacto_tel,ps.reduce((a,r)=>a+r.total_unidades,0),'Platos Gourmet']; })]);
+    $('#dLbl').onclick = () => printLabels(rows);
+  };
+  $('#dF').onchange = reload; reload();
+};
+function printLabels(rows){
+  const labels = [];
+  rows.forEach(r => r.gourmet_pedido_items.forEach(i => { const p = D.platos.find(x=>x.id===i.plato_id)||{};
+    for (let n=0; n<i.cantidad; n++) labels.push({ r, i, p }); }));
+  const w = window.open('', '_blank');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiquetas ${F.fecha}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>@page{margin:8mm}body{margin:0;font:10px/1.35 Roboto,sans-serif;color:#1D1B17}.g{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm}
+  .l{border:1px solid #bbb;border-radius:3mm;padding:3mm 3.5mm;height:44mm;overflow:hidden;page-break-inside:avoid;display:flex;flex-direction:column}
+  .e{font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#138E03;font-weight:600}.n{font-family:Montserrat,sans-serif;font-size:16px;line-height:1.05;margin:1mm 0}
+  .f{margin-top:auto;border-top:1px dashed #ccc;padding-top:1.5mm;display:flex;justify-content:space-between;gap:2mm}</style></head><body><div class="g">
+  ${labels.map(({r,i,p}) => `<div class="l"><div class="e">Easy Lunch Gourmet · #${r.numero}</div>
+    <div class="n">${esc(i.plato_nombre)}</div>${i.guarnicion_nombre?`<div>con ${esc(i.guarnicion_nombre)}</div>`:''}
+    ${i.para_quien?`<div><b>Para: ${esc(i.para_quien)}</b></div>`:''}<div>${esc(empName(r.empresa_id))}</div>
+    <div class="f"><span>Elab. ${fF(r.fecha_entrega)}</span><span>Heladera ${p.conservacion_heladera_dias ?? '—'} d · Freezer ${p.conservacion_freezer_meses ?? '—'} m</span></div></div>`).join('')}
+  </div><script>setTimeout(()=>print(),400)<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ---------------- FACTURACIÓN ---------------- */
+VIEWS.facturacion = async () => {
+  F.mes ||= hoyAR().slice(0,7);
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Administración</div><h1>Facturación</h1></div>
+      <button class="btn ghost" id="fCsv">Exportar detalle CSV</button></div>
+    <div class="toolbar"><div class="field"><label>Mes</label><input type="month" class="input" id="fMes" value="${F.mes}"></div></div>
+    <div id="fBody"><div class="empty">Cargando…</div></div>`;
+  const reload = async () => {
+    F.mes = $('#fMes').value; const [y,m] = F.mes.split('-').map(Number);
+    const desde = `${F.mes}-01`, hasta = new Date(Date.UTC(y, m, 0)).toISOString().slice(0,10);
+    const rows = await fetchPedidos({ desde, hasta, sinCancelados:true });
+    const byEmp = {}; rows.forEach(r => (byEmp[r.empresa_id] ||= []).push(r));
+    if (!rows.length){ $('#fBody').innerHTML = '<div class="empty">Sin pedidos en el mes.</div>'; return; }
+    $('#fBody').innerHTML = `<div class="panel"><table><thead><tr><th>Empresa</th><th>Razón social / CUIT</th><th class="num">Pedidos</th><th class="num">Platos</th><th class="num">Total</th><th>Facturado</th><th></th></tr></thead><tbody>
+      ${Object.entries(byEmp).map(([eid, ps]) => { const e=D.empresas.find(x=>x.id===eid)||{}; const fact=ps.every(p=>p.facturado);
+        return `<tr><td><b>${esc(e.nombre)}</b><br><small class="muted">${esc(e.condicion_facturacion||'')}</small></td><td>${esc(e.razon_social||'')}<br><small class="muted">${esc(e.cuit||'')}</small></td>
+        <td class="num">${ps.length}</td><td class="num">${ps.reduce((a,r)=>a+r.total_unidades,0)}</td><td class="num"><b>${money(ps.reduce((a,r)=>a+Number(r.total),0))}</b></td>
+        <td>${fact?`<span class="st entregado">Sí</span> <small class="muted">${esc([...new Set(ps.map(p=>p.factura_ref).filter(Boolean))].join(', '))}</small>`:`<span class="st">${ps.filter(p=>p.facturado).length}/${ps.length}</span>`}</td>
+        <td>${fact?'':`<div style="display:flex;gap:6px"><input class="input" style="width:130px;padding:5px 8px" placeholder="N° factura" data-ref="${eid}"><button class="btn small" data-fac="${eid}">Marcar</button></div>`}</td></tr>`; }).join('')}
+      </tbody></table></div>`;
+    $$('[data-fac]').forEach(b => b.onclick = async () => { const eid=b.dataset.fac; const ref=$(`[data-ref="${eid}"]`).value.trim()||null;
+      await q(sb.from('gourmet_pedidos').update({ facturado:true, factura_ref:ref }).in('id', byEmp[eid].filter(p=>!p.facturado).map(p=>p.id)), 'Marcado como facturado'); reload(); });
+    $('#fCsv').onclick = () => csv(`facturacion_gourmet_${F.mes}.csv`, [['Empresa','Razón social','CUIT','Pedido','Entrega','Plato','Guarnición','Cantidad','Precio unit.','Subtotal','Facturado','N° factura'],
+      ...rows.flatMap(r => { const e=D.empresas.find(x=>x.id===r.empresa_id)||{}; return r.gourmet_pedido_items.map(i => [e.nombre,e.razon_social,e.cuit,r.numero,r.fecha_entrega,i.plato_nombre,i.guarnicion_nombre||'',i.cantidad,i.precio_unit??'',i.subtotal,r.facturado?'Sí':'No',r.factura_ref||'']); })]);
+  };
+  $('#fMes').onchange = reload; reload();
+};
+
+/* ---------------- PLATOS ---------------- */
+VIEWS.platos = () => {
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Catálogo</div><h1>Platos</h1></div><button class="btn" id="nuevo">+ Nuevo plato</button></div>
+    ${D.platos.length ? `<div class="plist">${D.platos.map(p => { const nE=D.ep.filter(x=>x.plato_id===p.id).length, nG=D.pg.filter(x=>x.plato_id===p.id).length;
+      return `<div class="pcard" data-id="${p.id}"><div class="ph" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Sin foto'}</div>
+        <div class="b"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(p.nombre)}</h3>${p.activo?'':'<span class="st off">Inactivo</span>'}</div>
+        <div class="muted" style="font-size:12px">${nG} guarnición(es) · ${nE} empresa(s) · ${money(p.precio)}</div></div></div>`; }).join('')}</div>`
+      : '<div class="empty">Todavía no hay platos. Creá el primero.</div>'}`;
+  $('#nuevo').onclick = () => editPlato(null);
+  $$('.pcard').forEach(c => c.onclick = () => editPlato(c.dataset.id));
+};
+
+async function comprimir(file, max=1600){
+  const img = await new Promise((ok, bad) => { const i=new Image(); i.onload=()=>ok(i); i.onerror=bad; i.src=URL.createObjectURL(file); });
+  const k = Math.min(1, max/Math.max(img.width, img.height));
+  const c = document.createElement('canvas'); c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return await new Promise(ok => c.toBlob(ok, 'image/jpeg', .85));
+}
+async function subirFoto(file, carpeta){
+  const blob = await comprimir(file);
+  const path = `${carpeta}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+  await q(sb.storage.from('gourmet').upload(path, blob, { contentType:'image/jpeg', upsert:true }));
+  return sb.storage.from('gourmet').getPublicUrl(path).data.publicUrl;
+}
+
+function editPlato(id){
+  const p = D.platos.find(x=>x.id===id) || { activo:true, orden:0 };
+  const gSel = new Set(D.pg.filter(x=>x.plato_id===id).map(x=>x.guarnicion_id));
+  const eSel = new Set(D.ep.filter(x=>x.plato_id===id).map(x=>x.empresa_id));
+  let foto = p.foto_url || '';
+  const v = k => esc(p[k] ?? '');
+  openModal(`
+    <h2>${id ? 'Editar plato' : 'Nuevo plato'}</h2>
+    <div class="photo field"><div class="ph" id="fPh" style="${foto?`background-image:url('${esc(foto)}')`:''}">${foto?'':'Sin foto'}</div>
+      <div><label class="btn ghost" style="display:inline-block">Subir foto (plato con guarnición)<input type="file" accept="image/*" id="fFile" hidden></label>
+      <div class="muted" style="font-size:12px;margin-top:6px">Se comprime automáticamente. Ideal horizontal 4:3.</div>
+      ${foto?'<button class="btn small danger" id="fDel" style="margin-top:6px">Quitar foto</button>':''}</div></div>
+    <div class="row">
+      <div class="field" style="grid-column:span 2"><label>Nombre *</label><input class="input" id="p_nombre" value="${v('nombre')}"></div>
+      <div class="field"><label>Proteína</label><select class="input" id="p_proteina"><option value="">—</option>${PROTEINAS.map(x=>`<option ${p.proteina===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Subtítulo</label><input class="input" id="p_subtitulo" value="${v('subtitulo')}" placeholder="Ej: Cocción lenta 12 horas"></div>
+    <div class="field"><label>Descripción breve</label><textarea class="input" id="p_descripcion" rows="2">${v('descripcion')}</textarea></div>
+    <div class="field"><label>Ingredientes</label><textarea class="input" id="p_ingredientes" rows="2">${v('ingredientes')}</textarea></div>
+    <div class="row">
+      <div class="field"><label>Gramaje principal</label><input class="input" id="p_gramaje_principal" value="${v('gramaje_principal')}" placeholder="Ojo de bife 250 g"></div>
+      <div class="field"><label>Gramaje total</label><input class="input" id="p_gramaje_total" value="${v('gramaje_total')}" placeholder="450 g"></div>
+      <div class="field"><label>Alérgenos</label><input class="input" id="p_alergenos" value="${v('alergenos')}" placeholder="Lácteos, gluten"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Heladera (días)</label><input type="number" class="input" id="p_conservacion_heladera_dias" value="${v('conservacion_heladera_dias')}" placeholder="5"></div>
+      <div class="field"><label>Freezer (meses)</label><input type="number" class="input" id="p_conservacion_freezer_meses" value="${v('conservacion_freezer_meses')}" placeholder="6"></div>
+      <div class="field" style="grid-column:span 2"><label>Notas de conservación</label><input class="input" id="p_conservacion_notas" value="${v('conservacion_notas')}" placeholder="Descongelar en heladera 24 h antes. No recongelar."></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Regeneración <small>(un paso por línea)</small></label><textarea class="input" id="p_regeneracion" rows="5" placeholder="Calentar agua a 85 °C&#10;Sumergir la bolsa cerrada 12 minutos&#10;…">${v('regeneracion')}</textarea></div>
+      <div class="field"><label>Emplatado <small>(un paso por línea)</small></label><textarea class="input" id="p_emplatado" rows="5" placeholder="Base de puré en el centro&#10;Carne fileteada encima&#10;…">${v('emplatado')}</textarea></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Precio de lista</label><input type="number" class="input" id="p_precio" value="${v('precio')}"></div>
+      <div class="field"><label>Receta en el recetario</label><input class="input" id="p_receta_ref" value="${v('receta_ref')}" placeholder="Nombre o ID de la receta"></div>
+      <div class="field"><label>Orden</label><input type="number" class="input" id="p_orden" value="${v('orden')}"></div>
+      <div class="field"><label>Estado</label><select class="input" id="p_activo"><option value="1" ${p.activo?'selected':''}>Activo</option><option value="0" ${!p.activo?'selected':''}>Inactivo</option></select></div>
+    </div>
+    <div class="field"><label>Guarniciones habilitadas para este plato</label>
+      <div class="checks">${D.guarniciones.map(g=>`<label><input type="checkbox" class="gChk" value="${g.id}" ${gSel.has(g.id)?'checked':''}> ${esc(g.nombre)}${g.activa?'':' <small class="muted">(inactiva)</small>'}</label>`).join('') || '<span class="muted">Primero cargá guarniciones.</span>'}</div></div>
+    <div class="field"><label>Empresas que ven este plato <button type="button" class="btn small ghost" id="allE" style="margin-left:6px">Todas</button></label>
+      <div class="checks">${D.empresas.map(e=>`<label><input type="checkbox" class="eChk" value="${e.id}" ${eSel.has(e.id)?'checked':''}> ${esc(e.nombre)}</label>`).join('') || '<span class="muted">Todavía no hay empresas.</span>'}</div></div>
+    <div class="mfoot"><div>${id?'<button class="btn danger" id="pDel">Eliminar</button>':''}</div>
+      <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="pSave">Guardar</button></div></div>`);
+
+  $('#fFile').onchange = async e => { const f=e.target.files[0]; if(!f) return; $('#fPh').textContent='Subiendo…';
+    try { foto = await subirFoto(f, 'platos'); $('#fPh').style.backgroundImage=`url('${foto}')`; $('#fPh').textContent=''; } catch(_){ $('#fPh').textContent='Error'; } };
+  if ($('#fDel')) $('#fDel').onclick = () => { foto=''; $('#fPh').style.backgroundImage=''; $('#fPh').textContent='Sin foto'; };
+  $('#allE').onclick = () => $$('.eChk').forEach(c=>c.checked=true);
+  if ($('#pDel')) $('#pDel').onclick = e => confirmBtn(e.target, async () => {
+    const { error } = await sb.from('gourmet_platos').delete().eq('id', id);
+    if (error){ await q(sb.from('gourmet_platos').update({activo:false}).eq('id', id)); toast('Tiene pedidos: lo dejé inactivo'); }
+    else toast('Plato eliminado');
+    closeModal(); await loadBase(); go('platos'); });
+  $('#pSave').onclick = async () => {
+    const val = k => $('#p_'+k).value.trim();
+    const num = k => val(k)==='' ? null : Number(val(k));
+    if (!val('nombre')) return toast('Falta el nombre', true);
+    const row = { nombre:val('nombre'), subtitulo:val('subtitulo')||null, descripcion:val('descripcion')||null, ingredientes:val('ingredientes')||null,
+      gramaje_principal:val('gramaje_principal')||null, gramaje_total:val('gramaje_total')||null, proteina:val('proteina')||null, alergenos:val('alergenos')||null,
+      foto_url:foto||null, conservacion_heladera_dias:num('conservacion_heladera_dias'), conservacion_freezer_meses:num('conservacion_freezer_meses'),
+      conservacion_notas:val('conservacion_notas')||null, regeneracion:val('regeneracion')||null, emplatado:val('emplatado')||null,
+      precio:num('precio'), receta_ref:val('receta_ref')||null, orden:num('orden')||0, activo:$('#p_activo').value==='1' };
+    $('#pSave').disabled = true;
+    try {
+      let pid = id;
+      if (id) await q(sb.from('gourmet_platos').update(row).eq('id', id));
+      else pid = (await q(sb.from('gourmet_platos').insert(row).select('id').single())).id;
+      // guarniciones
+      await q(sb.from('gourmet_plato_guarniciones').delete().eq('plato_id', pid));
+      const gs = $$('.gChk:checked').map(c => ({ plato_id:pid, guarnicion_id:c.value }));
+      if (gs.length) await q(sb.from('gourmet_plato_guarniciones').insert(gs));
+      // empresas (conserva precio especial existente)
+      const want = new Set($$('.eChk:checked').map(c=>c.value));
+      const quitar = [...eSel].filter(e=>!want.has(e)), agregar = [...want].filter(e=>!eSel.has(e));
+      if (quitar.length) await q(sb.from('gourmet_empresa_platos').delete().eq('plato_id', pid).in('empresa_id', quitar));
+      if (agregar.length) await q(sb.from('gourmet_empresa_platos').insert(agregar.map(e=>({ empresa_id:e, plato_id:pid }))));
+      toast('Plato guardado'); closeModal(); await loadBase(); go('platos');
+    } catch(_) { $('#pSave').disabled = false; }
+  };
+}
+
+/* ---------------- GUARNICIONES ---------------- */
+VIEWS.guarniciones = () => {
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Catálogo</div><h1>Guarniciones</h1></div><button class="btn" id="nuevo">+ Nueva guarnición</button></div>
+    <div class="panel">${D.guarniciones.length ? `<table><thead><tr><th>Nombre</th><th>Gramaje</th><th>Descripción</th><th>Receta</th><th class="num">Platos</th><th>Estado</th></tr></thead><tbody>
+      ${D.guarniciones.map(g=>`<tr class="click" data-id="${g.id}"><td><b>${esc(g.nombre)}</b></td><td>${esc(g.gramaje||'')}</td><td class="muted">${esc(g.descripcion||'')}</td><td class="muted">${esc(g.receta_ref||'')}</td><td class="num">${D.pg.filter(x=>x.guarnicion_id===g.id).length}</td><td>${g.activa?'<span class="st confirmado">Activa</span>':'<span class="st off">Inactiva</span>'}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty">Todavía no hay guarniciones.</div>'}</div>`;
+  $('#nuevo').onclick = () => editGuar(null);
+  $$('tr.click').forEach(r => r.onclick = () => editGuar(r.dataset.id));
+};
+function editGuar(id){
+  const g = D.guarniciones.find(x=>x.id===id) || { activa:true, orden:0 };
+  openModal(`<h2>${id?'Editar':'Nueva'} guarnición</h2>
+    <div class="row"><div class="field" style="grid-column:span 2"><label>Nombre *</label><input class="input" id="g_nombre" value="${esc(g.nombre||'')}"></div>
+      <div class="field"><label>Gramaje</label><input class="input" id="g_gramaje" value="${esc(g.gramaje||'')}" placeholder="180 g"></div></div>
+    <div class="field"><label>Descripción</label><input class="input" id="g_descripcion" value="${esc(g.descripcion||'')}"></div>
+    <div class="row"><div class="field"><label>Receta en el recetario</label><input class="input" id="g_receta_ref" value="${esc(g.receta_ref||'')}"></div>
+      <div class="field"><label>Orden</label><input type="number" class="input" id="g_orden" value="${g.orden??0}"></div>
+      <div class="field"><label>Estado</label><select class="input" id="g_activa"><option value="1" ${g.activa?'selected':''}>Activa</option><option value="0" ${!g.activa?'selected':''}>Inactiva</option></select></div></div>
+    <div class="mfoot"><div>${id?'<button class="btn danger" id="gDel">Eliminar</button>':''}</div>
+      <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="gSave">Guardar</button></div></div>`);
+  $('#gSave').onclick = async () => {
+    const row = { nombre:$('#g_nombre').value.trim(), gramaje:$('#g_gramaje').value.trim()||null, descripcion:$('#g_descripcion').value.trim()||null,
+      receta_ref:$('#g_receta_ref').value.trim()||null, orden:Number($('#g_orden').value)||0, activa:$('#g_activa').value==='1' };
+    if (!row.nombre) return toast('Falta el nombre', true);
+    await q(id ? sb.from('gourmet_guarniciones').update(row).eq('id', id) : sb.from('gourmet_guarniciones').insert(row), 'Guardado');
+    closeModal(); await loadBase(); go('guarniciones');
+  };
+  if ($('#gDel')) $('#gDel').onclick = e => confirmBtn(e.target, async () => {
+    await q(sb.from('gourmet_guarniciones').delete().eq('id', id), 'Eliminada'); closeModal(); await loadBase(); go('guarniciones'); });
+}
+
+/* ---------------- EMPRESAS ---------------- */
+VIEWS.empresas = () => {
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Clientes</div><h1>Empresas</h1></div><button class="btn" id="nuevo">+ Nueva empresa</button></div>
+    <div class="panel">${D.empresas.length ? `<table><thead><tr><th>Empresa</th><th>Dirección</th><th>Contacto</th><th class="num">Platos</th><th class="num">Usuarios</th><th>Precios</th><th>Estado</th></tr></thead><tbody>
+      ${D.empresas.map(e=>`<tr class="click" data-id="${e.id}"><td><b>${esc(e.nombre)}</b><br><small class="muted">${esc(e.razon_social||'')}</small></td>
+        <td>${esc(e.direccion||'')}<br><small class="muted">${esc([e.piso_oficina,e.localidad].filter(Boolean).join(' · '))}</small></td>
+        <td>${esc(e.contacto_nombre||'')}<br><small class="muted">${esc(e.contacto_tel||'')}</small></td>
+        <td class="num">${D.ep.filter(x=>x.empresa_id===e.id).length}</td><td class="num">${D.usuarios.filter(u=>u.empresa_id===e.id).length}</td>
+        <td>${e.mostrar_precios?'Visibles':'<span class="muted">Ocultos</span>'}</td><td>${e.activa?'<span class="st confirmado">Activa</span>':'<span class="st off">Inactiva</span>'}</td></tr>`).join('')}
+      </tbody></table>` : '<div class="empty">Todavía no hay empresas.</div>'}</div>`;
+  $('#nuevo').onclick = () => editEmpresa(null);
+  $$('tr.click').forEach(r => r.onclick = () => editEmpresa(r.dataset.id));
+};
+function editEmpresa(id){
+  const e = D.empresas.find(x=>x.id===id) || { activa:true, mostrar_precios:false };
+  const epMap = Object.fromEntries(D.ep.filter(x=>x.empresa_id===id).map(x=>[x.plato_id, x]));
+  const v = k => esc(e[k] ?? '');
+  const fld = (k, l, ph='', span=1) => `<div class="field" style="grid-column:span ${span}"><label>${l}</label><input class="input" id="e_${k}" value="${v(k)}" placeholder="${ph}"></div>`;
+  openModal(`<h2>${id?'Editar':'Nueva'} empresa</h2>
+    <div class="row">${fld('nombre','Nombre comercial *','',2)}${fld('razon_social','Razón social')}${fld('cuit','CUIT')}</div>
+    <div class="row">${fld('direccion','Dirección de entrega','Av. del Libertador 6000',2)}${fld('piso_oficina','Piso / oficina')}${fld('localidad','Barrio / localidad','Núñez')}</div>
+    <div class="row">${fld('horario_entrega','Horario de entrega','10 a 12 hs')}${fld('contacto_nombre','Contacto')}${fld('contacto_tel','Teléfono')}${fld('contacto_email','Email contacto')}</div>
+    <div class="row">${fld('condicion_facturacion','Condición de facturación','Factura A mensual · 30 días',2)}
+      <div class="field"><label>Precios en el front</label><select class="input" id="e_mostrar_precios"><option value="0" ${!e.mostrar_precios?'selected':''}>No mostrar</option><option value="1" ${e.mostrar_precios?'selected':''}>Mostrar</option></select></div>
+      <div class="field"><label>Estado</label><select class="input" id="e_activa"><option value="1" ${e.activa?'selected':''}>Activa</option><option value="0" ${!e.activa?'selected':''}>Inactiva</option></select></div></div>
+    <div class="field"><label>Notas internas</label><textarea class="input" id="e_notas" rows="2">${v('notas')}</textarea></div>
+    <div class="field"><label>Platos habilitados y precio especial <small>(vacío = precio de lista)</small> <button type="button" class="btn small ghost" id="allP" style="margin-left:6px">Todos</button></label>
+      <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;max-height:320px;overflow:auto">
+      ${D.platos.map(p=>`<div class="ep-row"><input type="checkbox" class="pChk" value="${p.id}" ${epMap[p.id]?'checked':''}>
+        <span>${esc(p.nombre)} <small class="muted">· lista ${money(p.precio)}${p.activo?'':' · inactivo'}</small></span>
+        <input type="number" class="input pPr" data-id="${p.id}" style="padding:5px 8px" placeholder="Precio esp." value="${epMap[p.id]?.precio ?? ''}"></div>`).join('') || '<div class="muted" style="padding:8px">Primero cargá platos.</div>'}
+      </div></div>
+    <div class="mfoot"><div>${id?'<button class="btn danger" id="eDel">Eliminar</button>':''}</div>
+      <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="eSave">Guardar</button></div></div>`);
+  $('#allP').onclick = () => $$('.pChk').forEach(c=>c.checked=true);
+  $('#eSave').onclick = async () => {
+    const val = k => $('#e_'+k).value.trim() || null;
+    const row = { nombre:val('nombre'), razon_social:val('razon_social'), cuit:val('cuit'), direccion:val('direccion'), piso_oficina:val('piso_oficina'),
+      localidad:val('localidad'), horario_entrega:val('horario_entrega'), contacto_nombre:val('contacto_nombre'), contacto_tel:val('contacto_tel'),
+      contacto_email:val('contacto_email'), condicion_facturacion:val('condicion_facturacion'), notas:val('notas'),
+      mostrar_precios:$('#e_mostrar_precios').value==='1', activa:$('#e_activa').value==='1' };
+    if (!row.nombre) return toast('Falta el nombre', true);
+    $('#eSave').disabled = true;
+    try {
+      let eid = id;
+      if (id) await q(sb.from('gourmet_empresas').update(row).eq('id', id));
+      else eid = (await q(sb.from('gourmet_empresas').insert(row).select('id').single())).id;
+      await q(sb.from('gourmet_empresa_platos').delete().eq('empresa_id', eid));
+      const sel = $$('.pChk:checked').map(c => { const pr=$(`.pPr[data-id="${c.value}"]`).value; return { empresa_id:eid, plato_id:c.value, precio: pr===''?null:Number(pr) }; });
+      if (sel.length) await q(sb.from('gourmet_empresa_platos').insert(sel));
+      toast('Empresa guardada'); closeModal(); await loadBase(); go('empresas');
+    } catch(_) { $('#eSave').disabled = false; }
+  };
+  if ($('#eDel')) $('#eDel').onclick = ev => confirmBtn(ev.target, async () => {
+    const { error } = await sb.from('gourmet_empresas').delete().eq('id', id);
+    if (error){ await q(sb.from('gourmet_empresas').update({activa:false}).eq('id', id)); toast('Tiene pedidos: la dejé inactiva'); } else toast('Empresa eliminada');
+    closeModal(); await loadBase(); go('empresas'); });
+}
+
+/* ---------------- USUARIOS ---------------- */
+async function api(body){
+  const { data:{ session } } = await sb.auth.getSession();
+  const r = await fetch(API_USUARIOS, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+session.access_token }, body:JSON.stringify(body) });
+  const j = await r.json().catch(()=>({ error:'Respuesta inválida del servidor (¿está subida la carpeta /api?)' }));
+  if (!r.ok) { toast(j.error||'Error', true); throw new Error(j.error); }
+  return j;
+}
+const genPass = () => { const c='abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.from(crypto.getRandomValues(new Uint32Array(10)), n=>c[n%c.length]).join(''); };
+VIEWS.usuarios = () => {
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Clientes</div><h1>Usuarios</h1></div><button class="btn" id="nuevo">+ Nuevo usuario</button></div>
+    <div class="toolbar"><div class="field"><label>Empresa</label><select class="input" id="uEmp">${empOptions('', 'Todas')}</select></div></div>
+    <div class="panel" id="uTbl"></div>`;
+  const render = () => { const f=$('#uEmp').value; const us=D.usuarios.filter(u=>!f||u.empresa_id===f);
+    $('#uTbl').innerHTML = us.length ? `<table><thead><tr><th>Nombre</th><th>Email</th><th>Empresa</th><th>Rol</th><th>Estado</th></tr></thead><tbody>
+      ${us.map(u=>`<tr class="click" data-id="${u.id}"><td><b>${esc(u.nombre||'—')}</b><br><small class="muted">${esc(u.telefono||'')}</small></td><td>${esc(u.email||'')}</td><td>${esc(u.empresa_id?empName(u.empresa_id):'—')}</td>
+        <td>${u.rol==='admin'?'<span class="st en_produccion">Admin</span>':'Cliente'}</td><td>${u.activo?'<span class="st confirmado">Activo</span>':'<span class="st off">Inactivo</span>'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Sin usuarios.</div>';
+    $$('#uTbl tr.click').forEach(r => r.onclick = () => editUsuario(r.dataset.id)); };
+  $('#uEmp').onchange = render; render();
+  $('#nuevo').onclick = () => nuevoUsuario();
+};
+function nuevoUsuario(){
+  const pass = genPass();
+  openModal(`<h2>Nuevo usuario</h2>
+    <div class="row"><div class="field"><label>Nombre *</label><input class="input" id="u_nombre"></div><div class="field"><label>Email *</label><input class="input" id="u_email" type="email"></div></div>
+    <div class="row"><div class="field"><label>Empresa *</label><select class="input" id="u_empresa">${empOptions('', 'Elegir…')}</select></div>
+      <div class="field"><label>Teléfono</label><input class="input" id="u_tel"></div>
+      <div class="field"><label>Rol</label><select class="input" id="u_rol"><option value="cliente">Cliente</option><option value="admin">Administrador Easy Lunch</option></select></div></div>
+    <div class="field"><label>Contraseña inicial</label><div style="display:flex;gap:8px"><input class="input" id="u_pass" value="${pass}"><button class="btn ghost" id="cp" type="button">Copiar</button></div>
+      <small>Pasásela al cliente. Puede cambiarla desde "Olvidé mi contraseña".</small></div>
+    <div class="mfoot"><span></span><div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="uSave">Crear usuario</button></div></div>`);
+  $('#cp').onclick = () => { navigator.clipboard?.writeText(`Usuario: ${$('#u_email').value}\nContraseña: ${$('#u_pass').value}\nIngreso: ${location.origin}/gourmet.html`); toast('Datos de acceso copiados'); };
+  $('#uSave').onclick = async () => { $('#uSave').disabled = true;
+    try { await api({ accion:'crear', nombre:$('#u_nombre').value, email:$('#u_email').value, empresa_id:$('#u_empresa').value||null, telefono:$('#u_tel').value, rol:$('#u_rol').value, password:$('#u_pass').value });
+      toast('Usuario creado'); closeModal(); await loadBase(); go('usuarios'); } catch(_) { $('#uSave').disabled = false; } };
+}
+function editUsuario(id){
+  const u = D.usuarios.find(x=>x.id===id); if (!u) return;
+  openModal(`<h2>${esc(u.nombre||u.email)}</h2><div class="muted" style="margin:-10px 0 16px">${esc(u.email)}</div>
+    <div class="row"><div class="field"><label>Nombre</label><input class="input" id="u_nombre" value="${esc(u.nombre||'')}"></div><div class="field"><label>Teléfono</label><input class="input" id="u_tel" value="${esc(u.telefono||'')}"></div></div>
+    <div class="row"><div class="field"><label>Empresa</label><select class="input" id="u_empresa">${empOptions(u.empresa_id, '— Sin empresa —')}</select></div>
+      <div class="field"><label>Rol</label><select class="input" id="u_rol"><option value="cliente" ${u.rol==='cliente'?'selected':''}>Cliente</option><option value="admin" ${u.rol==='admin'?'selected':''}>Administrador</option></select></div>
+      <div class="field"><label>Estado</label><select class="input" id="u_activo"><option value="1" ${u.activo?'selected':''}>Activo</option><option value="0" ${!u.activo?'selected':''}>Inactivo (no puede pedir)</option></select></div></div>
+    <div class="field"><label>Nueva contraseña</label><div style="display:flex;gap:8px"><input class="input" id="u_pass" placeholder="Dejar vacío para no cambiar"><button class="btn ghost" type="button" id="gen">Generar</button><button class="btn ghost" type="button" id="setP">Cambiar</button></div></div>
+    <div class="mfoot"><button class="btn danger" id="uDel">Eliminar usuario</button>
+      <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="uSave">Guardar</button></div></div>`);
+  $('#gen').onclick = () => $('#u_pass').value = genPass();
+  $('#setP').onclick = async () => { await api({ accion:'clave', id, password:$('#u_pass').value }); toast('Contraseña cambiada'); };
+  $('#uSave').onclick = async () => {
+    await q(sb.from('gourmet_usuarios').update({ nombre:$('#u_nombre').value.trim()||null, telefono:$('#u_tel').value.trim()||null, empresa_id:$('#u_empresa').value||null, rol:$('#u_rol').value, activo:$('#u_activo').value==='1' }).eq('id', id), 'Usuario guardado');
+    closeModal(); await loadBase(); go('usuarios'); };
+  $('#uDel').onclick = e => confirmBtn(e.target, async () => { await api({ accion:'eliminar', id }); toast('Usuario eliminado'); closeModal(); await loadBase(); go('usuarios'); });
+}
+
+/* ---------------- AJUSTES ---------------- */
+VIEWS.ajustes = () => {
+  const c = D.config, dias = c.dias_entrega || [1,2,3,4,5];
+  const nom = ['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+  $('#main').innerHTML = `
+    <div class="head"><div><div class="eyebrow">Configuración</div><h1>Ajustes</h1></div></div>
+    <div class="group" style="max-width:640px">
+      <div class="row"><div class="field"><label>Hora de corte (día anterior)</label><input type="time" class="input" id="a_hora" value="${esc(c.hora_corte||'18:00')}"></div>
+        <div class="field"><label>Fechas visibles para el cliente</label><input type="number" class="input" id="a_vis" value="${c.dias_visibles||12}"></div></div>
+      <div class="field"><label>Días con entrega</label><div class="checks" style="max-height:none">${[1,2,3,4,5,6,7].map(d=>`<label><input type="checkbox" class="aDia" value="${d}" ${dias.includes(d)?'checked':''}> ${nom[d]}</label>`).join('')}</div></div>
+      <div class="field"><label>Feriados / días sin entrega</label><textarea class="input" id="a_fer" rows="3" placeholder="2026-12-08&#10;2026-12-25">${(c.feriados||[]).join('\n')}</textarea><small>Una fecha por línea, formato AAAA-MM-DD.</small></div>
+      <button class="btn" id="aSave">Guardar ajustes</button>
+    </div>
+    <div class="group" style="max-width:640px"><h3>Accesos</h3>
+      <p class="muted">Link para clientes: <b>${location.origin}/gourmet.html</b></p></div>`;
+  $('#aSave').onclick = async () => {
+    const fer = $('#a_fer').value.split(/\s+/).map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
+    await q(sb.from('gourmet_config').upsert([
+      { clave:'hora_corte', valor:$('#a_hora').value || '18:00' },
+      { clave:'dias_visibles', valor:Number($('#a_vis').value)||12 },
+      { clave:'dias_entrega', valor:$$('.aDia:checked').map(c=>Number(c.value)) },
+      { clave:'feriados', valor:fer } ]), 'Ajustes guardados');
+    await loadBase(); };
+};
+
+init();
+</script>
+</body>
+</html>

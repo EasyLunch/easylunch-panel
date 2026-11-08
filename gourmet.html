@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Easy Lunch · Gourmet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+/* Estética alineada a app.easylunch.com.ar (Angular Material: Montserrat + Roboto, gris #F5F5F5, verde #32952E) */
+:root{
+  --bg:#F5F5F5; --surface:#FFFFFF; --ink:rgba(0,0,0,.87); --muted:#757575; --line:rgba(0,0,0,.12);
+  --green:#32952E; --green-2:#2A7F27; --green-login:#138E03; --green-soft:#7BC67B; --navy:#2B3B4B;
+  --orange:#F28A0B; --danger:#F44336; --radius:8px; --shadow:0 2px 6px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Roboto,"Helvetica Neue",sans-serif;letter-spacing:.25px;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:Montserrat,sans-serif;font-weight:500;margin:0;letter-spacing:.3px}
+button{font:inherit;cursor:pointer;letter-spacing:inherit}
+input,textarea,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.btn{border:0;border-radius:7px;padding:10px 22px;background:var(--green);color:#fff;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.6px;box-shadow:0 2px 5px rgba(0,0,0,.16);transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--green-2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.orange{background:var(--orange)}
+.btn.ghost{background:#EEEEEE;color:#1E1E1E;border:1px solid var(--line);box-shadow:none;border-radius:4px;text-transform:none;font-size:14px;font-weight:500;letter-spacing:1.25px}
+.btn.ghost:hover{background:#E4E4E4}
+.btn.small{padding:6px 12px;font-size:12px}
+.btn.danger{background:#fff;color:var(--danger);border:1px solid #F5C6C2;box-shadow:none}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.field label{font-size:13px;color:var(--muted);font-weight:500}
+.input{width:100%;border:1px solid rgba(0,0,0,.2);background:#fff;border-radius:4px;padding:10px 12px;outline:none}
+.input:focus{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.eyebrow{font-size:12px;color:var(--muted);font-weight:500}
+.link{background:none;border:0;color:var(--green);padding:0;font-weight:500}
+.err{color:var(--danger);font-size:13px;min-height:20px;margin:6px 0}
+.ico{width:20px;height:20px;fill:currentColor;flex:0 0 auto}
+
+/* LOGIN — igual al de app.easylunch.com.ar */
+#login,#reset{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+  background:linear-gradient(rgba(0,0,0,.45),rgba(0,0,0,.45)),url('https://app.easylunch.com.ar/assets/img/home/inicio-desktop.jpg') center/cover,url('gourmet-assets/fondo-login.jpg') center/cover,#333}
+.login-card{width:100%;max-width:410px;text-align:center;color:#fff}
+.login-card .logo{height:58px;margin-bottom:22px}
+.login-card h2{font-weight:500;font-size:32px;margin-bottom:6px}
+.login-card .sub{color:#eee;margin-bottom:24px}
+.login-card .tag{display:inline-block;background:var(--green-login);color:#fff;font-family:Montserrat,sans-serif;font-weight:600;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:4px 12px;border-radius:6px;margin-bottom:14px}
+.login-card .field{text-align:left}
+.login-card .field label{color:#fff}
+.login-card .input{border-color:transparent;padding:11px 12px}
+.login-card .btn{width:100%;padding:13px;font-size:16px;margin-top:6px;background:var(--green-login);border-radius:8px;text-transform:none;font-family:Montserrat,sans-serif;letter-spacing:0}
+.login-card .link{color:#fff;text-decoration:underline}
+.login-card .err{color:#FFD5D3}
+
+/* TOOLBAR */
+header.top{position:sticky;top:0;z-index:20;background:#F5F5F5;height:64px}
+.top-in{height:64px;display:flex;align-items:center;gap:16px;padding:0 16px}
+.logo-head{height:42px;display:block;cursor:pointer}
+.gtag{font-family:Montserrat,sans-serif;font-weight:600;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);border-left:1px solid #ccc;padding-left:12px}
+.tabs{display:flex;gap:2px;margin-left:auto}
+.tab{background:none;border:0;padding:8px 12px;border-radius:20px;color:rgba(0,0,0,.6);display:flex;align-items:center;gap:6px;font-weight:500}
+.tab:hover{background:rgba(0,0,0,.05)}
+.tab.on{color:var(--green)}
+.who{font-size:12px;color:var(--muted);text-align:right;line-height:1.3;padding-left:8px}
+.who b{display:block;color:var(--ink);font-weight:500}
+@media (max-width:720px){.who,.gtag,.tab .lbl{display:none}.logo-head{height:34px}}
+
+/* BANNER */
+.banner{height:200px;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;
+  background:linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.42)),url('https://app.easylunch.com.ar/media/bienvenidos-NJSJD7AT.png') center/cover,url('gourmet-assets/banner.jpg') center/cover,#444}
+.banner h1{font-size:32px;line-height:1.25;font-weight:500;padding:0 16px}
+@media (max-width:720px){.banner{height:150px}.banner h1{font-size:22px}}
+
+main{max-width:1180px;margin:auto;padding:20px 16px 120px}
+.notice{max-width:300px;margin:4px auto 26px;background:var(--green-soft);border-radius:4px;padding:12px 16px;text-align:center;font-weight:500;color:#111}
+.edit-banner{max-width:760px;margin:0 auto 18px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:4px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+
+.dates{display:flex;gap:10px;overflow-x:auto;padding:6px 6px 14px;justify-content:safe center;scrollbar-width:thin}
+.date{flex:0 0 auto;width:84px;border:1px solid transparent;background:#fff;border-radius:10px;padding:8px 4px;text-align:center;box-shadow:var(--shadow);color:#9E9E9E;transition:.15s;line-height:1.15}
+.date small{display:block;font-size:13px}
+.date b{display:block;font-size:28px;font-weight:700;line-height:1.05;color:#9E9E9E}
+.date span{font-size:13px}
+.date:hover{color:#555}.date:hover b{color:#555}
+.date.on{color:#111;border-color:rgba(0,0,0,.2);box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.date.on b{color:#111}
+.cutoff{font-size:13px;color:var(--muted);margin:4px 0 6px;text-align:center}
+.dot{display:none}
+.sec-head{font-size:32px;text-align:center;padding:24px 0 18px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,298px));gap:16px;justify-content:center}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12.8px;display:flex;flex-direction:column;cursor:pointer}
+.ph{aspect-ratio:1/1;background:#EEE center/cover no-repeat;position:relative;border-radius:2px}
+.ph.empty{display:flex;align-items:center;justify-content:center;color:#BDBDBD;font-family:Montserrat,sans-serif;font-size:18px}
+.badge{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.95);border-radius:12px;padding:2px 10px;font-size:11px;text-transform:capitalize;font-weight:500;color:#333}
+.incart{position:absolute;top:8px;right:8px;background:var(--green);color:#fff;border-radius:4px;padding:2px 8px;font-size:12px;font-weight:500}
+.card-body{padding:10px 0 0;display:flex;flex-direction:column;gap:4px;flex:1}
+.card-body h3{font-family:Roboto,sans-serif;font-size:15px;font-weight:500;line-height:1.35}
+.card-body .sub2{font-size:12px;color:var(--green)}
+.card-body p{margin:0;color:var(--muted);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-foot{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding:8px 0 10px;font-size:12px;color:var(--muted)}
+.card .btn.ghost{width:100%}
+.price{font-weight:500;color:var(--ink)}
+.empty-state{text-align:center;padding:50px 20px;color:var(--muted)}
+.empty-state h3{font-size:22px;color:var(--ink);margin-bottom:6px}
+
+/* MODAL (mat-dialog) */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:#fff;border-radius:4px;box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14);max-width:960px;width:100%;max-height:92vh;overflow:auto;display:grid;grid-template-columns:1fr 1fr;position:relative}
+.modal .ph{aspect-ratio:auto;min-height:100%;border-radius:4px 0 0 4px}
+.modal-body{padding:26px 26px 22px}
+.x{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.95);font-size:18px;z-index:2;box-shadow:var(--shadow)}
+.modal-body h2{font-size:24px;line-height:1.2;margin:4px 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.chip{background:#E0E0E0;border-radius:16px;padding:4px 12px;font-size:13px}
+.chip b{font-weight:500}
+.sec-title{font-size:13px;color:var(--muted);font-weight:500;margin:16px 0 6px}
+.itabs{display:flex;border-bottom:1px solid var(--line);margin-top:16px}
+.itab{background:none;border:0;padding:10px 14px;color:rgba(0,0,0,.6);border-bottom:2px solid transparent;font-weight:500;font-size:13px;letter-spacing:.6px}
+.itab.on{color:var(--green);border-color:var(--green)}
+.ipanel{padding:12px 0 4px;font-size:14px}
+.ipanel ol{margin:0;padding-left:20px}.ipanel li{margin-bottom:6px}
+.keep{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.keep div{background:#fff;border-radius:10px;padding:10px 12px;box-shadow:var(--shadow);text-align:center}
+.keep b{font-size:28px;font-weight:700;display:block;line-height:1.1}
+.keep small{color:var(--muted)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opt{border:0;background:#E0E0E0;border-radius:16px;padding:6px 14px;text-align:left}
+.opt small{display:block;color:var(--muted);font-size:11px}
+.opt.on{background:var(--green);color:#fff}
+.opt.on small{color:#E3F2E2}
+.add-row{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
+.stepper{display:flex;align-items:center;border:1px solid rgba(0,0,0,.2);border-radius:4px;background:#fff}
+.stepper button{width:36px;height:36px;border:0;background:none;font-size:18px}
+.stepper input{width:44px;text-align:center;border:0;outline:none;background:none;font-weight:500}
+@media (max-width:780px){.modal{grid-template-columns:1fr}.modal .ph{aspect-ratio:4/3;min-height:0;border-radius:4px 4px 0 0}.modal-body{padding:20px 16px}}
+
+/* CARRITO */
+.fab{position:fixed;right:22px;bottom:22px;z-index:30;display:flex;align-items:center;gap:10px;padding:13px 20px;border-radius:7px;border:0;background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.3);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.6px}
+.fab .n{background:#fff;color:var(--green);border-radius:10px;padding:0 8px}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:430px;max-width:100%;background:#F5F5F5;z-index:60;box-shadow:-6px 0 24px rgba(0,0,0,.2);display:flex;flex-direction:column}
+.drawer-head{padding:18px 20px 12px;background:#fff;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start}
+.drawer-head h2{font-size:24px}
+.drawer-body{flex:1;overflow:auto;padding:14px 16px}
+.drawer-foot{padding:14px 20px 20px;border-top:1px solid var(--line);background:#fff}
+.line{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px}
+.line-top{display:flex;justify-content:space-between;gap:10px}
+.line-top b{font-weight:500;font-size:15px}
+.line-top small{display:block;color:var(--muted)}
+.line-ctrl{display:flex;gap:10px;align-items:center;margin-top:10px}
+.line-ctrl .stepper button{width:30px;height:30px;font-size:16px}
+.line-ctrl .stepper input{width:32px}
+.line-ctrl .input{padding:6px 10px;font-size:13px}
+.rm{background:none;border:0;color:var(--danger);font-size:13px}
+.summary{display:flex;justify-content:space-between;margin-bottom:12px}
+.summary b{font-size:16px}
+.drawer-foot .btn{width:100%;padding:13px}
+
+/* MIS PEDIDOS */
+.order{background:#fff;border-radius:10px;box-shadow:var(--shadow);padding:16px 18px;margin:0 auto 12px;max-width:760px;display:grid;grid-template-columns:76px 1fr;gap:16px}
+.order .dbox{text-align:center;color:#111;line-height:1.1}
+.order .dbox small{display:block;font-size:13px;color:var(--muted)}
+.order .dbox b{display:block;font-size:30px;font-weight:700}
+.order .dbox span{font-size:12px;color:var(--muted)}
+.order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.order-head h3{font-family:Roboto,sans-serif;font-size:15px;font-weight:500}
+.order-head .meta{color:var(--muted);font-size:12px}
+.st{display:inline-block;border-radius:12px;padding:2px 10px;font-size:12px;font-weight:500;background:#E0E0E0;color:#555}
+.st.confirmado{background:#E3F2E2;color:#2A7F27}
+.st.en_produccion{background:#FFF3E0;color:#C66A00}
+.st.despachado,.st.entregado{background:#E3EAF2;color:var(--navy)}
+.st.cancelado{background:#FDE7E5;color:var(--danger)}
+.order ul{margin:10px 0 0;padding:0;list-style:none;font-size:14px}
+.order li{padding:5px 0;border-top:1px solid #F0F0F0;display:flex;justify-content:space-between;gap:10px}
+.order li small{color:var(--muted)}
+.order-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+@media (max-width:600px){.order{grid-template-columns:1fr}.order .dbox{display:flex;gap:6px;align-items:baseline}.order .dbox b{font-size:20px}}
+
+.toast{position:fixed;left:50%;top:8px;transform:translateX(-50%);background:#323232;color:#fff;padding:12px 18px;border-radius:4px;z-index:90;box-shadow:0 3px 5px rgba(0,0,0,.2);max-width:90vw;font-weight:500;text-transform:uppercase;font-size:13px}
+.toast.bad{background:var(--danger)}
+.loading{padding:60px;text-align:center;color:var(--muted)}
+.page-title{font-size:32px;text-align:center;padding:24px 0 6px}
+.page-sub{text-align:center;color:var(--muted);margin:0 0 20px}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login" hidden>
+  <form class="login-card" id="loginForm">
+    <img class="logo" alt="Easy Lunch" src="https://app.easylunch.com.ar/assets/img/logos/logo-easylunch-trans.png" onerror="this.onerror=null;this.src='gourmet-assets/logo-easylunch.png'">
+    <div><span class="tag">Platos Gourmet</span></div>
+    <h2>¡Te damos la bienvenida!</h2>
+    <div class="sub">Pedidos especiales para directorio y gerencia.</div>
+    <div class="field"><label>Usuario</label><input class="input" id="lEmail" type="email" autocomplete="username" placeholder="tu@empresa.com" required></div>
+    <div class="field"><label>Contraseña</label><input class="input" id="lPass" type="password" autocomplete="current-password" required></div>
+    <div class="err" id="lErr"></div>
+    <button class="btn" id="lBtn">Iniciar sesión</button>
+    <div style="margin-top:16px"><button type="button" class="link" id="forgot">Olvidé mi contraseña</button></div>
+  </form>
+</section>
+
+<!-- ============ NUEVA CLAVE (link de recuperación) ============ -->
+<section id="reset" hidden>
+  <form class="login-card" id="resetForm">
+    <img class="logo" alt="Easy Lunch" src="https://app.easylunch.com.ar/assets/img/logos/logo-easylunch-trans.png" onerror="this.onerror=null;this.src='gourmet-assets/logo-easylunch.png'">
+    <h2>Nueva contraseña</h2>
+    <div class="sub">Elegí una contraseña de al menos 8 caracteres.</div>
+    <div class="field"><label>Contraseña nueva</label><input class="input" id="rPass" type="password" minlength="8" required></div>
+    <div class="err" id="rErr"></div>
+    <button class="btn">Guardar</button>
+  </form>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" hidden>
+  <header class="top"><div class="top-in">
+    <img class="logo-head" alt="Easy Lunch" src="https://app.easylunch.com.ar/assets/img/upload/XOn7H9LwQB.webp" onerror="this.onerror=null;this.src='gourmet-assets/logo-easylunch-color.png'"><span class="gtag">Gourmet</span>
+    <nav class="tabs">
+      <button class="tab on" data-view="pedir" title="Pedir"><svg class="ico" viewBox="0 0 24 24"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg><span class="lbl">Pedir</span></button>
+      <button class="tab" data-view="pedidos" title="Mis pedidos"><svg class="ico" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg><span class="lbl">Mis pedidos</span></button>
+      <button class="tab" id="logout" title="Salir"><svg class="ico" viewBox="0 0 24 24"><path d="M10.09 15.59 11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5a2 2 0 0 0-2 2v4h2V5h14v14H5v-4H3v4a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg><span class="lbl">Salir</span></button>
+    </nav>
+    <div class="who"><b id="whoEmp"></b><span id="whoName"></span></div>
+  </div></header>
+  <div class="banner" id="banner"><h1 id="hello">Hola,<br>te damos la bienvenida a<br>Easy Lunch Gourmet.</h1></div>
+
+  <main>
+    <div id="v-pedir">
+      <div id="editBanner" class="edit-banner" hidden>
+        <span>Estás modificando el pedido <b id="editNum"></b>. Al confirmar, reemplaza al anterior.</span>
+        <button class="btn ghost small" id="cancelEdit">Descartar cambios</button>
+      </div>
+      <div class="notice">Podés pedir hasta las <span id="horaCorte">18:00</span> hs del día anterior a la entrega</div>
+      <div class="dates" id="dates"></div>
+      <div class="cutoff" id="cutoff"></div>
+      <h3 class="sec-head">Platos Gourmet</h3>
+      <div class="grid" id="menu"><div class="loading">Cargando menú…</div></div>
+    </div>
+
+    <div id="v-pedidos" hidden>
+      <h3 class="page-title">Mis pedidos</h3><p class="page-sub">Podés modificar o cancelar un pedido hasta el horario de corte.</p>
+      <div id="orders"><div class="loading">Cargando…</div></div>
+    </div>
+  </main>
+
+  <button class="fab" id="fab" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1z"/></svg>Ver pedido <span class="n" id="fabN">0</span></button>
+</section>
+
+<!-- Modal plato -->
+<div class="overlay" id="mOverlay" hidden><div class="modal" id="modal"></div></div>
+
+<!-- Carrito -->
+<div class="overlay" id="cOverlay" hidden style="justify-content:flex-end;padding:0"></div>
+<aside class="drawer" id="drawer" hidden>
+  <div class="drawer-head">
+    <div><div class="eyebrow" id="dDate"></div><h2>Tu pedido</h2></div>
+    <button class="x" style="position:static" id="dClose">✕</button>
+  </div>
+  <div class="drawer-body" id="dBody"></div>
+  <div class="drawer-foot">
+    <div class="field" style="margin-bottom:12px"><label>Notas para la entrega (opcional)</label>
+      <textarea class="input" id="dNotes" rows="2" placeholder="Ej: entregar en recepción del piso 12"></textarea></div>
+    <div class="summary"><span id="dUnits"></span><b id="dTotal"></b></div>
+    <button class="btn" id="dConfirm">Confirmar pedido</button>
+  </div>
+</aside>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* =====================================================================
+   CONFIGURACIÓN — mismos valores que usa el panel (recetario.html)
+   ===================================================================== */
+const SUPABASE_URL      = 'https://xlwcozznliafhouhqjzl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $  = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => n == null ? '' : '$ ' + Number(n).toLocaleString('es-AR', {maximumFractionDigits: 0});
+const DIAS  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const DIAS_L = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_L = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const ESTADOS = {confirmado:'Confirmado', en_produccion:'En producción', despachado:'Despachado', entregado:'Entregado', cancelado:'Cancelado'};
+
+const S = { menu:null, fecha:null, cart:[], editId:null, editNum:null, notas:'', orders:[] };
+
+function toast(msg, bad){ const t=$('#toast'); t.textContent=msg; t.className='toast'+(bad?' bad':''); t.hidden=false; clearTimeout(t._h); t._h=setTimeout(()=>t.hidden=true, 3800); }
+function parseDate(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y, m-1, d); }
+function fmtFecha(s, largo){ const d=parseDate(s); return largo ? `${DIAS_L[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}` : `${DIAS[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`; }
+function corteDe(fecha){ // día anterior a la hora de corte, hora Argentina (UTC-3)
+  const hora = (S.menu?.config?.hora_corte) || '18:00';
+  const d = parseDate(fecha); d.setDate(d.getDate()-1);
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return new Date(`${y}-${m}-${dd}T${hora}:00-03:00`);
+}
+function fmtCorte(iso){ const d=new Date(iso); const ar=new Date(d.getTime()-3*3600e3);
+  const hoy=new Date(Date.now()-3*3600e3); const man=new Date(hoy.getTime()+864e5);
+  const same=(a,b)=>a.toISOString().slice(0,10)===b.toISOString().slice(0,10);
+  const hh=ar.toISOString().slice(11,16);
+  if (same(ar,hoy)) return `hoy a las ${hh} hs`;
+  if (same(ar,man)) return `mañana a las ${hh} hs`;
+  return `el ${DIAS_L[ar.getUTCDay()]} ${ar.getUTCDate()} a las ${hh} hs`;
+}
+function lines(txt){ return String(txt||'').split(/\n+/).map(s=>s.replace(/^\s*(\d+[\.\)]|[-•])\s*/,'').trim()).filter(Boolean); }
+
+/* ---------------- AUTH ---------------- */
+async function init(){
+  const isRecovery = location.hash.includes('type=recovery');
+  sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') show('reset'); });
+  if (isRecovery) return show('reset');
+  const { data:{ session } } = await sb.auth.getSession();
+  session ? boot() : show('login');
+}
+function show(id){ ['login','reset','app'].forEach(x => $('#'+x).hidden = x!==id); }
+
+$('#loginForm').onsubmit = async e => {
+  e.preventDefault(); $('#lErr').textContent=''; $('#lBtn').disabled=true;
+  const { error } = await sb.auth.signInWithPassword({ email:$('#lEmail').value.trim(), password:$('#lPass').value });
+  $('#lBtn').disabled=false;
+  if (error) return $('#lErr').textContent = 'Email o contraseña incorrectos.';
+  boot();
+};
+$('#forgot').onclick = async () => {
+  const email = $('#lEmail').value.trim();
+  if (!email) return $('#lErr').textContent = 'Escribí tu email y volvé a tocar "Olvidé mi contraseña".';
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  $('#lErr').textContent = error ? 'No pudimos enviar el mail. Probá de nuevo.' : 'Te enviamos un mail para crear una nueva contraseña.';
+};
+$('#resetForm').onsubmit = async e => {
+  e.preventDefault();
+  const { error } = await sb.auth.updateUser({ password: $('#rPass').value });
+  if (error) return $('#rErr').textContent = error.message;
+  history.replaceState(null,'',location.pathname); toast('Contraseña actualizada'); boot();
+};
+$('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+/* ---------------- BOOT ---------------- */
+async function boot(){
+  show('app');
+  const { data, error } = await sb.rpc('gourmet_mi_menu');
+  if (error){
+    $('#menu').innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>No pudimos cargar el menú</h3><p>${esc(error.message)}</p></div>`;
+    return;
+  }
+  S.menu = data;
+  $('#whoEmp').textContent = data.empresa?.nombre || '';
+  $('#whoName').textContent = data.usuario?.nombre || data.usuario?.email || '';
+  $('#hello').innerHTML = `Hola ${esc(data.usuario?.nombre?.split(' ')[0] || data.empresa?.nombre || '')},<br>te damos la bienvenida a<br>Easy Lunch Gourmet.`;
+  $('#horaCorte').textContent = data.config?.hora_corte || '18:00';
+  try { const saved = JSON.parse(sessionStorage.getItem('gourmet_cart')||'null'); if (saved && !S.editId) { S.cart = saved.cart||[]; S.fecha = saved.fecha; } } catch(_){}
+  if (!data.fechas.some(f => f.fecha === S.fecha)) S.fecha = data.fechas[0]?.fecha || null;
+  // limpiar carrito de platos que ya no están
+  S.cart = S.cart.filter(l => data.platos.some(p => p.id === l.plato_id));
+  renderDates(); renderMenu(); renderCart();
+}
+
+/* ---------------- FECHAS ---------------- */
+function renderDates(){
+  const fs = S.menu.fechas;
+  if (!fs.length){ $('#dates').innerHTML = '<div class="cutoff">No hay fechas disponibles por el momento.</div>'; $('#cutoff').innerHTML=''; return; }
+  $('#dates').innerHTML = fs.map(f => { const d=parseDate(f.fecha);
+    return `<button class="date ${f.fecha===S.fecha?'on':''}" data-f="${f.fecha}"><small>${MESES_L[d.getMonth()]}</small><b>${d.getDate()}</b><span>${DIAS_L[d.getDay()]}</span></button>`; }).join('');
+  $('#dates').querySelectorAll('.date').forEach(b => b.onclick = () => { S.fecha=b.dataset.f; saveCart(); renderDates(); renderCart(); });
+  const sel = fs.find(f => f.fecha===S.fecha);
+  $('#cutoff').innerHTML = sel ? `<span>Entrega el <b>${fmtFecha(S.fecha,true)}</b>. Podés pedir o modificar hasta ${fmtCorte(sel.corte)}.</span>` : '';
+}
+
+/* ---------------- MENÚ ---------------- */
+function qtyInCart(id){ return S.cart.filter(l=>l.plato_id===id).reduce((a,l)=>a+l.cantidad,0); }
+function renderMenu(){
+  const ps = S.menu.platos;
+  if (!ps.length){ $('#menu').innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Todavía no hay platos habilitados</h3><p>Escribinos y armamos tu menú.</p></div>`; return; }
+  $('#menu').innerHTML = ps.map(p => { const q=qtyInCart(p.id);
+    return `<article class="card" data-id="${p.id}">
+      <div class="ph ${p.foto_url?'':'empty'}" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Easy Lunch'}
+        ${p.proteina?`<span class="badge">${esc(p.proteina)}</span>`:''}${q?`<span class="incart">${q} en el pedido</span>`:''}</div>
+      <div class="card-body">
+        <h3>${esc(p.nombre)}</h3>
+        ${p.subtitulo?`<div class="sub2">${esc(p.subtitulo)}</div>`:''}
+        <p>${esc(p.descripcion||'')}</p>
+        <div class="card-foot"><span>${esc(p.gramaje_total||'')}${p.guarniciones.length?` · ${p.guarniciones.length} ${p.guarniciones.length>1?'guarniciones':'guarnición'}`:''}</span>
+        ${p.precio!=null?`<span class="price">${money(p.precio)}</span>`:''}</div>
+        <button class="btn ghost" type="button">${q?'Agregar otro':'Seleccionar'}</button>
+      </div></article>`; }).join('');
+  $('#menu').querySelectorAll('.card').forEach(c => c.onclick = () => openPlato(c.dataset.id));
+}
+
+function openPlato(id){
+  const p = S.menu.platos.find(x=>x.id===id); if (!p) return;
+  const st = { g: p.guarniciones.length===1 ? p.guarniciones[0].id : null, q:1, tab:'conservacion' };
+  const reg = lines(p.regeneracion), emp = lines(p.emplatado);
+  const render = () => {
+    $('#modal').innerHTML = `
+      <button class="x" id="mClose">✕</button>
+      <div class="ph ${p.foto_url?'':'empty'}" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Easy Lunch'}</div>
+      <div class="modal-body">
+        ${p.proteina?`<div class="eyebrow">${esc(p.proteina)}</div>`:''}
+        <h2>${esc(p.nombre)}</h2>
+        ${p.subtitulo?`<div style="color:var(--gold)">${esc(p.subtitulo)}</div>`:''}
+        <p style="color:var(--muted);margin:10px 0 0">${esc(p.descripcion||'')}</p>
+        <div class="chips">
+          ${p.gramaje_principal?`<span class="chip">${esc(p.gramaje_principal)}</span>`:''}
+          ${p.gramaje_total?`<span class="chip">Porción total <b>${esc(p.gramaje_total)}</b></span>`:''}
+          ${p.precio!=null?`<span class="chip"><b>${money(p.precio)}</b></span>`:''}
+        </div>
+        ${p.ingredientes?`<div class="sec-title">Ingredientes</div><div style="font-size:14px">${esc(p.ingredientes)}</div>`:''}
+        ${p.alergenos?`<div style="font-size:13px;color:var(--danger);margin-top:6px">Alérgenos: ${esc(p.alergenos)}</div>`:''}
+
+        <div class="itabs">
+          <button class="itab ${st.tab==='conservacion'?'on':''}" data-t="conservacion">Conservación</button>
+          ${reg.length?`<button class="itab ${st.tab==='regeneracion'?'on':''}" data-t="regeneracion">Regenerar</button>`:''}
+          ${emp.length?`<button class="itab ${st.tab==='emplatado'?'on':''}" data-t="emplatado">Emplatar</button>`:''}
+        </div>
+        <div class="ipanel">${
+          st.tab==='conservacion' ? `
+            <div class="keep">
+              <div><b>${p.conservacion_heladera_dias ?? '—'}</b><small>días en heladera (0–4 °C)</small></div>
+              <div><b>${p.conservacion_freezer_meses ?? '—'}</b><small>meses en freezer (−18 °C)</small></div>
+            </div>
+            <div style="color:var(--muted)">Envasado al vacío. ${esc(p.conservacion_notas||'Mantener cerrado hasta el momento de regenerar. Una vez descongelado no volver a congelar.')}</div>`
+          : st.tab==='regeneracion' ? `<ol>${reg.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`
+          : `<ol>${emp.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`
+        }</div>
+
+        ${p.guarniciones.length?`
+          <div class="sec-title">Guarnición</div>
+          <div class="opts">${p.guarniciones.map(g=>`<button class="opt ${st.g===g.id?'on':''}" data-g="${g.id}">${esc(g.nombre)}${g.gramaje||g.descripcion?`<small>${esc([g.gramaje,g.descripcion].filter(Boolean).join(' · '))}</small>`:''}</button>`).join('')}</div>`:''}
+        <div class="sec-title">¿Para quién? <span style="text-transform:none;letter-spacing:0;font-weight:400">(opcional)</span></div>
+        <input class="input" id="mFor" placeholder="Ej: Sr. Gómez – Directorio" value="${esc(st.for||'')}">
+        <div class="add-row">
+          <div class="stepper"><button data-d="-1">−</button><input id="mQ" value="${st.q}" inputmode="numeric"><button data-d="1">+</button></div>
+          <button class="btn" id="mAdd" style="flex:1">Agregar al pedido${p.precio!=null?` · ${money(p.precio*st.q)}`:''}</button>
+        </div>
+      </div>`;
+    $('#mClose').onclick = closePlato;
+    $('#modal').querySelectorAll('.itab').forEach(b => b.onclick = () => { st.for=$('#mFor').value; st.tab=b.dataset.t; render(); });
+    $('#modal').querySelectorAll('.opt').forEach(b => b.onclick = () => { st.for=$('#mFor').value; st.g=b.dataset.g; render(); });
+    $('#modal').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { st.for=$('#mFor').value; st.q=Math.max(1, Math.min(500, (parseInt($('#mQ').value)||1)+Number(b.dataset.d))); render(); });
+    $('#mQ').onchange = () => { st.for=$('#mFor').value; st.q=Math.max(1, Math.min(500, parseInt($('#mQ').value)||1)); render(); };
+    $('#mAdd').onclick = () => {
+      if (p.guarniciones.length && !st.g) return toast('Elegí una guarnición', true);
+      st.q = Math.max(1, Math.min(500, parseInt($('#mQ').value)||1));
+      addToCart(p, st.g, st.q, $('#mFor').value.trim());
+      closePlato(); toast(`${p.nombre} agregado`);
+    };
+  };
+  render();
+  $('#mOverlay').hidden = false; document.body.style.overflow='hidden';
+}
+function closePlato(){ $('#mOverlay').hidden = true; document.body.style.overflow=''; }
+$('#mOverlay').onclick = e => { if (e.target.id==='mOverlay') closePlato(); };
+
+/* ---------------- CARRITO ---------------- */
+function saveCart(){ try { if (!S.editId) sessionStorage.setItem('gourmet_cart', JSON.stringify({cart:S.cart, fecha:S.fecha})); } catch(_){} }
+function addToCart(p, gid, q, para){
+  const ex = S.cart.find(l => l.plato_id===p.id && (l.guarnicion_id||null)===(gid||null) && (l.para_quien||'')===(para||''));
+  if (ex) ex.cantidad = Math.min(500, ex.cantidad+q);
+  else S.cart.push({ plato_id:p.id, guarnicion_id:gid||null, cantidad:q, para_quien:para||'' });
+  saveCart(); renderCart(); renderMenu();
+}
+function cartTotals(){
+  let u=0, t=0, priced = S.menu?.empresa?.mostrar_precios;
+  S.cart.forEach(l => { const p=S.menu.platos.find(x=>x.id===l.plato_id); u+=l.cantidad; if (p?.precio!=null) t+=p.precio*l.cantidad; });
+  return { u, t, priced };
+}
+function renderCart(){
+  const { u, t, priced } = cartTotals();
+  $('#fab').hidden = !u || !$('#v-pedidos').hidden; $('#fabN').textContent = u;
+  $('#dDate').textContent = S.fecha ? 'Entrega ' + fmtFecha(S.fecha, true) : 'Elegí una fecha';
+  $('#dUnits').textContent = `${u} plato${u===1?'':'s'}`;
+  $('#dTotal').textContent = priced ? money(t) : '';
+  $('#dConfirm').textContent = S.editId ? 'Guardar cambios' : 'Confirmar pedido';
+  $('#editBanner').hidden = !S.editId; $('#editNum').textContent = S.editNum ? '#'+S.editNum : '';
+  if (!S.cart.length){ $('#dBody').innerHTML = '<div class="empty-state"><h3>Vacío</h3><p>Elegí platos del menú.</p></div>'; return; }
+  $('#dBody').innerHTML = S.cart.map((l,i) => {
+    const p = S.menu.platos.find(x=>x.id===l.plato_id); const g = p?.guarniciones.find(x=>x.id===l.guarnicion_id);
+    return `<div class="line">
+      <div class="line-top"><div><b>${esc(p?.nombre)}</b>${g?`<small>con ${esc(g.nombre)}</small>`:''}</div>
+        ${priced && p?.precio!=null?`<span class="price">${money(p.precio*l.cantidad)}</span>`:''}</div>
+      <div class="line-ctrl">
+        <div class="stepper"><button data-i="${i}" data-d="-1">−</button><input value="${l.cantidad}" data-i="${i}" class="lq"><button data-i="${i}" data-d="1">+</button></div>
+        <input class="input lf" data-i="${i}" placeholder="Para quién (opcional)" value="${esc(l.para_quien)}">
+        <button class="rm" data-rm="${i}">Quitar</button>
+      </div></div>`; }).join('');
+  $('#dBody').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { const l=S.cart[b.dataset.i]; l.cantidad=Math.max(1,Math.min(500,l.cantidad+Number(b.dataset.d))); saveCart(); renderCart(); renderMenu(); });
+  $('#dBody').querySelectorAll('.lq').forEach(inp => inp.onchange = () => { S.cart[inp.dataset.i].cantidad=Math.max(1,Math.min(500,parseInt(inp.value)||1)); saveCart(); renderCart(); renderMenu(); });
+  $('#dBody').querySelectorAll('.lf').forEach(inp => inp.oninput = () => { S.cart[inp.dataset.i].para_quien=inp.value; saveCart(); });
+  $('#dBody').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { S.cart.splice(b.dataset.rm,1); saveCart(); renderCart(); renderMenu(); });
+}
+function openCart(){ $('#dNotes').value = S.notas||''; $('#drawer').hidden=false; $('#cOverlay').hidden=false; renderCart(); }
+function closeCart(){ S.notas=$('#dNotes').value; $('#drawer').hidden=true; $('#cOverlay').hidden=true; }
+$('#fab').onclick = openCart; $('#dClose').onclick = closeCart; $('#cOverlay').onclick = closeCart;
+
+$('#dConfirm').onclick = async () => {
+  if (!S.fecha) return toast('Elegí una fecha de entrega', true);
+  if (!S.cart.length) return toast('El pedido está vacío', true);
+  const btn = $('#dConfirm'); btn.disabled = true;
+  const items = S.cart.map(l => ({ plato_id:l.plato_id, guarnicion_id:l.guarnicion_id, cantidad:l.cantidad, para_quien:l.para_quien }));
+  const { error } = await sb.rpc('gourmet_guardar_pedido', { p_pedido_id:S.editId, p_fecha:S.fecha, p_notas:$('#dNotes').value, p_items:items });
+  btn.disabled = false;
+  if (error) return toast(error.message.replace(/^.*?:\s*/,'') || 'No se pudo guardar', true);
+  const wasEdit = !!S.editId;
+  S.cart=[]; S.editId=null; S.editNum=null; S.notas=''; $('#dNotes').value='';
+  try { sessionStorage.removeItem('gourmet_cart'); } catch(_){}
+  closeCart(); renderCart(); renderMenu();
+  toast(wasEdit ? 'Pedido actualizado' : '¡Pedido confirmado! Lo vas a ver en "Mis pedidos".');
+  go('pedidos');
+};
+$('#cancelEdit').onclick = () => { S.cart=[]; S.editId=null; S.editNum=null; S.notas=''; renderCart(); renderMenu(); go('pedidos'); };
+
+/* ---------------- MIS PEDIDOS ---------------- */
+async function loadOrders(){
+  $('#orders').innerHTML = '<div class="loading">Cargando…</div>';
+  const { data, error } = await sb.from('gourmet_pedidos')
+    .select('id,numero,fecha_entrega,estado,notas,total,total_unidades,created_at,usuario_id,gourmet_pedido_items(plato_id,guarnicion_id,plato_nombre,guarnicion_nombre,cantidad,para_quien,subtotal)')
+    .order('fecha_entrega', { ascending:false }).order('numero', { ascending:false }).limit(60);
+  if (error) return $('#orders').innerHTML = `<div class="empty-state"><h3>Error</h3><p>${esc(error.message)}</p></div>`;
+  S.orders = data;
+  if (!data.length) return $('#orders').innerHTML = `<div class="empty-state"><h3>Todavía no hiciste pedidos</h3><p>Elegí una fecha y tus platos en "Pedir".</p></div>`;
+  const priced = S.menu?.empresa?.mostrar_precios;
+  $('#orders').innerHTML = data.map(o => {
+    const editable = o.estado==='confirmado' && corteDe(o.fecha_entrega) > new Date();
+    const od=parseDate(o.fecha_entrega);
+    return `<div class="order"><div class="dbox"><small>${MESES_L[od.getMonth()]}</small><b>${od.getDate()}</b><span>${DIAS_L[od.getDay()]}</span></div><div>
+      <div class="order-head">
+        <div><h3>Pedido #${o.numero}</h3>
+          <div class="meta">${o.total_unidades} plato${o.total_unidades===1?'':'s'}${priced?` · ${money(o.total)}`:''}${editable?` · modificable hasta ${fmtCorte(corteDe(o.fecha_entrega).toISOString())}`:''}</div></div>
+        <span class="st ${o.estado}">${ESTADOS[o.estado]||o.estado}</span>
+      </div>
+      <ul>${o.gourmet_pedido_items.map(i => `<li><span>${i.cantidad} × ${esc(i.plato_nombre)}${i.guarnicion_nombre?` <small>con ${esc(i.guarnicion_nombre)}</small>`:''}${i.para_quien?` <small>· para ${esc(i.para_quien)}</small>`:''}</span>${priced?`<small>${money(i.subtotal)}</small>`:''}</li>`).join('')}</ul>
+      ${o.notas?`<div style="font-size:13px;color:var(--muted);margin-top:8px">Notas: ${esc(o.notas)}</div>`:''}
+      <div class="order-actions">
+        ${editable?`<button class="btn small" data-edit="${o.id}">Modificar</button><button class="btn danger small" data-cancel="${o.id}">Cancelar</button>`:''}
+        ${o.estado!=='cancelado'?`<button class="btn ghost small" data-guide="${o.id}">Instrucciones de conservación y regeneración</button>`:''}
+        <button class="btn ghost small" data-repeat="${o.id}">Repetir pedido</button>
+      </div></div></div>`; }).join('');
+  $('#orders').querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editOrder(b.dataset.edit));
+  $('#orders').querySelectorAll('[data-cancel]').forEach(b => b.onclick = () => cancelOrder(b));
+  $('#orders').querySelectorAll('[data-repeat]').forEach(b => b.onclick = () => repeatOrder(b.dataset.repeat));
+  $('#orders').querySelectorAll('[data-guide]').forEach(b => b.onclick = () => printGuide(b.dataset.guide));
+}
+function itemsToCart(o){
+  return o.gourmet_pedido_items.filter(i => S.menu.platos.some(p => p.id===i.plato_id))
+    .map(i => ({ plato_id:i.plato_id, guarnicion_id:i.guarnicion_id, cantidad:i.cantidad, para_quien:i.para_quien||'' }));
+}
+function editOrder(id){
+  const o = S.orders.find(x=>x.id===id); if (!o) return;
+  S.editId=o.id; S.editNum=o.numero; S.cart=itemsToCart(o); S.notas=o.notas||'';
+  if (!S.menu.fechas.some(f=>f.fecha===o.fecha_entrega)) S.menu.fechas.unshift({ fecha:o.fecha_entrega, corte:corteDe(o.fecha_entrega).toISOString() });
+  S.fecha=o.fecha_entrega; go('pedir'); renderDates(); renderMenu(); renderCart(); openCart();
+}
+function repeatOrder(id){
+  const o = S.orders.find(x=>x.id===id); if (!o) return;
+  S.editId=null; S.editNum=null; S.cart=itemsToCart(o); S.notas=o.notas||''; saveCart();
+  go('pedir'); renderMenu(); renderCart(); openCart();
+  toast('Copiamos los platos. Elegí la fecha y confirmá.');
+}
+async function cancelOrder(btn){
+  if (btn.dataset.sure !== '1'){ btn.dataset.sure='1'; btn.textContent='¿Seguro? Tocá de nuevo'; setTimeout(()=>{ btn.dataset.sure=''; btn.textContent='Cancelar'; }, 4000); return; }
+  const { error } = await sb.rpc('gourmet_cancelar_pedido', { p_pedido_id: btn.dataset.cancel });
+  if (error) return toast(error.message, true);
+  toast('Pedido cancelado'); loadOrders();
+}
+function printGuide(id){
+  const o = S.orders.find(x=>x.id===id); if (!o) return;
+  const seen = new Set();
+  const platos = o.gourmet_pedido_items.map(i => S.menu.platos.find(p=>p.id===i.plato_id)).filter(p => p && !seen.has(p.id) && seen.add(p.id));
+  const w = window.open('', '_blank');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Instrucciones – Pedido #${o.numero}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>body{font:13px/1.5 Roboto,sans-serif;color:#1D1B17;max-width:760px;margin:30px auto;padding:0 20px}h1,h2{font-family:Montserrat,sans-serif;margin:0}
+  h1{font-size:34px}.p{border-top:1px solid #ddd;padding:18px 0;page-break-inside:avoid}.p h2{font-size:24px}.k{display:flex;gap:20px;margin:8px 0;color:#555}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}h4{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#138E03;margin:10px 0 4px}ol{margin:0;padding-left:18px}</style></head><body>
+  <div style="font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#138E03">Easy Lunch Gourmet · Pedido #${o.numero}</div>
+  <h1>Conservación, regeneración y emplatado</h1><p>Entrega: ${fmtFecha(o.fecha_entrega,true)} · ${esc(S.menu.empresa.nombre)}</p>
+  ${platos.map(p => `<div class="p"><h2>${esc(p.nombre)}</h2>
+    <div class="k"><span><b>Heladera:</b> ${p.conservacion_heladera_dias ?? '—'} días</span><span><b>Freezer:</b> ${p.conservacion_freezer_meses ?? '—'} meses</span><span>${esc(p.gramaje_total||'')}</span></div>
+    ${p.conservacion_notas?`<div>${esc(p.conservacion_notas)}</div>`:''}
+    <div class="cols"><div><h4>Regenerar</h4><ol>${lines(p.regeneracion).map(s=>`<li>${esc(s)}</li>`).join('')||'<li>—</li>'}</ol></div>
+    <div><h4>Emplatar</h4><ol>${lines(p.emplatado).map(s=>`<li>${esc(s)}</li>`).join('')||'<li>—</li>'}</ol></div></div></div>`).join('')}
+  <script>setTimeout(()=>print(),400)<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ---------------- NAV ---------------- */
+function go(v){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.view===v));
+  $('#v-pedir').hidden = v!=='pedir'; $('#v-pedidos').hidden = v!=='pedidos'; $('#banner').hidden = v!=='pedir';
+  $('#fab').hidden = v!=='pedir' || !S.cart.length;
+  if (v==='pedidos') loadOrders();
+  window.scrollTo({ top:0 });
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => go(t.dataset.view));
+document.addEventListener('keydown', e => { if (e.key==='Escape'){ closePlato(); closeCart(); } });
+
+init();
+</script>
+</body>
+</html>
