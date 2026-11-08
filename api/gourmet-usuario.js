@@ -18,7 +18,10 @@ export default async function handler(req, res) {
   const token = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ error: 'Sesión requerida' });
 
-  const H = { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
+  // Claves nuevas de Supabase (sb_secret_...) van solo en "apikey"; las legacy (eyJ...) también en Authorization
+  const H = SERVICE.startsWith('sb_')
+    ? { apikey: SERVICE, 'Content-Type': 'application/json' }
+    : { apikey: SERVICE, Authorization: `Bearer ${SERVICE}`, 'Content-Type': 'application/json' };
 
   try {
     // 1) ¿Quién llama?
@@ -28,6 +31,7 @@ export default async function handler(req, res) {
 
     // 2) ¿Es administrador?
     const rolRes = await fetch(`${URL}/rest/v1/gourmet_usuarios?id=eq.${me.id}&select=rol,activo`, { headers: H });
+    if (!rolRes.ok) return res.status(500).json({ error: 'No se pudo verificar el rol (revisá SUPABASE_SERVICE_ROLE_KEY en Vercel): ' + (await rolRes.text()).slice(0, 160) });
     const rol = (await rolRes.json())[0];
     if (!rol || rol.rol !== 'admin' || !rol.activo) return res.status(403).json({ error: 'Solo administradores' });
 
