@@ -87,6 +87,10 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
 .date.on b{color:#111}
 .date .dn{position:absolute;top:-6px;right:-6px;background:var(--green);color:#fff;font-style:normal;font-size:11px;font-weight:700;min-width:20px;height:20px;line-height:20px;border-radius:10px;padding:0 5px}
 .dhead{font-family:Montserrat,sans-serif;font-weight:600;font-size:14px;text-transform:capitalize;margin:10px 2px 8px;color:var(--green)}
+.paras{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin-top:8px}
+.paras .input{padding:7px 10px;font-size:13px}
+.dhead.venc{color:var(--danger)}
+.derr{background:#FDECEA;border:1px solid #F5C6C2;color:#B3261E;border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:13px}
 .cutoff{font-size:13px;color:var(--muted);margin:4px 0 6px;text-align:center}
 .dot{display:none}
 .sec-head{font-size:32px;text-align:center;padding:24px 0 18px}
@@ -265,6 +269,7 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
     <div class="field" style="margin-bottom:12px"><label>Notas para la entrega (opcional)</label>
       <textarea class="input" id="dNotes" rows="2" placeholder="Ej: entregar en recepción del piso 12"></textarea></div>
     <div class="summary"><span id="dUnits"></span><b id="dTotal"></b></div>
+    <div class="derr" id="dErr" hidden></div>
     <button class="btn" id="dConfirm">Confirmar pedido</button>
   </div>
 </aside>
@@ -353,7 +358,7 @@ async function boot(){
   $('#whoName').textContent = data.usuario?.nombre || data.usuario?.email || '';
   $('#hello').innerHTML = `Hola ${esc(data.usuario?.nombre?.split(' ')[0] || data.empresa?.nombre || '')},<br>te damos la bienvenida a<br>Easy Lunch Gourmet.`;
   $('#horaCorte').textContent = data.config?.hora_corte || '18:00';
-  try { const saved = JSON.parse(sessionStorage.getItem('gourmet_cart')||'null'); if (saved && !S.editId) { S.cart = (saved.cart||[]).map(l => ({...l, fecha:l.fecha||saved.fecha})); S.fecha = saved.fecha; } } catch(_){}
+  try { const saved = JSON.parse(sessionStorage.getItem('gourmet_cart')||'null'); if (saved && !S.editId) { S.cart = (saved.cart||[]).map(l => fixParas({...l, fecha:l.fecha||saved.fecha, paras: l.paras || (l.para_quien ? Array(l.cantidad).fill(l.para_quien) : [])})); S.fecha = saved.fecha; } } catch(_){}
   S.cart = S.cart.filter(l => data.fechas.some(f => f.fecha === l.fecha));
   if (!data.fechas.some(f => f.fecha === S.fecha)) S.fecha = data.fechas[0]?.fecha || null;
   // limpiar carrito de platos que ya no están
@@ -397,6 +402,8 @@ function openPlato(id){
   const p = S.menu.platos.find(x=>x.id===id); if (!p) return;
   const st = { g: p.guarniciones.length===1 ? p.guarniciones[0].id : null, q:1, tab:'conservacion' };
   const reg = lines(p.regeneracion), emp = lines(p.emplatado);
+  const keepParas = () => { st.paras = st.paras || []; $$m('.mFor').forEach(i => st.paras[+i.dataset.k] = i.value); };
+  const $$m = sel => [...document.querySelectorAll('#modal ' + sel)];
   const render = () => {
     $('#modal').innerHTML = `
       <button class="x" id="mClose">✕</button>
@@ -433,22 +440,23 @@ function openPlato(id){
         ${p.guarniciones.length?`
           <div class="sec-title">Guarnición</div>
           <div class="opts">${p.guarniciones.map(g=>`<button class="opt ${st.g===g.id?'on':''}" data-g="${g.id}">${esc(g.nombre)}${g.gramaje||g.descripcion?`<small>${esc([g.gramaje,g.descripcion].filter(Boolean).join(' · '))}</small>`:''}</button>`).join('')}</div>`:''}
-        <div class="sec-title">¿Para quién? <span style="text-transform:none;letter-spacing:0;font-weight:400">(opcional)</span></div>
-        <input class="input" id="mFor" placeholder="Ej: Sr. Gómez – Directorio" value="${esc(st.for||'')}">
+        <div class="sec-title">¿Para quién es cada plato? <span style="text-transform:none;letter-spacing:0;font-weight:400">(opcional)</span></div>
+        <div class="paras">${Array.from({length:st.q},(_,k)=>`<input class="input mFor" data-k="${k}" placeholder="Plato ${k+1} · ej: Sr. Gómez" value="${esc((st.paras||[])[k]||'')}">`).join('')}</div>
         <div class="add-row">
           <div class="stepper"><button data-d="-1">−</button><input id="mQ" value="${st.q}" inputmode="numeric"><button data-d="1">+</button></div>
           <button class="btn" id="mAdd" style="flex:1">Agregar al pedido${p.precio!=null?` · ${money(p.precio*st.q)}`:''}</button>
         </div>
       </div>`;
     $('#mClose').onclick = closePlato;
-    $('#modal').querySelectorAll('.itab').forEach(b => b.onclick = () => { st.for=$('#mFor').value; st.tab=b.dataset.t; render(); });
-    $('#modal').querySelectorAll('.opt').forEach(b => b.onclick = () => { st.for=$('#mFor').value; st.g=b.dataset.g; render(); });
-    $('#modal').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { st.for=$('#mFor').value; st.q=Math.max(1, Math.min(500, (parseInt($('#mQ').value)||1)+Number(b.dataset.d))); render(); });
-    $('#mQ').onchange = () => { st.for=$('#mFor').value; st.q=Math.max(1, Math.min(500, parseInt($('#mQ').value)||1)); render(); };
+    $('#modal').querySelectorAll('.itab').forEach(b => b.onclick = () => { keepParas(); st.tab=b.dataset.t; render(); });
+    $('#modal').querySelectorAll('.opt').forEach(b => b.onclick = () => { keepParas(); st.g=b.dataset.g; render(); });
+    $('#modal').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { keepParas(); st.q=Math.max(1, Math.min(500, (parseInt($('#mQ').value)||1)+Number(b.dataset.d))); render(); });
+    $('#mQ').onchange = () => { keepParas(); st.q=Math.max(1, Math.min(500, parseInt($('#mQ').value)||1)); render(); };
     $('#mAdd').onclick = () => {
       if (p.guarniciones.length && !st.g) return toast('Elegí una guarnición', true);
       st.q = Math.max(1, Math.min(500, parseInt($('#mQ').value)||1));
-      addToCart(p, st.g, st.q, $('#mFor').value.trim());
+      keepParas();
+      addToCart(p, st.g, st.q, (st.paras||[]).slice(0, st.q).map(x => String(x||'').trim()));
       closePlato(); toast(`${p.nombre} agregado`);
     };
   };
@@ -458,13 +466,15 @@ function openPlato(id){
 function closePlato(){ $('#mOverlay').hidden = true; document.body.style.overflow=''; }
 $('#mOverlay').onclick = e => { if (e.target.id==='mOverlay') closePlato(); };
 
-/* ---------------- CARRITO (varios días en un mismo carrito) ---------------- */
+/* ---------------- CARRITO (varios días; un "para quién" por plato) ---------------- */
+// línea: { fecha, plato_id, guarnicion_id, cantidad, paras: [nombre por cada plato] }
+const fixParas = l => { l.paras = (l.paras || []).slice(0, l.cantidad); while (l.paras.length < l.cantidad) l.paras.push(''); return l; };
 function saveCart(){ try { if (!S.editId) sessionStorage.setItem('gourmet_cart', JSON.stringify({cart:S.cart, fecha:S.fecha})); } catch(_){} }
-function addToCart(p, gid, q, para){
+function addToCart(p, gid, q, paras){
   if (!S.fecha) return toast('Elegí primero el día de entrega', true);
-  const ex = S.cart.find(l => l.fecha===S.fecha && l.plato_id===p.id && (l.guarnicion_id||null)===(gid||null) && (l.para_quien||'')===(para||''));
-  if (ex) ex.cantidad = Math.min(500, ex.cantidad+q);
-  else S.cart.push({ fecha:S.fecha, plato_id:p.id, guarnicion_id:gid||null, cantidad:q, para_quien:para||'' });
+  const ex = S.cart.find(l => l.fecha===S.fecha && l.plato_id===p.id && (l.guarnicion_id||null)===(gid||null));
+  if (ex) { fixParas(ex); ex.cantidad = Math.min(500, ex.cantidad+q); ex.paras = ex.paras.concat(paras); fixParas(ex); }
+  else S.cart.push(fixParas({ fecha:S.fecha, plato_id:p.id, guarnicion_id:gid||null, cantidad:q, paras:paras||[] }));
   saveCart(); renderCart(); renderMenu(); renderDates();
 }
 function cartTotals(){
@@ -473,8 +483,10 @@ function cartTotals(){
   const dias = [...new Set(S.cart.map(l=>l.fecha))].sort();
   return { u, t, priced, dias };
 }
+function showErr(msg){ const e=$('#dErr'); e.innerHTML = msg || ''; e.hidden = !msg; }
 function renderCart(){
   const { u, t, priced, dias } = cartTotals();
+  const vencidas = dias.filter(fe => !S.menu.fechas.some(f => f.fecha===fe));
   $('#fab').hidden = !u || !$('#v-pedidos').hidden; $('#fabN').textContent = u;
   $('#dDate').textContent = S.editId ? 'Entrega ' + fmtFecha(S.fecha, true) : (dias.length ? `${dias.length} día${dias.length>1?'s':''} de entrega` : 'Elegí días y platos');
   $('#dUnits').textContent = `${u} plato${u===1?'':'s'}`;
@@ -482,47 +494,71 @@ function renderCart(){
   $('#dConfirm').textContent = S.editId ? 'Guardar cambios' : (dias.length>1 ? `Confirmar ${dias.length} pedidos` : 'Confirmar pedido');
   $('#editBanner').hidden = !S.editId; $('#editNum').textContent = S.editNum ? '#'+S.editNum : '';
   if (!S.cart.length){ $('#dBody').innerHTML = '<div class="empty-state"><h3>Vacío</h3><p>Elegí un día y agregá platos del menú. Podés sumar varios días antes de confirmar.</p></div>'; return; }
-  $('#dBody').innerHTML = dias.map(fe => `<div class="dhead">${fmtFecha(fe,true)}</div>` + S.cart.map((l,i) => {
+  $('#dBody').innerHTML = dias.map(fe => `<div class="dhead ${vencidas.includes(fe)?'venc':''}">${fmtFecha(fe,true)}${vencidas.includes(fe)?' · ya cerró, pasalo a otro día o quitalo':''}</div>` + S.cart.map((l,i) => {
     if (l.fecha!==fe) return '';
+    fixParas(l);
     const p = S.menu.platos.find(x=>x.id===l.plato_id); const g = p?.guarniciones.find(x=>x.id===l.guarnicion_id);
     return `<div class="line">
       <div class="line-top"><div><b>${esc(p?.nombre)}</b>${g?`<small>con ${esc(g.nombre)}</small>`:''}</div>
         ${priced && p?.precio!=null?`<span class="price">${money(p.precio*l.cantidad)}</span>`:''}</div>
       <div class="line-ctrl">
         <div class="stepper"><button data-i="${i}" data-d="-1">−</button><input value="${l.cantidad}" data-i="${i}" class="lq"><button data-i="${i}" data-d="1">+</button></div>
-        <input class="input lf" data-i="${i}" placeholder="Para quién (opcional)" value="${esc(l.para_quien)}">
+        <span class="muted" style="font-size:12px;flex:1">${l.cantidad} plato${l.cantidad>1?'s':''}</span>
         <button class="rm" data-rm="${i}">Quitar</button>
-      </div></div>`; }).join('')).join('');
+      </div>
+      <div class="paras">${l.paras.map((n,k)=>`<input class="input lf" data-i="${i}" data-k="${k}" placeholder="Plato ${k+1} · para quién (opcional)" value="${esc(n)}">`).join('')}</div>
+      </div>`; }).join('')).join('');
   const upd = () => { saveCart(); renderCart(); renderMenu(); renderDates(); };
-  $('#dBody').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { const l=S.cart[b.dataset.i]; l.cantidad=Math.max(1,Math.min(500,l.cantidad+Number(b.dataset.d))); upd(); });
-  $('#dBody').querySelectorAll('.lq').forEach(inp => inp.onchange = () => { S.cart[inp.dataset.i].cantidad=Math.max(1,Math.min(500,parseInt(inp.value)||1)); upd(); });
-  $('#dBody').querySelectorAll('.lf').forEach(inp => inp.oninput = () => { S.cart[inp.dataset.i].para_quien=inp.value; saveCart(); });
+  $('#dBody').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { const l=S.cart[b.dataset.i]; l.cantidad=Math.max(1,Math.min(500,l.cantidad+Number(b.dataset.d))); fixParas(l); upd(); });
+  $('#dBody').querySelectorAll('.lq').forEach(inp => inp.onchange = () => { const l=S.cart[inp.dataset.i]; l.cantidad=Math.max(1,Math.min(500,parseInt(inp.value)||1)); fixParas(l); upd(); });
+  $('#dBody').querySelectorAll('.lf').forEach(inp => inp.oninput = () => { S.cart[inp.dataset.i].paras[inp.dataset.k]=inp.value; saveCart(); });
   $('#dBody').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { S.cart.splice(b.dataset.rm,1); upd(); });
 }
-function openCart(){ $('#dNotes').value = S.notas||''; $('#drawer').hidden=false; $('#cOverlay').hidden=false; renderCart(); }
+function openCart(){ $('#dNotes').value = S.notas||''; showErr(''); $('#drawer').hidden=false; $('#cOverlay').hidden=false; renderCart(); }
 function closeCart(){ S.notas=$('#dNotes').value; $('#drawer').hidden=true; $('#cOverlay').hidden=true; }
 $('#fab').onclick = openCart; $('#dClose').onclick = closeCart; $('#cOverlay').onclick = closeCart;
 
+/** Cada plato con su "para quién": agrupa los iguales en un ítem con cantidad. */
+function toItems(ls){
+  const m = new Map();
+  ls.forEach(l => { fixParas(l); l.paras.forEach(n => {
+    const para = String(n||'').trim(); const k = l.plato_id + '|' + (l.guarnicion_id||'') + '|' + para.toLowerCase();
+    const it = m.get(k) || { plato_id:l.plato_id, guarnicion_id:l.guarnicion_id, cantidad:0, para_quien:para };
+    it.cantidad++; m.set(k, it);
+  }); });
+  return [...m.values()];
+}
+/** Vuelve a pedir las fechas abiertas (por si pasó la hora de corte con la página abierta). */
+async function refrescarFechas(){
+  const { data, error } = await sb.rpc('gourmet_fechas_disponibles');
+  if (!error && Array.isArray(data)) { S.menu.fechas = data; if (!data.some(f=>f.fecha===S.fecha) && !S.editId) S.fecha = data[0]?.fecha || null; renderDates(); }
+}
+let menuCargado = Date.now();
+window.addEventListener('focus', () => { if (S.menu && Date.now() - menuCargado > 5*60e3) { menuCargado = Date.now(); refrescarFechas().then(renderCart); } });
+
 $('#dConfirm').onclick = async () => {
-  if (!S.cart.length) return toast('El pedido está vacío', true);
-  const btn = $('#dConfirm'); btn.disabled = true;
+  if (!S.cart.length) return showErr('El pedido está vacío.');
+  const btn = $('#dConfirm'); btn.disabled = true; btn.textContent = 'Guardando…'; showErr('');
   const notas = $('#dNotes').value;
-  const toItems = ls => ls.map(l => ({ plato_id:l.plato_id, guarnicion_id:l.guarnicion_id, cantidad:l.cantidad, para_quien:l.para_quien }));
   const wasEdit = !!S.editId;
+  if (!wasEdit) await refrescarFechas();
+  const dias = [...new Set(S.cart.map(l=>l.fecha))].sort();
+  const cerradas = wasEdit ? [] : dias.filter(fe => !S.menu.fechas.some(f => f.fecha===fe));
+  if (cerradas.length){ btn.disabled=false; renderCart();
+    return showErr(`<b>No se confirmó nada.</b> ${cerradas.map(fe=>fmtFecha(fe,true)).join(', ')} ya cerró (se puede pedir hasta las ${esc(S.menu.config?.hora_corte||'18:00')} hs del día anterior). Quitá esos platos o pasalos a otro día.`); }
   let ok = 0;
   if (wasEdit){
     const { error } = await sb.rpc('gourmet_guardar_pedido', { p_pedido_id:S.editId, p_fecha:S.fecha, p_notas:notas, p_items:toItems(S.cart) });
-    btn.disabled = false;
-    if (error) return toast(error.message || 'No se pudo guardar', true);
+    if (error){ btn.disabled = false; renderCart(); return showErr('<b>No se guardó.</b> ' + esc(error.message)); }
   } else {
-    for (const fe of [...new Set(S.cart.map(l=>l.fecha))].sort()){
+    for (const fe of dias){
       const { error } = await sb.rpc('gourmet_guardar_pedido', { p_pedido_id:null, p_fecha:fe, p_notas:notas, p_items:toItems(S.cart.filter(l=>l.fecha===fe)) });
       if (error){ btn.disabled = false; S.cart = S.cart.filter(l => l.fecha >= fe); saveCart(); renderCart(); renderMenu(); renderDates();
-        return toast(`${ok?ok+' pedido(s) confirmados. ':''}No se pudo confirmar el ${fmtFecha(fe,true)}: ${error.message}`, true); }
+        return showErr(`${ok?`<b>${ok} pedido(s) ya quedaron confirmados.</b> `:''}<b>No se pudo confirmar el ${fmtFecha(fe,true)}:</b> ${esc(error.message)}`); }
       ok++;
     }
-    btn.disabled = false;
   }
+  btn.disabled = false;
   S.cart=[]; S.editId=null; S.editNum=null; S.notas=''; $('#dNotes').value='';
   try { sessionStorage.removeItem('gourmet_cart'); } catch(_){}
   closeCart(); renderCart(); renderMenu(); renderDates();
@@ -563,8 +599,13 @@ async function loadOrders(){
   $('#orders').querySelectorAll('[data-guide]').forEach(b => b.onclick = () => printGuide(b.dataset.guide));
 }
 function itemsToCart(o, fecha){
-  return o.gourmet_pedido_items.filter(i => S.menu.platos.some(p => p.id===i.plato_id))
-    .map(i => ({ fecha, plato_id:i.plato_id, guarnicion_id:i.guarnicion_id, cantidad:i.cantidad, para_quien:i.para_quien||'' }));
+  const m = new Map();
+  o.gourmet_pedido_items.filter(i => S.menu.platos.some(p => p.id===i.plato_id)).forEach(i => {
+    const k = i.plato_id + '|' + (i.guarnicion_id||'');
+    const l = m.get(k) || { fecha, plato_id:i.plato_id, guarnicion_id:i.guarnicion_id, cantidad:0, paras:[] };
+    l.cantidad += i.cantidad; for (let n=0; n<i.cantidad; n++) l.paras.push(i.para_quien||''); m.set(k, l);
+  });
+  return [...m.values()];
 }
 function editOrder(id){
   const o = S.orders.find(x=>x.id===id); if (!o) return;
