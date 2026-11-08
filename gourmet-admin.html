@@ -113,9 +113,6 @@ select.st-sel{border:1px solid var(--line);border-radius:8px;padding:4px 6px;bac
     <div class="brand"><img class="logo" alt="Easy Lunch" src="https://app.easylunch.com.ar/assets/img/upload/XOn7H9LwQB.webp" onerror="this.onerror=null;this.src='gourmet-assets/logo-easylunch-color.png'"><span>Gourmet · Admin</span></div>
     <div class="nav-g">Operación</div>
     <button class="nav on" data-v="pedidos">Pedidos</button>
-    <button class="nav" data-v="produccion">Producción</button>
-    <button class="nav" data-v="despacho">Despacho y etiquetas</button>
-    <button class="nav" data-v="facturacion">Facturación</button>
     <div class="nav-g">Catálogo</div>
     <button class="nav" data-v="platos">Platos</button>
     <button class="nav" data-v="guarniciones">Guarniciones</button>
@@ -158,6 +155,7 @@ const fF = s => { const d=new Date(s+'T12:00:00Z'); return `${DIAS[d.getUTCDay()
 const fFL = s => { const d=new Date(s+'T12:00:00Z'); return `${DIAS_L[d.getUTCDay()]} ${d.getUTCDate()} de ${MESES[d.getUTCMonth()]}`; };
 const nextDelivery = () => { let d=addDays(hoyAR(),1); const dias=D.config.dias_entrega||[1,2,3,4,5]; for(let i=0;i<10;i++){ const w=new Date(d+'T12:00:00Z').getUTCDay()||7; if(dias.includes(w)) return d; d=addDays(d,1);} return d; };
 const lines = t => String(t||'').split(/\n+/).map(s=>s.replace(/^\s*(\d+[\.\)]|[-•])\s*/,'').trim()).filter(Boolean);
+const norm = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const empName = id => D.empresas.find(e=>e.id===id)?.nombre || '—';
 function csv(name, rows){
   const s = rows.map(r => r.map(v => { v = v==null ? '' : String(v); return /[";\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; }).join(';')).join('\n');
@@ -441,7 +439,7 @@ function editPlato(id){
       <div class="field"><label>Emplatado <small>(un paso por línea)</small></label><textarea class="input" id="p_emplatado" rows="5" placeholder="Base de puré en el centro&#10;Carne fileteada encima&#10;…">${v('emplatado')}</textarea></div>
     </div>
     <div class="row">
-      <div class="field"><label>Precio de lista</label><input type="number" class="input" id="p_precio" value="${v('precio')}"></div>
+      <div class="field"><label>Precio de lista (se factura)</label><input type="number" class="input" id="p_precio" value="${v('precio')}"></div>
       <div class="field"><label>Receta en el recetario</label><input class="input" id="p_receta_ref" value="${v('receta_ref')}" placeholder="Nombre o ID de la receta"></div>
       <div class="field"><label>Orden</label><input type="number" class="input" id="p_orden" value="${v('orden')}"></div>
       <div class="field"><label>Estado</label><select class="input" id="p_activo"><option value="1" ${p.activo?'selected':''}>Activo</option><option value="0" ${!p.activo?'selected':''}>Inactivo</option></select></div>
@@ -522,34 +520,45 @@ function editGuar(id){
     await q(sb.from('gourmet_guarniciones').delete().eq('id', id), 'Eliminada'); closeModal(); await loadBase(); go('guarniciones'); });
 }
 
-/* ---------------- EMPRESAS ---------------- */
+/* ---------------- EMPRESAS (solo las de app.easylunch.com.ar) ---------------- */
+let EMP_SIS = null;
+async function empresasSistema(){
+  if (EMP_SIS) return EMP_SIS;
+  const r = await fetch('/api/gourmet-empresas'); const j = await r.json().catch(()=>null);
+  if (!r.ok || !Array.isArray(j)) { toast((j && j.error) || 'No se pudo leer la lista de empresas del sistema', true); return []; }
+  return (EMP_SIS = j);
+}
 VIEWS.empresas = () => {
+  const sinVinc = D.empresas.filter(e=>!e.id_empresa_el).length;
   $('#main').innerHTML = `
-    <div class="head"><div><div class="eyebrow">Clientes</div><h1>Empresas</h1></div><button class="btn" id="nuevo">+ Nueva empresa</button></div>
-    <div class="panel">${D.empresas.length ? `<table><thead><tr><th>Empresa</th><th>Dirección</th><th>Contacto</th><th class="num">Platos</th><th class="num">Usuarios</th><th>Precios</th><th>Estado</th></tr></thead><tbody>
-      ${D.empresas.map(e=>`<tr class="click" data-id="${e.id}"><td><b>${esc(e.nombre)}</b><br><small class="muted">${esc(e.razon_social||'')}</small></td>
-        <td>${esc(e.direccion||'')}<br><small class="muted">${esc([e.piso_oficina,e.localidad].filter(Boolean).join(' · '))}</small></td>
-        <td>${esc(e.contacto_nombre||'')}<br><small class="muted">${esc(e.contacto_tel||'')}</small></td>
+    <div class="head"><div><div class="eyebrow">Clientes</div><h1>Empresas</h1><div class="muted">Solo empresas de la plataforma principal (app.easylunch.com.ar). Los pedidos se suman a esa empresa en Modificaciones, Producción, Recorridos y Facturación.</div></div><button class="btn" id="nuevo">+ Agregar empresa</button></div>
+    ${sinVinc?`<div class="group" style="border-left:4px solid #F28A0B"><b>${sinVinc} empresa(s) sin vincular al sistema.</b> Sus pedidos no llegan a Modificaciones. Abrila y elegí la empresa del sistema.</div>`:''}
+    <div class="panel">${D.empresas.length ? `<table><thead><tr><th>Empresa del sistema</th><th>N° sistema</th><th class="num">Platos</th><th class="num">Usuarios</th><th>Precios al cliente</th><th>Estado</th></tr></thead><tbody>
+      ${D.empresas.map(e=>`<tr class="click" data-id="${e.id}"><td><b>${esc(e.nombre)}</b>${e.notas?`<br><small class="muted">${esc(e.notas)}</small>`:''}</td>
+        <td>${e.id_empresa_el?esc(e.id_empresa_el):'<span class="st off">Sin vincular</span>'}</td>
         <td class="num">${D.ep.filter(x=>x.empresa_id===e.id).length}</td><td class="num">${D.usuarios.filter(u=>u.empresa_id===e.id).length}</td>
         <td>${e.mostrar_precios?'Visibles':'<span class="muted">Ocultos</span>'}</td><td>${e.activa?'<span class="st confirmado">Activa</span>':'<span class="st off">Inactiva</span>'}</td></tr>`).join('')}
-      </tbody></table>` : '<div class="empty">Todavía no hay empresas.</div>'}</div>`;
+      </tbody></table>` : '<div class="empty">Todavía no agregaste empresas.</div>'}</div>`;
   $('#nuevo').onclick = () => editEmpresa(null);
   $$('tr.click').forEach(r => r.onclick = () => editEmpresa(r.dataset.id));
 };
-function editEmpresa(id){
+async function editEmpresa(id){
   const e = D.empresas.find(x=>x.id===id) || { activa:true, mostrar_precios:false };
   const epMap = Object.fromEntries(D.ep.filter(x=>x.empresa_id===id).map(x=>[x.plato_id, x]));
   const v = k => esc(e[k] ?? '');
-  const fld = (k, l, ph='', span=1) => `<div class="field" style="grid-column:span ${span}"><label>${l}</label><input class="input" id="e_${k}" value="${v(k)}" placeholder="${ph}"></div>`;
-  openModal(`<h2>${id?'Editar':'Nueva'} empresa</h2>
-    <div class="row">${fld('nombre','Nombre comercial *','',2)}${fld('razon_social','Razón social')}${fld('cuit','CUIT')}</div>
-    <div class="row">${fld('direccion','Dirección de entrega','Av. del Libertador 6000',2)}${fld('piso_oficina','Piso / oficina')}${fld('localidad','Barrio / localidad','Núñez')}</div>
-    <div class="row">${fld('horario_entrega','Horario de entrega','10 a 12 hs')}${fld('contacto_nombre','Contacto')}${fld('contacto_tel','Teléfono')}${fld('contacto_email','Email contacto')}</div>
-    <div class="row">${fld('condicion_facturacion','Condición de facturación','Factura A mensual · 30 días',2)}
-      <div class="field"><label>Precios en el front</label><select class="input" id="e_mostrar_precios"><option value="0" ${!e.mostrar_precios?'selected':''}>No mostrar</option><option value="1" ${e.mostrar_precios?'selected':''}>Mostrar</option></select></div>
+  const sis = await empresasSistema();
+  const usadas = new Set(D.empresas.filter(x=>x.id!==id && x.id_empresa_el).map(x=>x.id_empresa_el));
+  const opciones = sis.filter(x=>!usadas.has(x.id));
+  openModal(`<h2>${id?'Editar':'Agregar'} empresa</h2>
+    <div class="field"><label>Empresa del sistema *</label>
+      <input class="input" id="e_buscar" placeholder="Buscar empresa…" style="margin-bottom:6px">
+      <select class="input" id="e_sis" size="7">${opciones.map(x=>`<option value="${esc(x.id)}" ${x.id===e.id_empresa_el?'selected':''}>${esc(x.nombre)}${x.activa?'':' (inactiva)'} · #${esc(x.id)}</option>`).join('')}</select>
+      <small>${id && !e.id_empresa_el ? `Esta empresa ("${esc(e.nombre)}") no está vinculada: elegí cuál es en el sistema.` : 'Los pedidos de esta empresa se suman a ella en Modificaciones, Producción, Recorridos y Facturación.'}</small></div>
+    <div class="row">
+      <div class="field"><label>Precios en la app del cliente</label><select class="input" id="e_mostrar_precios"><option value="0" ${!e.mostrar_precios?'selected':''}>No mostrar</option><option value="1" ${e.mostrar_precios?'selected':''}>Mostrar</option></select></div>
       <div class="field"><label>Estado</label><select class="input" id="e_activa"><option value="1" ${e.activa?'selected':''}>Activa</option><option value="0" ${!e.activa?'selected':''}>Inactiva</option></select></div></div>
     <div class="field"><label>Notas internas</label><textarea class="input" id="e_notas" rows="2">${v('notas')}</textarea></div>
-    <div class="field"><label>Platos habilitados y precio especial <small>(vacío = precio de lista)</small> <button type="button" class="btn small ghost" id="allP" style="margin-left:6px">Todos</button></label>
+    <div class="field"><label>Platos habilitados y precio para esta empresa <small>(vacío = precio de lista del plato; es el que se factura)</small> <button type="button" class="btn small ghost" id="allP" style="margin-left:6px">Todos</button></label>
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;max-height:320px;overflow:auto">
       ${D.platos.map(p=>`<div class="ep-row"><input type="checkbox" class="pChk" value="${p.id}" ${epMap[p.id]?'checked':''}>
         <span>${esc(p.nombre)} <small class="muted">· lista ${money(p.precio)}${p.activo?'':' · inactivo'}</small></span>
@@ -557,14 +566,14 @@ function editEmpresa(id){
       </div></div>
     <div class="mfoot"><div>${id?'<button class="btn danger" id="eDel">Eliminar</button>':''}</div>
       <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="eSave">Guardar</button></div></div>`);
+  $('#e_buscar').oninput = () => { const t=norm($('#e_buscar').value); [...$('#e_sis').options].forEach(o => o.hidden = t && !norm(o.text).includes(t)); };
   $('#allP').onclick = () => $$('.pChk').forEach(c=>c.checked=true);
   $('#eSave').onclick = async () => {
-    const val = k => $('#e_'+k).value.trim() || null;
-    const row = { nombre:val('nombre'), razon_social:val('razon_social'), cuit:val('cuit'), direccion:val('direccion'), piso_oficina:val('piso_oficina'),
-      localidad:val('localidad'), horario_entrega:val('horario_entrega'), contacto_nombre:val('contacto_nombre'), contacto_tel:val('contacto_tel'),
-      contacto_email:val('contacto_email'), condicion_facturacion:val('condicion_facturacion'), notas:val('notas'),
+    const idSis = $('#e_sis').value;
+    const es = (EMP_SIS||[]).find(x=>x.id===idSis);
+    if (!es) return toast('Elegí la empresa del sistema', true);
+    const row = { nombre:es.nombre, id_empresa_el:es.id, notas:$('#e_notas').value.trim() || null,
       mostrar_precios:$('#e_mostrar_precios').value==='1', activa:$('#e_activa').value==='1' };
-    if (!row.nombre) return toast('Falta el nombre', true);
     $('#eSave').disabled = true;
     try {
       let eid = id;

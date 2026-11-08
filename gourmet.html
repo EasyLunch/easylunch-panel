@@ -74,17 +74,19 @@ header.top{position:sticky;top:0;z-index:20;background:#F5F5F5;height:64px}
 @media (max-width:720px){.banner{height:150px}.banner h1{font-size:22px}}
 
 main{max-width:1180px;margin:auto;padding:20px 16px 120px}
-.notice{max-width:300px;margin:4px auto 26px;background:var(--green-soft);border-radius:4px;padding:12px 16px;text-align:center;font-weight:500;color:#111}
+.notice{max-width:520px;margin:4px auto 26px;background:var(--green-soft);border-radius:4px;padding:12px 16px;text-align:center;font-weight:500;color:#111}
 .edit-banner{max-width:760px;margin:0 auto 18px;background:#FFF3E0;border:1px solid #FFCC80;border-radius:4px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 
 .dates{display:flex;gap:10px;overflow-x:auto;padding:6px 6px 14px;justify-content:safe center;scrollbar-width:thin}
-.date{flex:0 0 auto;width:84px;border:1px solid transparent;background:#fff;border-radius:10px;padding:8px 4px;text-align:center;box-shadow:var(--shadow);color:#9E9E9E;transition:.15s;line-height:1.15}
+.date{position:relative;flex:0 0 auto;width:84px;border:1px solid transparent;background:#fff;border-radius:10px;padding:8px 4px;text-align:center;box-shadow:var(--shadow);color:#9E9E9E;transition:.15s;line-height:1.15}
 .date small{display:block;font-size:13px}
 .date b{display:block;font-size:28px;font-weight:700;line-height:1.05;color:#9E9E9E}
 .date span{font-size:13px}
 .date:hover{color:#555}.date:hover b{color:#555}
 .date.on{color:#111;border-color:rgba(0,0,0,.2);box-shadow:0 4px 12px rgba(0,0,0,.25)}
 .date.on b{color:#111}
+.date .dn{position:absolute;top:-6px;right:-6px;background:var(--green);color:#fff;font-style:normal;font-size:11px;font-weight:700;min-width:20px;height:20px;line-height:20px;border-radius:10px;padding:0 5px}
+.dhead{font-family:Montserrat,sans-serif;font-weight:600;font-size:14px;text-transform:capitalize;margin:10px 2px 8px;color:var(--green)}
 .cutoff{font-size:13px;color:var(--muted);margin:4px 0 6px;text-align:center}
 .dot{display:none}
 .sec-head{font-size:32px;text-align:center;padding:24px 0 18px}
@@ -232,7 +234,7 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
         <span>Estás modificando el pedido <b id="editNum"></b>. Al confirmar, reemplaza al anterior.</span>
         <button class="btn ghost small" id="cancelEdit">Descartar cambios</button>
       </div>
-      <div class="notice">Podés pedir hasta las <span id="horaCorte">18:00</span> hs del día anterior a la entrega</div>
+      <div class="notice">Podés pedir hasta las <span id="horaCorte">18:00</span> hs del día anterior a la entrega. Elegí un día, agregá platos y repetí con otros días antes de confirmar.</div>
       <div class="dates" id="dates"></div>
       <div class="cutoff" id="cutoff"></div>
       <h3 class="sec-head">Platos Gourmet</h3>
@@ -351,7 +353,8 @@ async function boot(){
   $('#whoName').textContent = data.usuario?.nombre || data.usuario?.email || '';
   $('#hello').innerHTML = `Hola ${esc(data.usuario?.nombre?.split(' ')[0] || data.empresa?.nombre || '')},<br>te damos la bienvenida a<br>Easy Lunch Gourmet.`;
   $('#horaCorte').textContent = data.config?.hora_corte || '18:00';
-  try { const saved = JSON.parse(sessionStorage.getItem('gourmet_cart')||'null'); if (saved && !S.editId) { S.cart = saved.cart||[]; S.fecha = saved.fecha; } } catch(_){}
+  try { const saved = JSON.parse(sessionStorage.getItem('gourmet_cart')||'null'); if (saved && !S.editId) { S.cart = (saved.cart||[]).map(l => ({...l, fecha:l.fecha||saved.fecha})); S.fecha = saved.fecha; } } catch(_){}
+  S.cart = S.cart.filter(l => data.fechas.some(f => f.fecha === l.fecha));
   if (!data.fechas.some(f => f.fecha === S.fecha)) S.fecha = data.fechas[0]?.fecha || null;
   // limpiar carrito de platos que ya no están
   S.cart = S.cart.filter(l => data.platos.some(p => p.id === l.plato_id));
@@ -363,14 +366,15 @@ function renderDates(){
   const fs = S.menu.fechas;
   if (!fs.length){ $('#dates').innerHTML = '<div class="cutoff">No hay fechas disponibles por el momento.</div>'; $('#cutoff').innerHTML=''; return; }
   $('#dates').innerHTML = fs.map(f => { const d=parseDate(f.fecha);
-    return `<button class="date ${f.fecha===S.fecha?'on':''}" data-f="${f.fecha}"><small>${MESES_L[d.getMonth()]}</small><b>${d.getDate()}</b><span>${DIAS_L[d.getDay()]}</span></button>`; }).join('');
-  $('#dates').querySelectorAll('.date').forEach(b => b.onclick = () => { S.fecha=b.dataset.f; saveCart(); renderDates(); renderCart(); });
+    const n = S.cart.filter(l=>l.fecha===f.fecha).reduce((a,l)=>a+l.cantidad,0);
+    return `<button class="date ${f.fecha===S.fecha?'on':''}" data-f="${f.fecha}">${n?`<i class="dn">${n}</i>`:''}<small>${MESES_L[d.getMonth()]}</small><b>${d.getDate()}</b><span>${DIAS_L[d.getDay()]}</span></button>`; }).join('');
+  $('#dates').querySelectorAll('.date').forEach(b => b.onclick = () => { S.fecha=b.dataset.f; if (S.editId) S.cart.forEach(l => l.fecha=S.fecha); saveCart(); renderDates(); renderCart(); renderMenu(); });
   const sel = fs.find(f => f.fecha===S.fecha);
   $('#cutoff').innerHTML = sel ? `<span>Entrega el <b>${fmtFecha(S.fecha,true)}</b>. Podés pedir o modificar hasta ${fmtCorte(sel.corte)}.</span>` : '';
 }
 
 /* ---------------- MENÚ ---------------- */
-function qtyInCart(id){ return S.cart.filter(l=>l.plato_id===id).reduce((a,l)=>a+l.cantidad,0); }
+function qtyInCart(id){ return S.cart.filter(l=>l.plato_id===id && l.fecha===S.fecha).reduce((a,l)=>a+l.cantidad,0); }
 function renderMenu(){
   const ps = S.menu.platos;
   if (!ps.length){ $('#menu').innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Todavía no hay platos habilitados</h3><p>Escribinos y armamos tu menú.</p></div>`; return; }
@@ -454,29 +458,32 @@ function openPlato(id){
 function closePlato(){ $('#mOverlay').hidden = true; document.body.style.overflow=''; }
 $('#mOverlay').onclick = e => { if (e.target.id==='mOverlay') closePlato(); };
 
-/* ---------------- CARRITO ---------------- */
+/* ---------------- CARRITO (varios días en un mismo carrito) ---------------- */
 function saveCart(){ try { if (!S.editId) sessionStorage.setItem('gourmet_cart', JSON.stringify({cart:S.cart, fecha:S.fecha})); } catch(_){} }
 function addToCart(p, gid, q, para){
-  const ex = S.cart.find(l => l.plato_id===p.id && (l.guarnicion_id||null)===(gid||null) && (l.para_quien||'')===(para||''));
+  if (!S.fecha) return toast('Elegí primero el día de entrega', true);
+  const ex = S.cart.find(l => l.fecha===S.fecha && l.plato_id===p.id && (l.guarnicion_id||null)===(gid||null) && (l.para_quien||'')===(para||''));
   if (ex) ex.cantidad = Math.min(500, ex.cantidad+q);
-  else S.cart.push({ plato_id:p.id, guarnicion_id:gid||null, cantidad:q, para_quien:para||'' });
-  saveCart(); renderCart(); renderMenu();
+  else S.cart.push({ fecha:S.fecha, plato_id:p.id, guarnicion_id:gid||null, cantidad:q, para_quien:para||'' });
+  saveCart(); renderCart(); renderMenu(); renderDates();
 }
 function cartTotals(){
   let u=0, t=0, priced = S.menu?.empresa?.mostrar_precios;
   S.cart.forEach(l => { const p=S.menu.platos.find(x=>x.id===l.plato_id); u+=l.cantidad; if (p?.precio!=null) t+=p.precio*l.cantidad; });
-  return { u, t, priced };
+  const dias = [...new Set(S.cart.map(l=>l.fecha))].sort();
+  return { u, t, priced, dias };
 }
 function renderCart(){
-  const { u, t, priced } = cartTotals();
+  const { u, t, priced, dias } = cartTotals();
   $('#fab').hidden = !u || !$('#v-pedidos').hidden; $('#fabN').textContent = u;
-  $('#dDate').textContent = S.fecha ? 'Entrega ' + fmtFecha(S.fecha, true) : 'Elegí una fecha';
+  $('#dDate').textContent = S.editId ? 'Entrega ' + fmtFecha(S.fecha, true) : (dias.length ? `${dias.length} día${dias.length>1?'s':''} de entrega` : 'Elegí días y platos');
   $('#dUnits').textContent = `${u} plato${u===1?'':'s'}`;
   $('#dTotal').textContent = priced ? money(t) : '';
-  $('#dConfirm').textContent = S.editId ? 'Guardar cambios' : 'Confirmar pedido';
+  $('#dConfirm').textContent = S.editId ? 'Guardar cambios' : (dias.length>1 ? `Confirmar ${dias.length} pedidos` : 'Confirmar pedido');
   $('#editBanner').hidden = !S.editId; $('#editNum').textContent = S.editNum ? '#'+S.editNum : '';
-  if (!S.cart.length){ $('#dBody').innerHTML = '<div class="empty-state"><h3>Vacío</h3><p>Elegí platos del menú.</p></div>'; return; }
-  $('#dBody').innerHTML = S.cart.map((l,i) => {
+  if (!S.cart.length){ $('#dBody').innerHTML = '<div class="empty-state"><h3>Vacío</h3><p>Elegí un día y agregá platos del menú. Podés sumar varios días antes de confirmar.</p></div>'; return; }
+  $('#dBody').innerHTML = dias.map(fe => `<div class="dhead">${fmtFecha(fe,true)}</div>` + S.cart.map((l,i) => {
+    if (l.fecha!==fe) return '';
     const p = S.menu.platos.find(x=>x.id===l.plato_id); const g = p?.guarniciones.find(x=>x.id===l.guarnicion_id);
     return `<div class="line">
       <div class="line-top"><div><b>${esc(p?.nombre)}</b>${g?`<small>con ${esc(g.nombre)}</small>`:''}</div>
@@ -485,29 +492,41 @@ function renderCart(){
         <div class="stepper"><button data-i="${i}" data-d="-1">−</button><input value="${l.cantidad}" data-i="${i}" class="lq"><button data-i="${i}" data-d="1">+</button></div>
         <input class="input lf" data-i="${i}" placeholder="Para quién (opcional)" value="${esc(l.para_quien)}">
         <button class="rm" data-rm="${i}">Quitar</button>
-      </div></div>`; }).join('');
-  $('#dBody').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { const l=S.cart[b.dataset.i]; l.cantidad=Math.max(1,Math.min(500,l.cantidad+Number(b.dataset.d))); saveCart(); renderCart(); renderMenu(); });
-  $('#dBody').querySelectorAll('.lq').forEach(inp => inp.onchange = () => { S.cart[inp.dataset.i].cantidad=Math.max(1,Math.min(500,parseInt(inp.value)||1)); saveCart(); renderCart(); renderMenu(); });
+      </div></div>`; }).join('')).join('');
+  const upd = () => { saveCart(); renderCart(); renderMenu(); renderDates(); };
+  $('#dBody').querySelectorAll('.stepper button').forEach(b => b.onclick = () => { const l=S.cart[b.dataset.i]; l.cantidad=Math.max(1,Math.min(500,l.cantidad+Number(b.dataset.d))); upd(); });
+  $('#dBody').querySelectorAll('.lq').forEach(inp => inp.onchange = () => { S.cart[inp.dataset.i].cantidad=Math.max(1,Math.min(500,parseInt(inp.value)||1)); upd(); });
   $('#dBody').querySelectorAll('.lf').forEach(inp => inp.oninput = () => { S.cart[inp.dataset.i].para_quien=inp.value; saveCart(); });
-  $('#dBody').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { S.cart.splice(b.dataset.rm,1); saveCart(); renderCart(); renderMenu(); });
+  $('#dBody').querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { S.cart.splice(b.dataset.rm,1); upd(); });
 }
 function openCart(){ $('#dNotes').value = S.notas||''; $('#drawer').hidden=false; $('#cOverlay').hidden=false; renderCart(); }
 function closeCart(){ S.notas=$('#dNotes').value; $('#drawer').hidden=true; $('#cOverlay').hidden=true; }
 $('#fab').onclick = openCart; $('#dClose').onclick = closeCart; $('#cOverlay').onclick = closeCart;
 
 $('#dConfirm').onclick = async () => {
-  if (!S.fecha) return toast('Elegí una fecha de entrega', true);
   if (!S.cart.length) return toast('El pedido está vacío', true);
   const btn = $('#dConfirm'); btn.disabled = true;
-  const items = S.cart.map(l => ({ plato_id:l.plato_id, guarnicion_id:l.guarnicion_id, cantidad:l.cantidad, para_quien:l.para_quien }));
-  const { error } = await sb.rpc('gourmet_guardar_pedido', { p_pedido_id:S.editId, p_fecha:S.fecha, p_notas:$('#dNotes').value, p_items:items });
-  btn.disabled = false;
-  if (error) return toast(error.message.replace(/^.*?:\s*/,'') || 'No se pudo guardar', true);
+  const notas = $('#dNotes').value;
+  const toItems = ls => ls.map(l => ({ plato_id:l.plato_id, guarnicion_id:l.guarnicion_id, cantidad:l.cantidad, para_quien:l.para_quien }));
   const wasEdit = !!S.editId;
+  let ok = 0;
+  if (wasEdit){
+    const { error } = await sb.rpc('gourmet_guardar_pedido', { p_pedido_id:S.editId, p_fecha:S.fecha, p_notas:notas, p_items:toItems(S.cart) });
+    btn.disabled = false;
+    if (error) return toast(error.message || 'No se pudo guardar', true);
+  } else {
+    for (const fe of [...new Set(S.cart.map(l=>l.fecha))].sort()){
+      const { error } = await sb.rpc('gourmet_guardar_pedido', { p_pedido_id:null, p_fecha:fe, p_notas:notas, p_items:toItems(S.cart.filter(l=>l.fecha===fe)) });
+      if (error){ btn.disabled = false; S.cart = S.cart.filter(l => l.fecha >= fe); saveCart(); renderCart(); renderMenu(); renderDates();
+        return toast(`${ok?ok+' pedido(s) confirmados. ':''}No se pudo confirmar el ${fmtFecha(fe,true)}: ${error.message}`, true); }
+      ok++;
+    }
+    btn.disabled = false;
+  }
   S.cart=[]; S.editId=null; S.editNum=null; S.notas=''; $('#dNotes').value='';
   try { sessionStorage.removeItem('gourmet_cart'); } catch(_){}
-  closeCart(); renderCart(); renderMenu();
-  toast(wasEdit ? 'Pedido actualizado' : '¡Pedido confirmado! Lo vas a ver en "Mis pedidos".');
+  closeCart(); renderCart(); renderMenu(); renderDates();
+  toast(wasEdit ? 'Pedido actualizado' : (ok>1 ? `¡${ok} pedidos confirmados!` : '¡Pedido confirmado!'));
   go('pedidos');
 };
 $('#cancelEdit').onclick = () => { S.cart=[]; S.editId=null; S.editNum=null; S.notas=''; renderCart(); renderMenu(); go('pedidos'); };
@@ -543,21 +562,21 @@ async function loadOrders(){
   $('#orders').querySelectorAll('[data-repeat]').forEach(b => b.onclick = () => repeatOrder(b.dataset.repeat));
   $('#orders').querySelectorAll('[data-guide]').forEach(b => b.onclick = () => printGuide(b.dataset.guide));
 }
-function itemsToCart(o){
+function itemsToCart(o, fecha){
   return o.gourmet_pedido_items.filter(i => S.menu.platos.some(p => p.id===i.plato_id))
-    .map(i => ({ plato_id:i.plato_id, guarnicion_id:i.guarnicion_id, cantidad:i.cantidad, para_quien:i.para_quien||'' }));
+    .map(i => ({ fecha, plato_id:i.plato_id, guarnicion_id:i.guarnicion_id, cantidad:i.cantidad, para_quien:i.para_quien||'' }));
 }
 function editOrder(id){
   const o = S.orders.find(x=>x.id===id); if (!o) return;
-  S.editId=o.id; S.editNum=o.numero; S.cart=itemsToCart(o); S.notas=o.notas||'';
+  S.editId=o.id; S.editNum=o.numero; S.cart=itemsToCart(o, o.fecha_entrega); S.notas=o.notas||'';
   if (!S.menu.fechas.some(f=>f.fecha===o.fecha_entrega)) S.menu.fechas.unshift({ fecha:o.fecha_entrega, corte:corteDe(o.fecha_entrega).toISOString() });
   S.fecha=o.fecha_entrega; go('pedir'); renderDates(); renderMenu(); renderCart(); openCart();
 }
 function repeatOrder(id){
   const o = S.orders.find(x=>x.id===id); if (!o) return;
-  S.editId=null; S.editNum=null; S.cart=itemsToCart(o); S.notas=o.notas||''; saveCart();
-  go('pedir'); renderMenu(); renderCart(); openCart();
-  toast('Copiamos los platos. Elegí la fecha y confirmá.');
+  S.editId=null; S.editNum=null; S.cart=itemsToCart(o, S.fecha); S.notas=o.notas||''; saveCart();
+  go('pedir'); renderMenu(); renderCart(); renderDates(); openCart();
+  toast(`Copiamos los platos para el ${fmtFecha(S.fecha,true)}. Revisá y confirmá.`);
 }
 async function cancelOrder(btn){
   if (btn.dataset.sure !== '1'){ btn.dataset.sure='1'; btn.textContent='¿Seguro? Tocá de nuevo'; setTimeout(()=>{ btn.dataset.sure=''; btn.textContent='Cancelar'; }, 4000); return; }
