@@ -136,6 +136,9 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
 .opt small{display:block;color:var(--muted);font-size:11px}
 .opt.on{background:var(--green);color:#fff}
 .opt.on small{color:#E3F2E2}
+.opt.img{display:flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border-radius:12px}
+.opt.img i{flex:0 0 54px;width:54px;height:54px;border-radius:8px;background:#ccc center/cover no-repeat}
+@media(max-width:600px){.opts{display:grid;grid-template-columns:1fr 1fr}.opt.img i{flex-basis:44px;width:44px;height:44px}}
 .add-row{display:flex;gap:12px;align-items:center;margin-top:18px;flex-wrap:wrap}
 .stepper{display:flex;align-items:center;border:1px solid rgba(0,0,0,.2);border-radius:4px;background:#fff}
 .stepper button{width:36px;height:36px;border:0;background:none;font-size:18px}
@@ -249,8 +252,7 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
       <div class="notice">Podés pedir hasta las <span id="horaCorte">18:00</span> hs del día anterior a la entrega. Elegí un día, agregá platos y repetí con otros días antes de confirmar.</div>
       <div class="dates" id="dates"></div>
       <div class="cutoff" id="cutoff"></div>
-      <h3 class="sec-head">Platos Gourmet</h3>
-      <div class="grid" id="menu"><div class="loading">Cargando menú…</div></div>
+      <div id="menu"><div class="loading">Cargando menú…</div></div>
     </div>
 
     <div id="v-pedidos" hidden>
@@ -390,8 +392,8 @@ function renderDates(){
 function qtyInCart(id){ return S.cart.filter(l=>l.plato_id===id && l.fecha===S.fecha).reduce((a,l)=>a+l.cantidad,0); }
 function renderMenu(){
   const ps = S.menu.platos;
-  if (!ps.length){ $('#menu').innerHTML = `<div class="empty-state" style="grid-column:1/-1"><h3>Todavía no hay platos habilitados</h3><p>Escribinos y armamos tu menú.</p></div>`; return; }
-  $('#menu').innerHTML = ps.map(p => { const q=qtyInCart(p.id);
+  if (!ps.length){ $('#menu').innerHTML = `<div class="empty-state"><h3>Todavía no hay platos habilitados</h3><p>Escribinos y armamos tu menú.</p></div>`; return; }
+  const card = p => { const q=qtyInCart(p.id);
     return `<article class="card" data-id="${p.id}">
       <div class="ph ${p.foto_url?'':'empty'}" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Easy Lunch'}
         ${p.proteina?`<span class="badge">${esc(p.proteina)}</span>`:''}${q?`<span class="incart">${q} en el pedido</span>`:''}</div>
@@ -402,7 +404,11 @@ function renderMenu(){
         <div class="card-foot"><span>${esc(p.gramaje_total||'')}${p.guarniciones.length?` · ${p.guarniciones.length} ${p.guarniciones.length>1?'guarniciones':'guarnición'}`:''}</span>
         ${p.precio!=null?`<span class="price">${money(p.precio)}</span>`:''}</div>
         <button class="btn ghost" type="button">${q?'Agregar otro':'Seleccionar'}</button>
-      </div></article>`; }).join('');
+      </div></article>`; };
+  const secciones = [['principal','Platos principales'],['postre','Postres caseros']]
+    .map(([t,tit]) => [tit, ps.filter(p => (p.tipo||'principal')===t)]).filter(x => x[1].length);
+  $('#menu').innerHTML = secciones.map(([tit, lista]) => `<h3 class="sec-head">${tit}</h3><div class="grid">${lista.map(card).join('')}</div>`).join('');
+
   $('#menu').querySelectorAll('.card').forEach(c => c.onclick = () => openPlato(c.dataset.id));
 }
 
@@ -447,7 +453,7 @@ function openPlato(id){
 
         ${p.guarniciones.length?`
           <div class="sec-title">Guarnición</div>
-          <div class="opts">${p.guarniciones.map(g=>`<button class="opt ${st.g===g.id?'on':''}" data-g="${g.id}">${esc(g.nombre)}${g.gramaje||g.descripcion?`<small>${esc([g.gramaje,g.descripcion].filter(Boolean).join(' · '))}</small>`:''}</button>`).join('')}</div>`:''}
+          <div class="opts">${p.guarniciones.map(g=>`<button class="opt ${g.foto_url?'img':''} ${st.g===g.id?'on':''}" data-g="${g.id}">${g.foto_url?`<i style="background-image:url('${esc(g.foto_url)}')"></i>`:''}<span>${esc(g.nombre)}${g.gramaje||g.descripcion?`<small>${esc([g.gramaje,g.descripcion].filter(Boolean).join(' · '))}</small>`:''}</span></button>`).join('')}</div>`:''}
         <div class="sec-title">¿Para quién es cada plato? <span style="text-transform:none;letter-spacing:0;font-weight:400">(opcional)</span></div>
         <div class="paras">${Array.from({length:st.q},(_,k)=>`<input class="input mFor" data-k="${k}" placeholder="Plato ${k+1} · ej: Sr. Gómez" value="${esc((st.paras||[])[k]||'')}">`).join('')}</div>
         <div class="add-row">

@@ -382,10 +382,10 @@ VIEWS.facturacion = async () => {
 VIEWS.platos = () => {
   $('#main').innerHTML = `
     <div class="head"><div><div class="eyebrow">Catálogo</div><h1>Platos</h1></div><button class="btn" id="nuevo">+ Nuevo plato</button></div>
-    ${D.platos.length ? `<div class="plist">${D.platos.map(p => { const nE=D.ep.filter(x=>x.plato_id===p.id).length, nG=D.pg.filter(x=>x.plato_id===p.id).length;
+    ${D.platos.length ? [['principal','Platos principales'],['postre','Postres']].map(([t,tit]) => { const ls = D.platos.filter(p => (p.tipo||'principal')===t); return ls.length ? `<h3 style="font-size:18px;margin:18px 0 10px">${tit}</h3><div class="plist">${ls.map(p => { const nE=D.ep.filter(x=>x.plato_id===p.id).length, nG=D.pg.filter(x=>x.plato_id===p.id).length;
       return `<div class="pcard" data-id="${p.id}"><div class="ph" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Sin foto'}</div>
         <div class="b"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(p.nombre)}</h3>${p.activo?'':'<span class="st off">Inactivo</span>'}</div>
-        <div class="muted" style="font-size:12px">${nG} guarnición(es) · ${nE} empresa(s) · ${money(p.precio)}</div></div></div>`; }).join('')}</div>`
+        <div class="muted" style="font-size:12px">${t==='principal'?nG+' guarnición(es) · ':''}${nE} empresa(s) · ${money(p.precio)}</div></div></div>`; }).join('')}</div>` : ''; }).join('')
       : '<div class="empty">Todavía no hay platos. Creá el primero.</div>'}`;
   $('#nuevo').onclick = () => editPlato(null);
   $$('.pcard').forEach(c => c.onclick = () => editPlato(c.dataset.id));
@@ -419,6 +419,7 @@ function editPlato(id){
       ${foto?'<button class="btn small danger" id="fDel" style="margin-top:6px">Quitar foto</button>':''}</div></div>
     <div class="row">
       <div class="field" style="grid-column:span 2"><label>Nombre *</label><input class="input" id="p_nombre" value="${v('nombre')}"></div>
+      <div class="field"><label>Tipo</label><select class="input" id="p_tipo"><option value="principal" ${(p.tipo||'principal')==='principal'?'selected':''}>Plato principal</option><option value="postre" ${p.tipo==='postre'?'selected':''}>Postre</option></select></div>
       <div class="field"><label>Proteína</label><select class="input" id="p_proteina"><option value="">—</option>${PROTEINAS.map(x=>`<option ${p.proteina===x?'selected':''}>${x}</option>`).join('')}</select></div>
     </div>
     <div class="field"><label>Subtítulo</label><input class="input" id="p_subtitulo" value="${v('subtitulo')}" placeholder="Ej: Cocción lenta 12 horas"></div>
@@ -464,7 +465,7 @@ function editPlato(id){
     const val = k => $('#p_'+k).value.trim();
     const num = k => val(k)==='' ? null : Number(val(k));
     if (!val('nombre')) return toast('Falta el nombre', true);
-    const row = { nombre:val('nombre'), subtitulo:val('subtitulo')||null, descripcion:val('descripcion')||null, ingredientes:val('ingredientes')||null,
+    const row = { nombre:val('nombre'), tipo:$('#p_tipo').value, subtitulo:val('subtitulo')||null, descripcion:val('descripcion')||null, ingredientes:val('ingredientes')||null,
       gramaje_principal:val('gramaje_principal')||null, gramaje_total:val('gramaje_total')||null, proteina:val('proteina')||null, alergenos:val('alergenos')||null,
       foto_url:foto||null, conservacion_heladera_dias:num('conservacion_heladera_dias'), conservacion_freezer_meses:num('conservacion_freezer_meses'),
       conservacion_notas:val('conservacion_notas')||null, regeneracion:val('regeneracion')||null, emplatado:val('emplatado')||null,
@@ -503,15 +504,22 @@ function editGuar(id){
   openModal(`<h2>${id?'Editar':'Nueva'} guarnición</h2>
     <div class="row"><div class="field" style="grid-column:span 2"><label>Nombre *</label><input class="input" id="g_nombre" value="${esc(g.nombre||'')}"></div>
       <div class="field"><label>Gramaje</label><input class="input" id="g_gramaje" value="${esc(g.gramaje||'')}" placeholder="180 g"></div></div>
+    <div class="photo field"><div class="ph" id="gPh" style="${g.foto_url?`background-image:url('${esc(g.foto_url)}')`:''}">${g.foto_url?'':'Sin foto'}</div>
+      <div><label class="btn ghost" style="display:inline-block">Subir foto de la guarnición<input type="file" accept="image/*" id="gFile" hidden></label>
+      ${g.foto_url?'<button class="btn small danger" id="gFotoDel" style="margin-top:6px">Quitar foto</button>':''}</div></div>
     <div class="field"><label>Descripción</label><input class="input" id="g_descripcion" value="${esc(g.descripcion||'')}"></div>
     <div class="row"><div class="field"><label>Receta en el recetario</label><input class="input" id="g_receta_ref" value="${esc(g.receta_ref||'')}"></div>
       <div class="field"><label>Orden</label><input type="number" class="input" id="g_orden" value="${g.orden??0}"></div>
       <div class="field"><label>Estado</label><select class="input" id="g_activa"><option value="1" ${g.activa?'selected':''}>Activa</option><option value="0" ${!g.activa?'selected':''}>Inactiva</option></select></div></div>
     <div class="mfoot"><div>${id?'<button class="btn danger" id="gDel">Eliminar</button>':''}</div>
       <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="gSave">Guardar</button></div></div>`);
+  let gfoto = g.foto_url || '';
+  $('#gFile').onchange = async e => { const f=e.target.files[0]; if(!f) return; $('#gPh').textContent='Subiendo…';
+    try { gfoto = await subirFoto(f, 'guarniciones'); $('#gPh').style.backgroundImage=`url('${gfoto}')`; $('#gPh').textContent=''; } catch(_){ $('#gPh').textContent='Error'; } };
+  if ($('#gFotoDel')) $('#gFotoDel').onclick = () => { gfoto=''; $('#gPh').style.backgroundImage=''; $('#gPh').textContent='Sin foto'; };
   $('#gSave').onclick = async () => {
     const row = { nombre:$('#g_nombre').value.trim(), gramaje:$('#g_gramaje').value.trim()||null, descripcion:$('#g_descripcion').value.trim()||null,
-      receta_ref:$('#g_receta_ref').value.trim()||null, orden:Number($('#g_orden').value)||0, activa:$('#g_activa').value==='1' };
+      receta_ref:$('#g_receta_ref').value.trim()||null, orden:Number($('#g_orden').value)||0, activa:$('#g_activa').value==='1', foto_url:gfoto||null };
     if (!row.nombre) return toast('Falta el nombre', true);
     await q(id ? sb.from('gourmet_guarniciones').update(row).eq('id', id) : sb.from('gourmet_guarniciones').insert(row), 'Guardado');
     closeModal(); await loadBase(); go('guarniciones');
