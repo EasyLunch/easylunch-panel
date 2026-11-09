@@ -293,6 +293,14 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
 const SUPABASE_URL      = 'https://xlwcozznliafhouhqjzl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg';
 
+// Cierre de sesión: borra la sesión guardada ANTES de crear el cliente (no depende de la red).
+function borrarSesionLocal(){
+  try { Object.keys(localStorage).filter(k => k.startsWith('sb-') || k.includes('supabase')).forEach(k => localStorage.removeItem(k)); } catch(_) {}
+  try { sessionStorage.clear(); } catch(_) {}
+  try { document.cookie.split(';').map(c => c.split('=')[0].trim()).filter(n => n.startsWith('sb-')).forEach(n => document.cookie = n + '=; Max-Age=0; path=/'); } catch(_) {}
+}
+const SALIENDO = new URLSearchParams(location.search).has('salir');
+if (SALIENDO) borrarSesionLocal();
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $  = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -326,10 +334,12 @@ function lines(txt){ return String(txt||'').split(/\n+/).map(s=>s.replace(/^\s*(
 
 /* ---------------- AUTH ---------------- */
 async function init(){
+  if (SALIENDO) { try { history.replaceState(null, '', location.pathname); } catch(_) {} return show('login'); }
   const isRecovery = location.hash.includes('type=recovery');
   sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') show('reset'); });
   if (isRecovery) return show('reset');
-  const { data:{ session } } = await sb.auth.getSession();
+  let session = null;
+  try { session = (await Promise.race([sb.auth.getSession(), new Promise((_, no) => setTimeout(() => no(new Error('tiempo')), 6000))])).data.session; } catch(_) {}
   session ? boot() : show('login');
 }
 function show(id){ ['login','reset','app'].forEach(x => $('#'+x).hidden = x!==id); }
@@ -355,9 +365,8 @@ $('#resetForm').onsubmit = async e => {
 };
 $('#logout').onclick = async () => {
   if (S.cart && S.cart.length && !confirm('Tenés platos sin confirmar. ¿Salir igual?')) return;
-  try { await Promise.race([sb.auth.signOut({ scope:'local' }), new Promise(r => setTimeout(r, 2500))]); } catch(_) {}
-  try { Object.keys(localStorage).filter(k => k.startsWith('sb-') || k.includes('supabase')).forEach(k => localStorage.removeItem(k)); } catch(_) {}
-  try { sessionStorage.clear(); } catch(_) {}
+  borrarSesionLocal();
+  try { sb.auth.signOut({ scope:'local' }).catch(() => {}); } catch(_) {}
   location.replace(location.pathname + '?salir=' + Date.now());
 };
 
