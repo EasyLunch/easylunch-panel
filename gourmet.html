@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Easy Lunch · Gourmet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -113,7 +113,7 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
 
 /* MODAL (mat-dialog) */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.32);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
-.modal{background:#fff;border-radius:4px;box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14);max-width:960px;width:100%;max-height:92vh;overflow:auto;display:grid;grid-template-columns:1fr 1fr;position:relative}
+.modal{background:#fff;border-radius:4px;box-shadow:0 11px 15px -7px rgba(0,0,0,.2),0 24px 38px 3px rgba(0,0,0,.14);max-width:960px;width:100%;max-height:92vh;max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:grid;grid-template-columns:1fr 1fr;position:relative}
 .modal .ph{aspect-ratio:auto;min-height:100%;border-radius:4px 0 0 4px}
 .modal-body{padding:26px 26px 22px}
 .x{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.95);font-size:18px;z-index:2;box-shadow:var(--shadow)}
@@ -140,16 +140,24 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
 .stepper{display:flex;align-items:center;border:1px solid rgba(0,0,0,.2);border-radius:4px;background:#fff}
 .stepper button{width:36px;height:36px;border:0;background:none;font-size:18px}
 .stepper input{width:44px;text-align:center;border:0;outline:none;background:none;font-weight:500}
-@media (max-width:780px){.modal{grid-template-columns:1fr}.modal .ph{aspect-ratio:4/3;min-height:0;border-radius:4px 4px 0 0}.modal-body{padding:20px 16px}}
+@media (max-width:780px){
+  .overlay{padding:0;align-items:stretch}
+  .modal{grid-template-columns:1fr;display:block;border-radius:0;height:100%;max-height:100%;height:100dvh;max-height:100dvh}
+  .modal .ph{aspect-ratio:4/3;min-height:0;border-radius:0}
+  .modal-body{padding:20px 16px 0}
+  .add-row{position:sticky;bottom:0;z-index:3;background:#fff;margin:16px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -8px 14px -10px rgba(0,0,0,.35)}
+  .x{position:fixed;top:calc(10px + env(safe-area-inset-top))}
+}
 
 /* CARRITO */
 .fab{position:fixed;right:22px;bottom:22px;z-index:30;display:flex;align-items:center;gap:10px;padding:13px 20px;border-radius:7px;border:0;background:var(--green);color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.3);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.6px}
+@media (max-width:720px){.fab{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));justify-content:center;font-size:12px;padding:15px 14px}}
 .fab .n{background:#fff;color:var(--green);border-radius:10px;padding:0 8px}
-.drawer{position:fixed;top:0;right:0;bottom:0;width:430px;max-width:100%;background:#F5F5F5;z-index:60;box-shadow:-6px 0 24px rgba(0,0,0,.2);display:flex;flex-direction:column}
+.drawer{position:fixed;top:0;right:0;bottom:0;height:100%;height:100dvh;width:430px;max-width:100%;background:#F5F5F5;z-index:60;box-shadow:-6px 0 24px rgba(0,0,0,.2);display:flex;flex-direction:column}
 .drawer-head{padding:18px 20px 12px;background:#fff;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start}
 .drawer-head h2{font-size:24px}
-.drawer-body{flex:1;overflow:auto;padding:14px 16px}
-.drawer-foot{padding:14px 20px 20px;border-top:1px solid var(--line);background:#fff}
+.drawer-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 16px}
+.drawer-foot{padding:14px 20px calc(20px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#fff}
 .line{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px}
 .line-top{display:flex;justify-content:space-between;gap:10px}
 .line-top b{font-weight:500;font-size:15px}
@@ -251,7 +259,7 @@ main{max-width:1180px;margin:auto;padding:20px 16px 120px}
     </div>
   </main>
 
-  <button class="fab" id="fab" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1z"/></svg>Ver pedido <span class="n" id="fabN">0</span></button>
+  <button class="fab" id="fab" hidden><svg class="ico" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1z"/></svg><span id="fabTxt">Confirmar pedido</span> <span class="n" id="fabN">0</span></button>
 </section>
 
 <!-- Modal plato -->
@@ -488,6 +496,7 @@ function renderCart(){
   const { u, t, priced, dias } = cartTotals();
   const vencidas = dias.filter(fe => !S.menu.fechas.some(f => f.fecha===fe));
   $('#fab').hidden = !u || !$('#v-pedidos').hidden; $('#fabN').textContent = u;
+  $('#fabTxt').textContent = S.editId ? 'Revisar y guardar cambios' : `Tenés ${u} plato${u===1?'':'s'} sin confirmar · Confirmar`;
   $('#dDate').textContent = S.editId ? 'Entrega ' + fmtFecha(S.fecha, true) : (dias.length ? `${dias.length} día${dias.length>1?'s':''} de entrega` : 'Elegí días y platos');
   $('#dUnits').textContent = `${u} plato${u===1?'':'s'}`;
   $('#dTotal').textContent = priced ? money(t) : '';
