@@ -20,6 +20,10 @@ html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 Roboto,"H
 h1,h2,h3{font-family:Montserrat,sans-serif;font-weight:500;margin:0;letter-spacing:.3px}
 button{font:inherit;cursor:pointer;letter-spacing:inherit}
 input,textarea,select{font:inherit;color:inherit}
+html,body{max-width:100%;overflow-x:hidden}
+/* iPhone: con letra menor a 16px Safari hace zoom al tocar un campo y la pantalla queda agrandada */
+@media (max-width:720px){input,select,textarea,.input,.paras .input,.line-ctrl .input,.stepper input{font-size:16px!important}
+  .fab{white-space:normal;line-height:1.3;text-align:center}}
 [hidden]{display:none!important}
 .btn{border:0;border-radius:7px;padding:10px 22px;background:var(--green);color:#fff;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.6px;box-shadow:0 2px 5px rgba(0,0,0,.16);transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .btn:hover{background:var(--green-2)}
