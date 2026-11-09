@@ -114,8 +114,9 @@ select.st-sel{border:1px solid var(--line);border-radius:8px;padding:4px 6px;bac
     <div class="nav-g">Operación</div>
     <button class="nav on" data-v="pedidos">Pedidos</button>
     <div class="nav-g">Catálogo</div>
-    <button class="nav" data-v="platos">Platos</button>
+    <button class="nav" data-v="platos">Platos principales</button>
     <button class="nav" data-v="guarniciones">Guarniciones</button>
+    <button class="nav" data-v="postres">Postres</button>
     <div class="nav-g">Clientes</div>
     <button class="nav" data-v="empresas">Empresas</button>
     <button class="nav" data-v="usuarios">Usuarios</button>
@@ -379,17 +380,21 @@ VIEWS.facturacion = async () => {
 };
 
 /* ---------------- PLATOS ---------------- */
-VIEWS.platos = () => {
+function listaPlatos(t){
+  const tit = t==='postre' ? 'Postres' : 'Platos principales';
+  const ls = D.platos.filter(p => (p.tipo||'principal')===t);
   $('#main').innerHTML = `
-    <div class="head"><div><div class="eyebrow">Catálogo</div><h1>Platos</h1></div><button class="btn" id="nuevo">+ Nuevo plato</button></div>
-    ${D.platos.length ? [['principal','Platos principales'],['postre','Postres']].map(([t,tit]) => { const ls = D.platos.filter(p => (p.tipo||'principal')===t); return ls.length ? `<h3 style="font-size:18px;margin:18px 0 10px">${tit}</h3><div class="plist">${ls.map(p => { const nE=D.ep.filter(x=>x.plato_id===p.id).length, nG=D.pg.filter(x=>x.plato_id===p.id).length;
+    <div class="head"><div><div class="eyebrow">Catálogo</div><h1>${tit}</h1></div><button class="btn" id="nuevo">+ ${t==='postre'?'Nuevo postre':'Nuevo plato'}</button></div>
+    ${ls.length ? `<div class="plist">${ls.map(p => { const nE=D.ep.filter(x=>x.plato_id===p.id).length, nG=D.pg.filter(x=>x.plato_id===p.id).length;
       return `<div class="pcard" data-id="${p.id}"><div class="ph" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Sin foto'}</div>
         <div class="b"><div style="display:flex;justify-content:space-between;gap:8px"><h3>${esc(p.nombre)}</h3>${p.activo?'':'<span class="st off">Inactivo</span>'}</div>
-        <div class="muted" style="font-size:12px">${t==='principal'?nG+' guarnición(es) · ':''}${nE} empresa(s) · ${money(p.precio)}</div></div></div>`; }).join('')}</div>` : ''; }).join('')
-      : '<div class="empty">Todavía no hay platos. Creá el primero.</div>'}`;
-  $('#nuevo').onclick = () => editPlato(null);
+        <div class="muted" style="font-size:12px">${t==='principal'?nG+' guarnición(es) · ':''}${nE} empresa(s) · ${money(p.precio)}</div></div></div>`; }).join('')}</div>`
+      : `<div class="empty">Todavía no hay ${t==='postre'?'postres':'platos'}. Creá el primero.</div>`}`;
+  $('#nuevo').onclick = () => editPlato(null, t);
   $$('.pcard').forEach(c => c.onclick = () => editPlato(c.dataset.id));
-};
+}
+VIEWS.platos  = () => listaPlatos('principal');
+VIEWS.postres = () => listaPlatos('postre');
 
 async function comprimir(file, max=1600){
   const img = await new Promise((ok, bad) => { const i=new Image(); i.onload=()=>ok(i); i.onerror=bad; i.src=URL.createObjectURL(file); });
@@ -405,14 +410,15 @@ async function subirFoto(file, carpeta){
   return sb.storage.from('gourmet').getPublicUrl(path).data.publicUrl;
 }
 
-function editPlato(id){
-  const p = D.platos.find(x=>x.id===id) || { activo:true, orden:0 };
+function editPlato(id, tipoNuevo){
+  const p = D.platos.find(x=>x.id===id) || { activo:true, orden:0, tipo:tipoNuevo||'principal' };
+  const vistaVolver = () => go((p.tipo||'principal')==='postre' ? 'postres' : 'platos');
   const gSel = new Set(D.pg.filter(x=>x.plato_id===id).map(x=>x.guarnicion_id));
   const eSel = new Set(D.ep.filter(x=>x.plato_id===id).map(x=>x.empresa_id));
   let foto = p.foto_url || '';
   const v = k => esc(p[k] ?? '');
   openModal(`
-    <h2>${id ? 'Editar plato' : 'Nuevo plato'}</h2>
+    <h2>${id ? 'Editar' : 'Nuevo'} ${p.tipo==='postre'?'postre':'plato'}</h2>
     <div class="photo field"><div class="ph" id="fPh" style="${foto?`background-image:url('${esc(foto)}')`:''}">${foto?'':'Sin foto'}</div>
       <div><label class="btn ghost" style="display:inline-block">Subir foto (plato con guarnición)<input type="file" accept="image/*" id="fFile" hidden></label>
       <div class="muted" style="font-size:12px;margin-top:6px">Se comprime automáticamente. Ideal horizontal 4:3.</div>
@@ -460,7 +466,7 @@ function editPlato(id){
     const { error } = await sb.from('gourmet_platos').delete().eq('id', id);
     if (error){ await q(sb.from('gourmet_platos').update({activo:false}).eq('id', id)); toast('Tiene pedidos: lo dejé inactivo'); }
     else toast('Plato eliminado');
-    closeModal(); await loadBase(); go('platos'); });
+    closeModal(); await loadBase(); vistaVolver(); });
   $('#pSave').onclick = async () => {
     const val = k => $('#p_'+k).value.trim();
     const num = k => val(k)==='' ? null : Number(val(k));
@@ -484,7 +490,7 @@ function editPlato(id){
       const quitar = [...eSel].filter(e=>!want.has(e)), agregar = [...want].filter(e=>!eSel.has(e));
       if (quitar.length) await q(sb.from('gourmet_empresa_platos').delete().eq('plato_id', pid).in('empresa_id', quitar));
       if (agregar.length) await q(sb.from('gourmet_empresa_platos').insert(agregar.map(e=>({ empresa_id:e, plato_id:pid }))));
-      toast('Plato guardado'); closeModal(); await loadBase(); go('platos');
+      toast('Guardado'); closeModal(); await loadBase(); go(row.tipo==='postre' ? 'postres' : 'platos');
     } catch(_) { $('#pSave').disabled = false; }
   };
 }
