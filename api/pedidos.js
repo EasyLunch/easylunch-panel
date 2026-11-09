@@ -24,7 +24,8 @@ const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, jul
 const pad = n => String(n).padStart(2, '0')
 const okFecha = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))
 // Misma base y misma clave pública que usa Recorridos
-const SB = process.env.SUPABASE_URL || 'https://xlwcozznliafhouhqjzl.supabase.co/rest/v1'
+// SUPABASE_URL puede venir con o sin "/rest/v1" (la app Gourmet la usa sin): se normaliza acá
+const SB = String(process.env.SUPABASE_URL || 'https://xlwcozznliafhouhqjzl.supabase.co').replace(/\/+$/, '').replace(/\/rest\/v1$/, '') + '/rest/v1'
 const KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
 
