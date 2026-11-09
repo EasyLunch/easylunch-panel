@@ -627,11 +627,34 @@ VIEWS.usuarios = () => {
   $('#uEmp').onchange = render; render();
   $('#nuevo').onclick = () => nuevoUsuario();
 };
-function nuevoUsuario(){
+/* Empresas para elegir al crear/editar un usuario: las ya habilitadas en Gourmet + todas las activas del sistema.
+   Si se elige una del sistema que todavía no está en Gourmet, se da de alta sola (con todos los platos activos). */
+async function empSelectUsuario(sel, vacio){
+  const sis = await empresasSistema();
+  const vinc = new Set(D.empresas.map(e=>String(e.id_empresa_el||'')));
+  const ya = D.empresas.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const nuevas = sis.filter(x=>x.activa && !vinc.has(String(x.id)));
+  return `<option value="">${vacio}</option>`
+    + (ya.length ? `<optgroup label="Ya habilitadas en Gourmet">${ya.map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.nombre)}</option>`).join('')}</optgroup>` : '')
+    + (nuevas.length ? `<optgroup label="Otras empresas activas del sistema">${nuevas.map(x=>`<option value="sis:${esc(x.id)}">${esc(x.nombre)}</option>`).join('')}</optgroup>` : '');
+}
+async function resolverEmpresa(v){
+  if (!v || !v.startsWith('sis:')) return v || null;
+  const idSis = v.slice(4), es = (EMP_SIS||[]).find(x=>String(x.id)===idSis);
+  if (!es) throw toast('No encontré esa empresa en el sistema', true);
+  const ex = D.empresas.find(e=>String(e.id_empresa_el)===idSis);
+  if (ex) return ex.id;
+  const eid = (await q(sb.from('gourmet_empresas').insert({ nombre:es.nombre, id_empresa_el:es.id, activa:true, mostrar_precios:false }).select('id').single())).id;
+  const pls = D.platos.filter(p=>p.activo && !/^PRUEBA/i.test(p.nombre)).map(p=>({ empresa_id:eid, plato_id:p.id, precio:null }));
+  if (pls.length) await q(sb.from('gourmet_empresa_platos').insert(pls));
+  return eid;
+}
+async function nuevoUsuario(){
   const pass = genPass();
+  const opts = await empSelectUsuario('', 'Elegir…');
   openModal(`<h2>Nuevo usuario</h2>
     <div class="row"><div class="field"><label>Nombre *</label><input class="input" id="u_nombre"></div><div class="field"><label>Email *</label><input class="input" id="u_email" type="email"></div></div>
-    <div class="row"><div class="field"><label>Empresa *</label><select class="input" id="u_empresa">${empOptions('', 'Elegir…')}</select></div>
+    <div class="row"><div class="field"><label>Empresa *</label><select class="input" id="u_empresa">${opts}</select></div>
       <div class="field"><label>Teléfono</label><input class="input" id="u_tel"></div>
       <div class="field"><label>Rol</label><select class="input" id="u_rol"><option value="cliente">Cliente</option><option value="admin">Administrador Easy Lunch</option></select></div></div>
     <div class="field"><label>Contraseña inicial</label><div style="display:flex;gap:8px"><input class="input" id="u_pass" value="${pass}"><button class="btn ghost" id="cp" type="button">Copiar</button></div>
@@ -639,14 +662,16 @@ function nuevoUsuario(){
     <div class="mfoot"><span></span><div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="uSave">Crear usuario</button></div></div>`);
   $('#cp').onclick = () => { navigator.clipboard?.writeText(`Usuario: ${$('#u_email').value}\nContraseña: ${$('#u_pass').value}\nIngreso: ${location.origin}/gourmet.html`); toast('Datos de acceso copiados'); };
   $('#uSave').onclick = async () => { $('#uSave').disabled = true;
-    try { await api({ accion:'crear', nombre:$('#u_nombre').value, email:$('#u_email').value, empresa_id:$('#u_empresa').value||null, telefono:$('#u_tel').value, rol:$('#u_rol').value, password:$('#u_pass').value });
+    try { if (!$('#u_empresa').value && $('#u_rol').value!=='admin') { toast('Elegí la empresa', true); throw 0; }
+      const empresa_id = await resolverEmpresa($('#u_empresa').value);
+      await api({ accion:'crear', nombre:$('#u_nombre').value, email:$('#u_email').value, empresa_id, telefono:$('#u_tel').value, rol:$('#u_rol').value, password:$('#u_pass').value });
       toast('Usuario creado'); closeModal(); await loadBase(); go('usuarios'); } catch(_) { $('#uSave').disabled = false; } };
 }
-function editUsuario(id){
+async function editUsuario(id){
   const u = D.usuarios.find(x=>x.id===id); if (!u) return;
   openModal(`<h2>${esc(u.nombre||u.email)}</h2><div class="muted" style="margin:-10px 0 16px">${esc(u.email)}</div>
     <div class="row"><div class="field"><label>Nombre</label><input class="input" id="u_nombre" value="${esc(u.nombre||'')}"></div><div class="field"><label>Teléfono</label><input class="input" id="u_tel" value="${esc(u.telefono||'')}"></div></div>
-    <div class="row"><div class="field"><label>Empresa</label><select class="input" id="u_empresa">${empOptions(u.empresa_id, '— Sin empresa —')}</select></div>
+    <div class="row"><div class="field"><label>Empresa</label><select class="input" id="u_empresa">${await empSelectUsuario(u.empresa_id, '— Sin empresa —')}</select></div>
       <div class="field"><label>Rol</label><select class="input" id="u_rol"><option value="cliente" ${u.rol==='cliente'?'selected':''}>Cliente</option><option value="admin" ${u.rol==='admin'?'selected':''}>Administrador</option></select></div>
       <div class="field"><label>Estado</label><select class="input" id="u_activo"><option value="1" ${u.activo?'selected':''}>Activo</option><option value="0" ${!u.activo?'selected':''}>Inactivo (no puede pedir)</option></select></div></div>
     <div class="field"><label>Nueva contraseña</label><div style="display:flex;gap:8px"><input class="input" id="u_pass" placeholder="Dejar vacío para no cambiar"><button class="btn ghost" type="button" id="gen">Generar</button><button class="btn ghost" type="button" id="setP">Cambiar</button></div></div>
@@ -655,7 +680,7 @@ function editUsuario(id){
   $('#gen').onclick = () => $('#u_pass').value = genPass();
   $('#setP').onclick = async () => { await api({ accion:'clave', id, password:$('#u_pass').value }); toast('Contraseña cambiada'); };
   $('#uSave').onclick = async () => {
-    await q(sb.from('gourmet_usuarios').update({ nombre:$('#u_nombre').value.trim()||null, telefono:$('#u_tel').value.trim()||null, empresa_id:$('#u_empresa').value||null, rol:$('#u_rol').value, activo:$('#u_activo').value==='1' }).eq('id', id), 'Usuario guardado');
+    await q(sb.from('gourmet_usuarios').update({ nombre:$('#u_nombre').value.trim()||null, telefono:$('#u_tel').value.trim()||null, empresa_id:await resolverEmpresa($('#u_empresa').value), rol:$('#u_rol').value, activo:$('#u_activo').value==='1' }).eq('id', id), 'Usuario guardado');
     closeModal(); await loadBase(); go('usuarios'); };
   $('#uDel').onclick = e => confirmBtn(e.target, async () => { await api({ accion:'eliminar', id }); toast('Usuario eliminado'); closeModal(); await loadBase(); go('usuarios'); });
 }
