@@ -248,14 +248,14 @@ VIEWS.pedidos = async () => {
     $('#tbl').innerHTML = `<table><thead><tr><th>#</th><th>Entrega</th><th>Empresa</th><th>Detalle</th><th class="num">Platos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody>
       ${rows.map(r => `<tr>
         <td>${r.numero}</td><td>${fF(r.fecha_entrega)}</td>
-        <td><b>${esc(empName(r.empresa_id))}</b><br><small class="muted">${esc(r.gourmet_usuarios?.nombre||r.gourmet_usuarios?.email||'')}</small></td>
+        <td><b>${esc(empName(r.empresa_id))}</b><br><small class="muted">${r.origen==='link' ? 'Link · ' + esc(r.cliente_nombre||'') : esc(r.gourmet_usuarios?.nombre||r.gourmet_usuarios?.email||'')}</small></td>
         <td><ul class="items">${r.gourmet_pedido_items.map(i=>`<li>${i.cantidad} × ${esc(i.plato_nombre)}${i.guarnicion_nombre?` <small>/ ${esc(i.guarnicion_nombre)}</small>`:''}${i.para_quien?` <small>· ${esc(i.para_quien)}</small>`:''}</li>`).join('')}</ul>${r.notas?`<small class="muted">Nota: ${esc(r.notas)}</small>`:''}</td>
         <td class="num">${r.total_unidades}</td><td class="num">${money(r.total)}${r.facturado?'<br><small class="muted">facturado</small>':''}</td>
         <td><select class="st-sel" data-id="${r.id}">${Object.entries(ESTADOS).map(([k,v])=>`<option value="${k}" ${r.estado===k?'selected':''}>${v}</option>`).join('')}</select></td>
       </tr>`).join('')}</tbody></table>`;
     $$('.st-sel').forEach(s => s.onchange = async () => { await q(sb.from('gourmet_pedidos').update({estado:s.value, updated_at:new Date().toISOString()}).eq('id', s.dataset.id), 'Estado actualizado'); reload(); });
     $('#xCsv').onclick = () => csv(`pedidos_gourmet_${F.desde}_${F.hasta}.csv`, [['Pedido','Entrega','Empresa','Solicitante','Plato','Guarnición','Cantidad','Para quién','Precio unit.','Subtotal','Estado','Notas'],
-      ...rows.flatMap(r => r.gourmet_pedido_items.map(i => [r.numero, r.fecha_entrega, empName(r.empresa_id), r.gourmet_usuarios?.nombre||'', i.plato_nombre, i.guarnicion_nombre||'', i.cantidad, i.para_quien||'', i.precio_unit??'', i.subtotal, ESTADOS[r.estado], r.notas||'']))]);
+      ...rows.flatMap(r => r.gourmet_pedido_items.map(i => [r.numero, r.fecha_entrega, empName(r.empresa_id), r.origen==='link' ? 'Link · ' + (r.cliente_nombre||'') : (r.gourmet_usuarios?.nombre||''), i.plato_nombre, i.guarnicion_nombre||'', i.cantidad, i.para_quien||'', i.precio_unit??'', i.subtotal, ESTADOS[r.estado], r.notas||'']))]);
     $('#bulkGo').onclick = e => confirmBtn(e.target, async () => {
       const ids = rows.filter(r=>r.estado!=='cancelado').map(r=>r.id); if (!ids.length) return;
       await q(sb.from('gourmet_pedidos').update({estado:$('#bulkEst').value, updated_at:new Date().toISOString()}).in('id', ids), `${ids.length} pedidos actualizados`); reload(); });
@@ -572,6 +572,8 @@ async function editEmpresa(id){
       <div class="field"><label>Precios en la app del cliente</label><select class="input" id="e_mostrar_precios"><option value="0" ${!e.mostrar_precios?'selected':''}>No mostrar</option><option value="1" ${e.mostrar_precios?'selected':''}>Mostrar</option></select></div>
       <div class="field"><label>Estado</label><select class="input" id="e_activa"><option value="1" ${e.activa?'selected':''}>Activa</option><option value="0" ${!e.activa?'selected':''}>Inactiva</option></select></div></div>
     <div class="field"><label>Notas internas</label><textarea class="input" id="e_notas" rows="2">${v('notas')}</textarea></div>
+    ${id ? `<div class="field"><label>Link para pedir sin usuario <small>(para pasarle a sus clientes o invitados: ponen nombre, apellido, fecha y eligen plato y postre)</small></label>
+      <div id="linkBox"></div></div>` : ''}
     <div class="field"><label>Platos habilitados y precio para esta empresa <small>(vacío = precio de lista del plato; es el que se factura)</small> <button type="button" class="btn small ghost" id="allP" style="margin-left:6px">Todos</button></label>
       <div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px 10px;max-height:320px;overflow:auto">
       ${D.platos.map(p=>`<div class="ep-row"><input type="checkbox" class="pChk" value="${p.id}" ${epMap[p.id]?'checked':''}>
@@ -582,6 +584,18 @@ async function editEmpresa(id){
       <div style="display:flex;gap:8px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="eSave">Guardar</button></div></div>`);
   $('#e_buscar').oninput = () => { const t=norm($('#e_buscar').value); [...$('#e_sis').options].forEach(o => o.hidden = t && !norm(o.text).includes(t)); };
   $('#allP').onclick = () => $$('.pChk').forEach(c=>c.checked=true);
+  const linkUrl = t => `${location.origin}/pedir.html?e=${t}`;
+  const pintarLink = () => { const box = $('#linkBox'); if (!box) return; const t = e.link_token;
+    box.innerHTML = t ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><input class="input" readonly value="${esc(linkUrl(t))}" style="flex:1;min-width:240px">
+        <button type="button" class="btn ghost" id="lkCopy">Copiar</button><a class="btn ghost" href="${esc(linkUrl(t))}" target="_blank" rel="noopener">Abrir</a></div>
+        <div style="margin-top:6px;display:flex;gap:8px"><button type="button" class="btn small ghost" id="lkNew">Generar uno nuevo (anula este)</button><button type="button" class="btn small danger" id="lkOff">Desactivar link</button></div>`
+      : `<button type="button" class="btn ghost" id="lkNew">Crear link</button>`;
+    if ($('#lkCopy')) $('#lkCopy').onclick = () => { navigator.clipboard?.writeText(linkUrl(t)); toast('Link copiado'); };
+    $('#lkNew').onclick = async () => { const nt = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g,'');
+      await q(sb.from('gourmet_empresas').update({ link_token: nt }).eq('id', id), 'Link listo'); e.link_token = nt; const x = D.empresas.find(z=>z.id===id); if (x) x.link_token = nt; pintarLink(); };
+    if ($('#lkOff')) $('#lkOff').onclick = async () => { await q(sb.from('gourmet_empresas').update({ link_token: null }).eq('id', id), 'Link desactivado'); e.link_token = null; const x = D.empresas.find(z=>z.id===id); if (x) x.link_token = null; pintarLink(); };
+  };
+  pintarLink();
   $('#eSave').onclick = async () => {
     const idSis = $('#e_sis').value;
     const es = (EMP_SIS||[]).find(x=>x.id===idSis);
