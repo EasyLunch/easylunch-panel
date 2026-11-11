@@ -67,11 +67,11 @@ header.top{position:sticky;top:0;z-index:20;background:var(--verde);color:#fff;p
 .porc{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .porc label{font-size:13px;color:var(--gris);font-weight:600}
 .stepper{display:flex;align-items:center;border:1px solid var(--borde);border-radius:12px;overflow:hidden}
-.stepper button{border:0;background:var(--fondo);width:42px;height:40px;font-size:20px;cursor:pointer}
-.stepper input{width:64px;border:0;text-align:center;font-size:18px;font-weight:700;height:40px;outline:none;-moz-appearance:textfield}
+.stepper button{border:0;background:var(--fondo);width:36px;height:38px;font-size:20px;cursor:pointer}
+.stepper input{width:52px;border:0;text-align:center;font-size:18px;font-weight:700;height:40px;outline:none;-moz-appearance:textfield}
 .stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .quick{display:flex;gap:6px}
-.quick button{border:1px solid var(--borde);background:#fff;border-radius:9px;padding:7px 10px;font-size:13px;cursor:pointer}
+.quick button{border:1px solid var(--borde);background:#fff;border-radius:9px;padding:7px 9px;font-size:13px;cursor:pointer}
 .quick button.on{background:var(--verde);color:#fff;border-color:var(--verde)}
 .tabs{display:flex;gap:4px;margin-top:10px;background:var(--fondo);padding:4px;border-radius:12px}
 .tabs button{flex:1;border:0;background:none;padding:9px 4px;border-radius:9px;font-size:14px;font-weight:600;color:var(--gris);cursor:pointer}
@@ -195,13 +195,22 @@ header.top{position:sticky;top:0;z-index:20;background:var(--verde);color:#fff;p
       </div>
     </div>
     <div class="porc">
-      <label>Porciones</label>
+      <label style="min-width:66px">Regulares</label>
       <div class="stepper">
         <button id="p-menos" aria-label="Menos">−</button>
-        <input id="p-n" type="number" inputmode="numeric" min="1" value="1">
+        <input id="p-n" type="number" inputmode="numeric" min="0" value="1">
         <button id="p-mas" aria-label="Más">+</button>
       </div>
       <div class="quick" id="quick"></div>
+    </div>
+    <div class="porc" style="margin-top:4px">
+      <label style="min-width:66px">XL <small style="font-weight:600;color:var(--ambar)">+30%</small></label>
+      <div class="stepper">
+        <button id="px-menos" aria-label="Menos XL">−</button>
+        <input id="px-n" type="number" inputmode="numeric" min="0" value="0">
+        <button id="px-mas" aria-label="Más XL">+</button>
+      </div>
+      <div class="quick" id="quickxl"></div>
     </div>
     <div class="tabs" id="tabs">
       <button data-t="armado" class="on">🧩 Armado</button>
@@ -226,6 +235,10 @@ const CACHE_KEY = 'el_produccion_cache_v1'
 const FOTOS_URL = 'https://app.easylunch.com.ar/server/traer-tabla-por-id.php?tabla=platos&id=0&order=DESC&by=id'  // fotos del sistema de pedidos
 const FOTOS_KEY = 'el_produccion_fotos_v1'
 let fotosSis = []
+const EMP_VARS = [ { v:'reg', l:'Regular', suf:'' }, { v:'xl', l:'XL', suf:'::xl' }, { v:'hit', l:'HIT', suf:'::hit' } ]
+const empKey = (id, v) => id + ((EMP_VARS.find(x => x.v === v) || EMP_VARS[0]).suf)
+const tieneEmp = id => EMP_VARS.some(x => empIds[id + x.suf])
+let empVar = 'reg'
 let empIds = {}, empCache = {}, empPrevia = null, empGuardando = false   // fotos del emplatado real (tabla fotos_emplatado)
 const PESO = new Set(['g','kg','ml','lt'])
 const TIPOS = [
@@ -242,7 +255,7 @@ const TIPO_MAP = Object.fromEntries(TIPOS.map(t => [t.v, t]))
 const PROT = { vegetariano:'🌿 Vegetariano', vacuna:'🥩 Vacuna', cerdo:'🐷 Cerdo', pollo:'🍗 Pollo', pescado:'🐟 Pescado', cordero:'🐑 Cordero', otra:'📋 Otra' }
 
 let platos = [], insMap = {}, srMap = {}
-let filtroTipo = 'todos', N = 1, tabActual = 'armado', platoActual = null, wakeLock = null
+let filtroTipo = 'todos', N = 1, NXL = 0, tabActual = 'armado', platoActual = null, wakeLock = null
 
 const $ = id => document.getElementById(id)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
@@ -330,7 +343,7 @@ function comprimir(file){
 async function guardarEmp(){
   if(!empPrevia || !platoActual || empGuardando) return
   empGuardando = true; renderDetalle()
-  const row = { plato_id: platoActual.id, foto: empPrevia, actualizado: new Date().toISOString() }
+  const row = { plato_id: empKey(platoActual.id, empVar), foto: empPrevia, actualizado: new Date().toISOString() }
   try{
     await config()
     const r = await fetch(`${SB}/fotos_emplatado?on_conflict=plato_id`, { method:'POST', headers:{ apikey:KEY, Authorization:'Bearer ' + KEY, 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates' }, body: JSON.stringify([row]) })
@@ -342,22 +355,24 @@ async function guardarEmp(){
 }
 let alertaEmp = ''
 function boxEmplatado(p){
-  const id = p.id, guardada = empCache[id], hay = !!empIds[id]
-  let h = `<div class="box emp"><h3>📷 Emplatado de referencia <span class="sub">así lo armamos siempre</span></h3>`
+  const id = empKey(p.id, empVar), guardada = empCache[id], hay = !!empIds[id]
+  const varTxt = (EMP_VARS.find(x => x.v === empVar) || EMP_VARS[0]).l
+  let h = `<div class="box emp"><h3>📷 Emplatado de referencia <span class="sub">así lo armamos siempre</span></h3>
+    <div class="tabs" style="margin:0 0 12px">${EMP_VARS.map(x => `<button data-empvar="${x.v}" class="${empVar === x.v ? 'on' : ''}">${x.l}${empIds[p.id + x.suf] ? ' ✓' : ''}</button>`).join('')}</div>`
   if(alertaEmp) h += `<div class="estado" style="margin:0 0 10px">${esc(alertaEmp)}</div>`
   if(empPrevia){
-    h += `<img src="${empPrevia}" alt="Vista previa"><div class="nota">¿Quedó bien? Esta foto va a ser el ejemplo para todos.</div>
+    h += `<img src="${empPrevia}" alt="Vista previa"><div class="nota">¿Quedó bien? Esta foto va a ser el ejemplo de <b>${varTxt}</b> para todos.</div>
       <div class="btn-row"><button class="btn sec" data-emp="cancelar">Cancelar</button><button class="btn pri" data-emp="guardar">${empGuardando ? 'Guardando…' : '✓ Guardar como ejemplo'}</button></div>`
   } else if(hay && guardada === undefined){
     h += `<div class="vacia">Cargando foto…</div>`
     traerEmp(id).then(() => { if(platoActual && platoActual.id === id && tabActual === 'armado') renderDetalle() })
   } else if(guardada){
     const d = new Date(guardada.actualizado)
-    h += `<img src="${guardada.foto}" alt="Emplatado de ${esc(p.nombre)}"><div class="nota">Foto sacada el ${d.toLocaleDateString('es-AR')} · armá cada vianda igual a esta.</div>
+    h += `<img src="${guardada.foto}" alt="Emplatado de ${esc(p.nombre)}"><div class="nota">${varTxt} · foto sacada el ${d.toLocaleDateString('es-AR')} · armá cada vianda ${varTxt} igual a esta.</div>
       <div class="btn-row"><button class="btn sec" data-emp="sacar">📷 Reemplazar foto</button></div>`
   } else {
-    h += `<div class="vacia">Todavía no hay foto de este plato en la bandeja.<br>Cuando armes una vianda bien emplatada, sacale una foto: queda como ejemplo para todos.</div>
-      <div class="btn-row"><button class="btn pri" data-emp="sacar">📷 Sacar foto del emplatado</button></div>`
+    h += `<div class="vacia">Todavía no hay foto del emplatado <b>${varTxt}</b> de este plato.<br>Cuando armes una vianda bien emplatada, sacale una foto: queda como ejemplo para todos.</div>
+      <div class="btn-row"><button class="btn pri" data-emp="sacar">📷 Sacar foto ${varTxt}</button></div>`
   }
   return h + `</div>`
 }
@@ -1214,7 +1229,7 @@ function render(){
   $('lista').innerHTML = lista.map(p => {
     const t = TIPO_MAP[p.tipo] || { e:'🍽', c:'#f1f5f9', l:p.tipo || 'Plato' }, a = p._a
     const meta = a.envasado ? [t.l, 'Viene envasado'] : [t.l, a.bandeja ? a.bandeja.txt : (a.guarnicion ? 'Guarnición' : null), a.pesoVianda ? fmtG(a.pesoVianda) + ' por vianda' : null]
-    if(empIds[p.id]) meta.push('📷 con foto')
+    if(tieneEmp(p.id)) meta.push('📷 con foto')
     return `<button class="card" data-id="${p.id}"><div class="em" style="background:${t.c}">${t.e}</div><div class="tx"><div class="nm">${esc(p.nombre.trim())}</div><div class="meta">${esc(meta.filter(Boolean).join(' · '))}</div></div><div class="go">›</div></button>`
   }).join('')
 }
@@ -1224,7 +1239,7 @@ function render(){
    ===================================================================== */
 function abrir(id, push){
   const p = platos.find(x => x.id === id); if(!p) return
-  platoActual = p; tabActual = 'armado'; empPrevia = null; alertaEmp = ''; editBandeja = false; editArmado = false; msgEd = ''; borrador = null
+  platoActual = p; tabActual = 'armado'; empVar = 'reg'; empPrevia = null; alertaEmp = ''; editBandeja = false; editArmado = false; msgEd = ''; borrador = null
   if(push) history.pushState({ id }, '', '#/p/' + id)
   $('detalle').classList.remove('hidden'); $('detalle').scrollTop = 0
   document.body.style.overflow = 'hidden'
@@ -1248,7 +1263,9 @@ function renderDetalle(){
   if(a.pesoVianda) b.push(`<span class="badge">⚖️ ${fmtG(a.pesoVianda)} por vianda</span>`)
   $('d-badges').innerHTML = b.join('')
   $('p-n').value = N
-  $('quick').innerHTML = [10, 20, 50, 100].map(q => `<button data-q="${q}" class="${N === q ? 'on' : ''}">${q}</button>`).join('')
+  $('px-n').value = NXL
+  $('quick').innerHTML = [10, 20, 50].map(q => `<button data-q="${q}" class="${N === q ? 'on' : ''}">${q}</button>`).join('')
+  $('quickxl').innerHTML = [0, 5, 10].map(q => `<button data-q="${q}" class="${NXL === q ? 'on' : ''}">${q}</button>`).join('')
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.t === tabActual))
   const body = $('d-body')
   if(tabActual === 'armado') body.innerHTML = vistaArmado(p)
@@ -1337,7 +1354,7 @@ function vistaArmado(p){
     const it = a.comps.filter(c => !c.pack && c.tipo !== 'falta')
     const fe = fotoDe(p)
     return `<div class="box envasado">${fe ? `<div class="foto"><img src="${esc(fe.img)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></div>` : '<div class="ic">📦</div>'}<div class="big">Producto envasado</div><div class="nota" style="font-size:14px">No requiere armado. Retirá del stock:</div>
-      <table class="tabla" style="margin-top:10px">${it.map(c => `<tr><td>${esc(c.nombre)}</td><td class="num">${c.tipo === 'ins' && !c.line.peso ? fmtU(c.line.unidades * N) + ' u.' : fmtG(c.g * N)}</td></tr>`).join('')}</table>
+      <table class="tabla" style="margin-top:10px">${it.map(c => `<tr><td>${esc(c.nombre)}</td><td class="num">${c.tipo === 'ins' && !c.line.peso ? fmtU(c.line.unidades * (N + NXL)) + ' u.' : fmtG(c.g * (N + NXL))}</td></tr>`).join('')}</table>
       <div class="nota">Controlá vencimiento y que la etiqueta diga <b>Sin TACC</b>. Guardalo separado del resto para evitar contaminación cruzada.</div></div>`
   }
   const foto = fotoDe(p)
@@ -1348,22 +1365,31 @@ function vistaArmado(p){
   h += boxArmado(p)
   const notas = a.comps.filter(c => c.tipo === 'sub' && !c.pack && c.sr.descripcion && c.sr.descripcion.trim())
   if(notas.length) h += `<div class="box"><h3>💡 Notas de las preparaciones</h3>${notas.map(c => `<p class="texto-receta" style="margin:0 0 10px"><b>${esc(c.nombre)}:</b> ${esc(c.sr.descripcion.trim())}</p>`).join('')}</div>`
-  if(N > 1) h += `<div class="nota" style="text-align:center">Las cantidades para ${N} porciones están en ⚖️ Ingredientes y 🧾 Producción.</div>`
+  if(N + NXL > 1) h += `<div class="nota" style="text-align:center">Las cantidades para ${porcTxt()} están en ⚖️ Ingredientes y 🧾 Producción.</div>`
   return h
 }
 
-const cantTxt = (l, k) => l.peso ? fmtG(l.g * k, l.liq) : fmtU(l.unidades * k) + ' u.'
-const filaIns = (l, k) => `<tr><td>${esc(l.nombre)}</td><td class="num">${cantTxt(l, k)}</td></tr>`
+/* Factores de producción: XL lleva 30% más de lo que dice la receta.
+   - gramos y todo lo de una preparación (sub-receta)  → regulares + XL × 1,3
+   - unidades por vianda (tortillas, panes, bandejas, dips) → regulares + XL */
+const XL_EXTRA = 1.3
+const factores = () => ({ g: N + NXL * XL_EXTRA, u: N + NXL, total: N + NXL })
+const kDe = (l, K, enPrep) => l.pack ? K.u : ((enPrep || l.peso) ? K.g : K.u)
+const cantTxt = (l, K, enPrep) => l.peso ? fmtG(l.g * kDe(l, K, enPrep), l.liq) : fmtU(l.unidades * kDe(l, K, enPrep)) + ' u.'
+const filaIns = (l, K, enPrep) => `<tr><td>${esc(l.nombre)}</td><td class="num">${cantTxt(l, K, enPrep)}</td></tr>`
+const porcTxt = () => NXL ? `${N} reg. + ${NXL} XL` : `${N} porc.`
+const kpiPorc = () => `<div class="kpi"><div class="v">${N + NXL}</div><div class="l">${NXL ? `porciones (${NXL} XL)` : 'porciones'}</div></div>`
+const notaXL = () => NXL ? `<div class="nota">Las ${NXL} XL llevan <b>30% más</b> de cada ingrediente (las unidades por vianda y el packaging no cambian).</div>` : ''
 const thead = `<tr><th>Insumo</th><th>Cantidad</th></tr>`
 
 function vistaIngredientes(p){
-  const a = p._a, k = N
+  const a = p._a, K = factores()
   if(a.envasado) return vistaArmado(p)
   let h = `<div class="box"><div class="kpis">
-    <div class="kpi"><div class="v">${N}</div><div class="l">porciones</div></div>
-    <div class="kpi"><div class="v">${fmtG(a.pesoVianda)}</div><div class="l">por vianda</div></div>
-    <div class="kpi"><div class="v">${fmtG(a.pesoVianda * N)}</div><div class="l">total</div></div></div>
-    <div class="nota">Cantidades tal como figuran en la receta.</div></div>`
+    ${kpiPorc()}
+    <div class="kpi"><div class="v">${fmtG(a.pesoVianda)}</div><div class="l">por vianda${NXL ? ` · XL ${fmtG(a.pesoVianda * XL_EXTRA)}` : ''}</div></div>
+    <div class="kpi"><div class="v">${fmtG(a.pesoVianda * K.g)}</div><div class="l">total</div></div></div>
+    <div class="nota">Cantidades tal como figuran en la receta.</div>${notaXL()}</div>`
   const directos = []
   a.comps.forEach(c => {
     if(c.pack || c.tipo === 'falta') return
@@ -1376,17 +1402,17 @@ function vistaIngredientes(p){
     preps.forEach((c, i) => {
       const sr = c.sr, ru = sr.unidad_rendimiento || 'unidad'
       const rendTxt = PESO.has(ru) ? fmtG(toG(+sr.rendimiento || 0, ru)) : `${fmtU(+sr.rendimiento || 1)} ${ru}`
-      h += `<details class="prep" ${i === 0 && preps.length < 3 ? 'open' : ''}><summary><span class="ar">›</span><span class="pn">${esc(c.nombre)}<small>${esc(c.cantTxt)} por vianda · la receta base rinde ${esc(rendTxt)}</small></span><span class="pt">${fmtG(c.g * k)}</span></summary>
-        <div class="pb"><div class="nota" style="margin:2px 0 6px">Hacer <b>×${fmtU(c.f * k)}</b> la receta base.</div><table class="tabla">${thead}${c.lines.map(l => filaIns(l, k)).join('')}</table>
+      h += `<details class="prep" ${i === 0 && preps.length < 3 ? 'open' : ''}><summary><span class="ar">›</span><span class="pn">${esc(c.nombre)}<small>${esc(c.cantTxt)} por vianda · la receta base rinde ${esc(rendTxt)}</small></span><span class="pt">${fmtG(c.g * K.g)}</span></summary>
+        <div class="pb"><div class="nota" style="margin:2px 0 6px">Hacer <b>×${fmtU(c.f * K.g)}</b> la receta base.</div><table class="tabla">${thead}${c.lines.map(l => filaIns(l, K, true)).join('')}</table>
         ${sr.descripcion ? `<div class="nota">💡 ${esc(sr.descripcion)}</div>` : ''}</div></details>`
     })
     h += `</div>`
   }
-  if(directos.length) h += `<div class="box"><h3>🧩 Insumos para el armado <span class="sub">${N} porc.</span></h3><table class="tabla">${thead}${directos.map(l => filaIns(l, k)).join('')}</table></div>`
+  if(directos.length) h += `<div class="box"><h3>🧩 Insumos para el armado <span class="sub">${porcTxt()}</span></h3><table class="tabla">${thead}${directos.map(l => filaIns(l, K, false)).join('')}</table></div>`
   const packs = a.comps.filter(c => c.pack)
   if(packs.length){
     const filas = []; packs.forEach(c => { if(c.tipo === 'ins') filas.push(c.line); else c.lines.forEach(l => filas.push(l)) })
-    h += `<div class="box"><h3>📦 Packaging</h3><table class="tabla"><tr><th>Ítem</th><th>Cantidad</th></tr>${filas.map(l => filaIns(l, k)).join('')}</table></div>`
+    h += `<div class="box"><h3>📦 Packaging</h3><table class="tabla"><tr><th>Ítem</th><th>Cantidad</th></tr>${filas.map(l => filaIns(l, { g: K.u, u: K.u }, false)).join('')}</table></div>`
   }
   const faltan = a.comps.filter(c => c.tipo === 'falta')
   if(faltan.length) h += `<div class="estado" style="margin:0">⚠️ Esta receta tiene ${faltan.length} ingrediente(s) que ya no existen en el recetario. Avisale a quien carga las recetas.</div>`
@@ -1394,26 +1420,27 @@ function vistaIngredientes(p){
 }
 
 function vistaTotal(p){
-  const a = p._a, k = N, tot = {}
+  const a = p._a, K = factores(), tot = {}
   if(a.envasado) return vistaArmado(p)
-  const sumar = l => {
+  const sumar = (l, enPrep) => {
     const key = l.id + (l.peso ? '' : '_u')
     const t = tot[key] || (tot[key] = { nombre:l.nombre, cat:l.cat || '', peso:l.peso, liq:l.liq, pack:l.pack, g:0, u:0 })
+    const k = l.pack ? K.u : kDe(l, K, enPrep)
     t.g += l.g * k; t.u += (l.unidades || 0) * k
   }
-  a.comps.forEach(c => { if(c.tipo === 'ins') sumar(c.line); if(c.tipo === 'sub') c.lines.forEach(sumar) })
+  a.comps.forEach(c => { if(c.tipo === 'ins') sumar(c.line, false); if(c.tipo === 'sub') c.lines.forEach(l => sumar(l, !c.expand && !c.pack)) })
   const arr = Object.values(tot)
   const comida = arr.filter(t => !t.pack).sort((x, y) => (x.cat || '').localeCompare(y.cat || '') || x.nombre.localeCompare(y.nombre))
   const pack = arr.filter(t => t.pack)
   const fila = t => `<tr><td>${esc(t.nombre)}</td><td class="num">${t.peso ? fmtG(t.g, t.liq) : fmtU(t.u) + ' u.'}</td></tr>`
   let h = `<div class="box"><div class="kpis">
-    <div class="kpi"><div class="v">${N}</div><div class="l">porciones</div></div>
-    <div class="kpi"><div class="v">${fmtG(a.pesoVianda)}</div><div class="l">por vianda</div></div>
-    <div class="kpi"><div class="v" style="color:var(--verde-osc)">${fmtG(a.pesoVianda * N)}</div><div class="l">total</div></div></div>
-    <div class="nota">Lista consolidada: suma cada insumo de todas las preparaciones del plato. Sirve para sacar de cámara o pedir mercadería.</div></div>`
+    ${kpiPorc()}
+    <div class="kpi"><div class="v">${fmtG(a.pesoVianda)}</div><div class="l">por vianda${NXL ? ` · XL ${fmtG(a.pesoVianda * XL_EXTRA)}` : ''}</div></div>
+    <div class="kpi"><div class="v" style="color:var(--verde-osc)">${fmtG(a.pesoVianda * K.g)}</div><div class="l">total</div></div></div>
+    <div class="nota">Lista consolidada: suma cada insumo de todas las preparaciones del plato. Sirve para sacar de cámara o pedir mercadería.</div>${notaXL()}</div>`
   let cat = null, filas = ''
   comida.forEach(t => { if(t.cat !== cat){ cat = t.cat; filas += `<tr class="cat"><td colspan="2">${esc(cap((cat || 'otros').replace(/_/g, ' ')))}</td></tr>` } filas += fila(t) })
-  h += `<div class="box"><h3>🧾 Total de insumos <span class="sub">${N} porciones</span></h3><table class="tabla">${thead}${filas}</table></div>`
+  h += `<div class="box"><h3>🧾 Total de insumos <span class="sub">${porcTxt()}</span></h3><table class="tabla">${thead}${filas}</table></div>`
   if(pack.length) h += `<div class="box"><h3>📦 Packaging</h3><table class="tabla"><tr><th>Ítem</th><th>Cantidad</th></tr>${pack.map(fila).join('')}</table></div>`
   return h
 }
@@ -1429,12 +1456,20 @@ $('lista').onclick = e => { const c = e.target.closest('.card'); if(c) abrir(c.d
 $('btn-back').onclick = () => { if(location.hash.startsWith('#/p/')) history.back(); else cerrar() }
 $('btn-refresh').onclick = () => { $('btn-refresh').textContent = '…'; cargar(true).finally(() => $('btn-refresh').textContent = '⟳') }
 $('tabs').onclick = e => { const b = e.target.closest('button'); if(!b) return; tabActual = b.dataset.t; renderDetalle(); $('detalle').scrollTop = 0 }
-const setN = v => { N = clamp(Math.round(+v || 1), 1, 9999); renderDetalle() }
+const setN = v => { N = clamp(Math.round(+v || 0), 0, 9999); if(!N && !NXL) N = 1; renderDetalle() }
+const setNXL = v => { NXL = clamp(Math.round(+v || 0), 0, 9999); if(!N && !NXL) N = 1; renderDetalle() }
+$('px-menos').onclick = () => setNXL(NXL - 1)
+$('px-mas').onclick = () => setNXL(NXL + 1)
+$('px-n').addEventListener('change', e => setNXL(e.target.value))
+$('px-n').addEventListener('focus', e => e.target.select())
+$('quickxl').onclick = e => { const b = e.target.closest('button'); if(b) setNXL(b.dataset.q) }
 $('p-menos').onclick = () => setN(N - 1)
 $('p-mas').onclick = () => setN(N + 1)
 $('p-n').addEventListener('change', e => setN(e.target.value))
 $('p-n').addEventListener('focus', e => e.target.select())
 $('d-body').addEventListener('click', e => {
+  const bv = e.target.closest('[data-empvar]')
+  if(bv){ empVar = bv.dataset.empvar; empPrevia = null; alertaEmp = ''; renderDetalle(); return }
   const b = e.target.closest('[data-emp]'); if(!b) return
   const acc = b.dataset.emp
   if(acc === 'sacar'){ alertaEmp = ''; $('cam').value = ''; $('cam').click() }
