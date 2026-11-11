@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Easy Lunch · Gourmet</title>
+<meta name="theme-color" content="#32952E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="EL Gourmet">
+<link rel="manifest" href="gourmet.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="gourmet-icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="gourmet-icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -465,7 +472,7 @@ function openPlato(id){
               <div><b>${p.conservacion_heladera_dias ?? '—'}</b><small>días en heladera (0–4 °C)</small></div>
               <div><b>${p.conservacion_freezer_meses ?? '—'}</b><small>meses en freezer (−18 °C)</small></div>
             </div>
-            <div style="color:var(--muted)">Envasado al vacío. ${esc(p.conservacion_notas||'Mantener cerrado hasta el momento de regenerar. Una vez descongelado no volver a congelar.')}</div>`
+            <div style="color:var(--muted)">${(()=>{ const n = p.conservacion_notas||'Mantener cerrado hasta el momento de regenerar. Una vez descongelado no volver a congelar.'; return esc(/vac[ií]o/i.test(n) ? n : 'Envasado al vacío. ' + n); })()}</div>`
           : st.tab==='regeneracion' ? `<ol>${reg.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`
           : `<ol>${emp.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`
         }</div>
@@ -688,7 +695,7 @@ function go(v){
   if (v==='pedidos') loadOrders();
   window.scrollTo({ top:0 });
 }
-document.querySelectorAll('.tab').forEach(t => t.onclick = () => go(t.dataset.view));
+document.querySelectorAll('.tab[data-view]').forEach(t => t.onclick = () => go(t.dataset.view));   // el botón Salir no es una pestaña
 document.addEventListener('keydown', e => { if (e.key==='Escape'){ closePlato(); closeCart(); } });
 
 init();
