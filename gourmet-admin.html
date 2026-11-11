@@ -187,6 +187,7 @@ $('#lForm').onsubmit = async e => { e.preventDefault();
 $('#logout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
 async function loadBase(){
+  if (!window.__ferSync) { window.__ferSync = true; fetch('/api/gourmet-feriados').catch(()=>{}); }   // copia los feriados del sistema
   const [e,p,g,pg,ep,u,c] = await Promise.all([
     sb.from('gourmet_empresas').select('*').order('nombre'),
     sb.from('gourmet_platos').select('*').order('orden').order('nombre'),

@@ -80,6 +80,38 @@ label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
 .ok ul{list-style:none;padding:0;margin:18px 0;text-align:left;border-top:1px solid var(--line)}
 .ok li{padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
 .ok li i{flex:0 0 52px;height:52px;border-radius:8px;background:#ddd center/cover}
+
+.pl{border:2px solid var(--line);border-radius:12px;background:#fff;overflow:hidden;margin-bottom:12px}
+.pl.on{border-color:var(--green)}
+.pl-h{display:flex;gap:14px;align-items:center;width:100%;border:0;background:none;padding:10px;text-align:left}
+.pl-h .ph{flex:0 0 132px;width:132px;height:99px;border-radius:8px;background:#e9e9e9 center/cover}
+.pl-h h3{font-size:16px;line-height:1.3}
+.pl-h .sub{color:var(--green-2);font-size:13px}
+.pl-h p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.pl-h .tot{margin-left:auto;flex:0 0 auto;min-width:34px;height:34px;border-radius:17px;padding:0 10px;background:#EEE;color:var(--muted);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:15px}
+.pl.on .tot{background:var(--green);color:#fff}
+.pl-h .chev{flex:0 0 auto;color:var(--muted);font-size:13px;white-space:nowrap}
+.gl{border-top:1px dashed var(--line);padding:6px 10px 10px}
+.gl .lbl{font-size:13px;color:var(--muted);margin:4px 2px 6px}
+.gr{display:flex;align-items:center;gap:10px;padding:6px 2px}
+.gr+.gr{border-top:1px solid #F0F0F0}
+.gr i{flex:0 0 52px;width:52px;height:52px;border-radius:8px;background:#ddd center/cover}
+.gr .t{flex:1;min-width:0}
+.gr .t b{font-weight:500;font-size:14px;display:block}
+.gr .t small{color:var(--muted);font-size:12px;line-height:1.3;display:block}
+.st{display:flex;align-items:center;border:1px solid rgba(0,0,0,.2);border-radius:22px;overflow:hidden;flex:0 0 auto;background:#fff}
+.st button{width:38px;height:38px;border:0;background:#fff;font-size:20px;line-height:1;color:var(--green-2)}
+.st button:disabled{color:#ccc}
+.st span{min-width:26px;text-align:center;font-weight:700}
+.st.on{border-color:var(--green);background:#EEF7EE}.st.on button{background:#EEF7EE}
+.card .st{margin:8px auto 0;width:max-content}
+.card .qb{position:absolute;top:10px;right:10px;min-width:30px;height:30px;border-radius:15px;padding:0 8px;background:var(--green);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.who{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.who .w{display:flex;flex-direction:column}
+.who .w span{font-size:12.5px;color:var(--ink);margin-bottom:3px}
+.who .w span small{color:var(--muted)}
+.who .input{padding:9px 10px}
+@media (max-width:600px){.pl-h .ph{flex-basis:92px;width:92px;height:80px}.pl-h h3{font-size:14.5px}.pl-h p{display:none}.who{grid-template-columns:1fr}.pl-h .chev{display:none}}
 @media (max-width:600px){
   .banner{height:120px}.banner h1{font-size:19px}
   .row2{grid-template-columns:1fr}
@@ -114,7 +146,8 @@ const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábad
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const pd = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
 const fLarga = s => { const d = pd(s); return `${DIAS[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}`; };
-const S = { menu:null, nombre:'', apellido:'', fecha:null, sel:{}, err:'' };   // sel[fecha] = { plato, guar, postre, sinPostre }
+const S = { menu:null, nombre:'', apellido:'', fecha:null, sel:{}, open:{}, err:'' };
+// sel[fecha] = { q: { 'plato|guarnicion': cantidad }, paras: { 'plato|guarnicion': ['nombre', ...] } }
 
 async function rpc(fn, body){
   const r = await fetch(SB + fn, { method:'POST', headers:{ apikey:KEY, Authorization:'Bearer '+KEY, 'Content-Type':'application/json' }, body:JSON.stringify(body) });
@@ -134,28 +167,34 @@ async function cargar(){
 }
 function fatal(msg){ $('#main').innerHTML = `<div class="center"><h3 style="color:#333;margin-bottom:6px">No se puede pedir</h3>${esc(msg)}</div>`; $('#bar').hidden = true; }
 
+const MAXQ = 20;
 const principales = () => S.menu.platos.filter(p => p.tipo !== 'postre');
 const postres = () => S.menu.platos.filter(p => p.tipo === 'postre');
 const byId = id => S.menu.platos.find(p => p.id === id);
-const cur = () => (S.sel[S.fecha] = S.sel[S.fecha] || { plato:null, guar:null, postre:null, sinPostre:false });
-const tiene = f => { const x = S.sel[f]; return !!(x && (x.plato || x.postre)); };
-const diasConPedido = () => S.menu.fechas.map(f => f.fecha).filter(tiene);
 const fCorta = s => { const d = pd(s); return `${DIAS[d.getDay()]} ${d.getDate()}`; };
+const cur = () => (S.sel[S.fecha] = S.sel[S.fecha] || { q:{}, paras:{} });
+const qOf = (f, k) => (S.sel[f] && S.sel[f].q[k]) || 0;
+const totPlato = (f, pid) => Object.entries((S.sel[f] || {q:{}}).q).filter(([k]) => k.split('|')[0] === pid).reduce((a, [, n]) => a + n, 0);
+const lineas = f => Object.entries((S.sel[f] || {q:{}}).q).filter(([, n]) => n > 0).map(([k, n]) => { const [pid, gid] = k.split('|'); return { k, pid, gid:gid || null, n }; })
+  .sort((a, b) => S.menu.platos.indexOf(byId(a.pid)) - S.menu.platos.indexOf(byId(b.pid)));
+const unidades = f => lineas(f).reduce((a, l) => a + l.n, 0);
+const tiene = f => unidades(f) > 0;
+const diasConPedido = () => S.menu.fechas.map(f => f.fecha).filter(tiene);
+const nombreLinea = l => { const p = byId(l.pid), g = l.gid && p && p.guarniciones.find(x => x.id === l.gid); return (p ? p.nombre : '') + (g ? ' con ' + g.nombre : ''); };
 function textoDia(f){
-  const x = S.sel[f], p = x.plato && byId(x.plato), g = p && p.guarniciones.find(y => y.id === x.guar), q = x.postre && byId(x.postre);
-  return [p ? esc(p.nombre) + (g ? ' con ' + esc(g.nombre) : '') : '', q ? esc(q.nombre) : ''].filter(Boolean).join(' + ');
+  const ls = lineas(f), pr = ls.filter(l => byId(l.pid)?.tipo !== 'postre').reduce((a, l) => a + l.n, 0), po = ls.filter(l => byId(l.pid)?.tipo === 'postre').reduce((a, l) => a + l.n, 0);
+  return [pr ? `${pr} plato${pr > 1 ? 's' : ''}` : '', po ? `${po} postre${po > 1 ? 's' : ''}` : ''].filter(Boolean).join(' y ');
 }
-
-function card(p, on){
-  return `<button type="button" class="card ${on?'on':''}" data-id="${p.id}">
-    <div class="ph" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Easy Lunch'}</div>
-    <span class="tick">✓</span>
-    <div class="cb"><h3>${esc(p.nombre)}</h3>${p.subtitulo?`<div class="sub">${esc(p.subtitulo)}</div>`:''}${p.descripcion?`<p>${esc(p.descripcion)}</p>`:''}</div>
-  </button>`;
+function setQ(k, n){
+  const c = cur(); n = Math.max(0, Math.min(MAXQ, n));
+  if (n) c.q[k] = n; else delete c.q[k];
+  const ps = (c.paras[k] || []).slice(0, n); while (ps.length < n) ps.push(''); c.paras[k] = ps;
+  if (!n) delete c.paras[k];
 }
+const stepper = (k, n) => `<div class="st ${n?'on':''}" data-k="${k}"><button type="button" data-d="-1" ${n?'':'disabled'} aria-label="Menos">−</button><span>${n}</span><button type="button" data-d="1" ${n>=MAXQ?'disabled':''} aria-label="Más">+</button></div>`;
 
 function render(){
-  const m = S.menu, ps = principales(), qs = postres(), c = cur(), pl = c.plato && byId(c.plato), dia = fCorta(S.fecha);
+  const m = S.menu, ps = principales(), qs = postres(), dia = fCorta(S.fecha), f = S.fecha, ls = lineas(f);
   $('#main').innerHTML = `
     ${S.err ? `<div class="err">${S.err}</div>` : ''}
     <section class="step"><h2><i>1</i>Tus datos</h2>
@@ -165,32 +204,39 @@ function render(){
       </div></section>
 
     <section class="step"><h2><i>2</i>¿Para qué día?</h2>
-      <div class="dates">${m.fechas.map(f => { const d = pd(f.fecha); return `<button type="button" class="date ${f.fecha===S.fecha?'on':''} ${tiene(f.fecha)?'has':''}" data-f="${f.fecha}">${tiene(f.fecha)?'<em class="dn">✓</em>':''}<small>${MESES[d.getMonth()].slice(0,3)}</small><b>${d.getDate()}</b><span>${DIAS[d.getDay()]}</span></button>`; }).join('')}</div>
-      <div class="hint">Podés pedir para uno o varios días: elegí el día, armá tu pedido y, si querés, pasá a otro día. Se puede pedir hasta las ${esc(m.hora_corte)} hs del día anterior a la entrega.</div></section>
+      <div class="dates">${m.fechas.map(x => { const d = pd(x.fecha), u = unidades(x.fecha); return `<button type="button" class="date ${x.fecha===f?'on':''} ${u?'has':''}" data-f="${x.fecha}">${u?`<em class="dn">${u}</em>`:''}<small>${MESES[d.getMonth()].slice(0,3)}</small><b>${d.getDate()}</b><span>${DIAS[d.getDay()]}</span></button>`; }).join('')}</div>
+      <div class="hint">Podés pedir para uno o varios días: elegí el día, armá el pedido y, si querés, pasá a otro día. Se puede pedir hasta las ${esc(m.hora_corte)} hs del día anterior a la entrega.</div></section>
 
-    ${ps.length ? `<section class="step" id="secPlato"><h2><i>3</i>Tu plato para el ${esc(dia)}</h2>
-      <div class="grid" id="gPlatos">${ps.map(p => card(p, p.id===c.plato)).join('')}</div>
-      ${pl && pl.guarniciones.length ? `<div class="guar" id="secGuar"><h3>Elegí la guarnición para ${esc(pl.nombre)}</h3>
-        <div class="opts">${pl.guarniciones.map(g => `<button type="button" class="opt ${g.id===c.guar?'on':''}" data-g="${g.id}"><i style="${g.foto_url?`background-image:url('${esc(g.foto_url)}')`:''}"></i><span><b>${esc(g.nombre)}</b>${g.descripcion?`<small>${esc(g.descripcion)}</small>`:''}</span></button>`).join('')}</div></div>` : ''}
+    ${ps.length ? `<section class="step" id="secPlato"><h2><i>3</i>Platos para el ${esc(dia)}</h2>
+      <div class="hint" style="margin:-4px 0 12px">Tocá un plato y poné cuántos querés de cada guarnición.</div>
+      ${ps.map(p => { const t = totPlato(f, p.id), abierto = S.open[p.id] || t > 0, gs = p.guarniciones;
+        return `<div class="pl ${t?'on':''}">
+          <button type="button" class="pl-h" data-p="${p.id}"><span class="ph" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}"></span>
+            <span style="flex:1;min-width:0"><h3>${esc(p.nombre)}</h3>${p.subtitulo?`<div class="sub">${esc(p.subtitulo)}</div>`:''}${p.descripcion?`<p>${esc(p.descripcion)}</p>`:''}</span>
+            ${!abierto ? '<span class="chev">Elegir ▾</span>' : ''}<span class="tot">${t}</span></button>
+          ${abierto ? `<div class="gl">${gs.length ? `<div class="lbl">¿Con qué guarnición? Poné la cantidad de cada una:</div>` + gs.map(g => { const k = p.id + '|' + g.id; return `<div class="gr"><i style="${g.foto_url?`background-image:url('${esc(g.foto_url)}')`:''}"></i><div class="t"><b>${esc(g.nombre)}</b>${g.descripcion?`<small>${esc(g.descripcion)}</small>`:''}</div>${stepper(k, qOf(f, k))}</div>`; }).join('')
+              : `<div class="gr"><div class="t"><b>Cantidad</b></div>${stepper(p.id + '|', qOf(f, p.id + '|'))}</div>`}</div>` : ''}
+        </div>`; }).join('')}
     </section>` : ''}
 
-    ${qs.length ? `<section class="step"><h2><i>${ps.length?4:3}</i>Postre para el ${esc(dia)} <small>(opcional)</small></h2>
-      <div class="grid" id="gPostres">${qs.map(p => card(p, p.id===c.postre)).join('')}</div>
-      <button type="button" class="nopost ${c.sinPostre?'on':''}" id="noPost">${c.sinPostre?'✓ ':''}Sin postre</button>
+    ${qs.length ? `<section class="step"><h2><i>${ps.length?4:3}</i>Postres para el ${esc(dia)} <small>(opcional)</small></h2>
+      <div class="grid" id="gPostres">${qs.map(p => { const k = p.id + '|', n = qOf(f, k); return `<div class="card ${n?'on':''}">
+        <div class="ph" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'Easy Lunch'}</div>${n?`<span class="qb">${n}</span>`:''}
+        <div class="cb"><h3>${esc(p.nombre)}</h3>${p.descripcion?`<p>${esc(p.descripcion)}</p>`:''}${stepper(k, n)}</div></div>`; }).join('')}</div>
     </section>` : ''}
-    ${tiene(S.fecha) ? `<div style="text-align:center;margin-top:-4px"><button type="button" class="nopost" id="borrarDia">Quitar el pedido del ${esc(dia)}</button></div>` : ''}`;
+
+    ${ls.length ? `<section class="step"><h2><i>${(ps.length?1:0)+(qs.length?1:0)+3}</i>¿Para quién es cada uno? <small>(opcional)</small></h2>
+      <div class="hint" style="margin:-4px 0 12px">Si lo dejás vacío, va a tu nombre.</div>
+      <div class="who">${ls.flatMap(l => Array.from({ length:l.n }, (_, i) => `<label class="w"><span>${esc(nombreLinea(l))}${l.n > 1 ? ` <small>(${i+1} de ${l.n})</small>` : ''}</span><input class="input para" data-k="${l.k}" data-i="${i}" placeholder="${esc((S.nombre + ' ' + S.apellido).trim() || 'Nombre')}" value="${esc((cur().paras[l.k] || [])[i] || '')}"></label>`)).join('')}</div>
+      <div style="text-align:center;margin-top:14px"><button type="button" class="nopost" id="borrarDia">Vaciar el pedido del ${esc(dia)}</button></div>
+    </section>` : ''}`;
 
   $('#nom').oninput = e => { S.nombre = e.target.value; resumen(); };
   $('#ape').oninput = e => { S.apellido = e.target.value; resumen(); };
   document.querySelectorAll('.date').forEach(b => b.onclick = () => { S.fecha = b.dataset.f; S.err = ''; render(); $('#secPlato')?.scrollIntoView({ behavior:'smooth', block:'start' }); });
-  document.querySelectorAll('#gPlatos .card').forEach(b => b.onclick = () => {
-    const c = cur(); c.plato = c.plato === b.dataset.id ? null : b.dataset.id;
-    const p = c.plato && byId(c.plato); c.guar = p && p.guarniciones.length === 1 ? p.guarniciones[0].id : null;
-    render(); if (p && p.guarniciones.length > 1) setTimeout(() => $('#secGuar')?.scrollIntoView({ behavior:'smooth', block:'center' }), 60);
-  });
-  document.querySelectorAll('.opt').forEach(b => b.onclick = () => { cur().guar = b.dataset.g; render(); });
-  document.querySelectorAll('#gPostres .card').forEach(b => b.onclick = () => { const c = cur(); c.postre = c.postre === b.dataset.id ? null : b.dataset.id; c.sinPostre = false; render(); });
-  if ($('#noPost')) $('#noPost').onclick = () => { const c = cur(); c.sinPostre = !c.sinPostre; if (c.sinPostre) c.postre = null; render(); };
+  document.querySelectorAll('.pl-h').forEach(b => b.onclick = () => { const id = b.dataset.p; if (totPlato(S.fecha, id)) return; S.open[id] = !S.open[id]; render(); });
+  document.querySelectorAll('.st button').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.parentElement.dataset.k; setQ(k, qOf(S.fecha, k) + Number(b.dataset.d)); const y = window.scrollY; render(); window.scrollTo(0, y); });
+  document.querySelectorAll('.para').forEach(inp => inp.oninput = () => { const c = cur(); (c.paras[inp.dataset.k] = c.paras[inp.dataset.k] || [])[+inp.dataset.i] = inp.value; });
   if ($('#borrarDia')) $('#borrarDia').onclick = () => { delete S.sel[S.fecha]; render(); };
   $('#bar').hidden = false;
   resumen();
@@ -199,17 +245,26 @@ function render(){
 function faltante(){
   if (S.nombre.trim().length < 2) return 'Completá tu nombre';
   if (S.apellido.trim().length < 2) return 'Completá tu apellido';
-  const dias = diasConPedido();
-  if (!dias.length) return principales().length ? 'Elegí tu plato' : 'Elegí tu postre';
-  for (const f of dias) { const x = S.sel[f], p = x.plato && byId(x.plato); if (p && p.guarniciones.length && !x.guar) return 'Elegí la guarnición del ' + fCorta(f); }
+  if (!diasConPedido().length) return principales().length ? 'Elegí al menos un plato' : 'Elegí al menos un postre';
   return '';
 }
 function resumen(){
   const dias = diasConPedido(), f = faltante();
-  $('#sum').innerHTML = (dias.length ? dias.map(d => `<b>${esc(fCorta(d))}:</b> ${textoDia(d)}`).join('<br>') : 'Todavía no elegiste nada')
+  $('#sum').innerHTML = (dias.length ? dias.map(d => `<b>${esc(fCorta(d))}:</b> ${esc(textoDia(d))}`).join('<br>') : 'Todavía no elegiste nada')
     + (f ? `<br><span style="color:var(--orange)">${esc(f)}</span>` : '');
   $('#send').disabled = !!f;
   $('#send').textContent = dias.length > 1 ? `Enviar ${dias.length} pedidos` : 'Enviar pedido';
+}
+
+/** Ítems de un día: agrupa por plato + guarnición + para quién. */
+function itemsDia(f){
+  const x = S.sel[f], m = new Map();
+  lineas(f).forEach(l => (x.paras[l.k] || []).slice(0, l.n).concat(Array(Math.max(0, l.n - (x.paras[l.k] || []).length)).fill('')).forEach(n => {
+    const para = String(n || '').trim(), key = l.k + '|' + para.toLowerCase();
+    const it = m.get(key) || { plato_id:l.pid, guarnicion_id:l.gid, cantidad:0, para_quien:para };
+    it.cantidad++; m.set(key, it);
+  }));
+  return [...m.values()];
 }
 
 $('#send').onclick = async () => {
@@ -217,12 +272,10 @@ $('#send').onclick = async () => {
   const btn = $('#send'); btn.disabled = true; btn.textContent = 'Enviando…';
   const ok = [];
   for (const f of diasConPedido()) {
-    const x = S.sel[f], items = [];
-    if (x.plato) items.push({ plato_id:x.plato, guarnicion_id:x.guar, cantidad:1 });
-    if (x.postre) items.push({ plato_id:x.postre, cantidad:1 });
     try {
-      const r = await rpc('gourmet_link_pedido', { p_token:TOKEN, p_nombre:S.nombre, p_apellido:S.apellido, p_fecha:f, p_items:items });
-      ok.push({ fecha:f, numero:r.numero, texto:textoDia(f), sel:x });
+      const det = lineas(f).map(l => ({ txt:nombreLinea(l), n:l.n, pid:l.pid }));
+      const r = await rpc('gourmet_link_pedido', { p_token:TOKEN, p_nombre:S.nombre, p_apellido:S.apellido, p_fecha:f, p_items:itemsDia(f) });
+      ok.push({ fecha:f, numero:r.numero, det });
       delete S.sel[f];
     } catch(e) {
       S.err = (ok.length ? `<b>${ok.length === 1 ? 'Se envió 1 pedido' : 'Se enviaron ' + ok.length + ' pedidos'}</b> (${ok.map(o => esc(fCorta(o.fecha))).join(', ')}). ` : '')
@@ -238,14 +291,15 @@ $('#send').onclick = async () => {
 
 function listo(ok){
   $('#bar').hidden = true; window.scrollTo({ top:0 });
-  const foto = id => { const p = id && byId(id); return p && p.foto_url ? `background-image:url('${esc(p.foto_url)}')` : ''; };
+  const foto = id => { const p = byId(id); return p && p.foto_url ? `background-image:url('${esc(p.foto_url)}')` : ''; };
   $('#main').innerHTML = `<div class="ok"><div class="big">✓</div>
     <h2>${ok.length > 1 ? '¡Pedidos recibidos!' : '¡Pedido recibido!'}</h2>
     <div style="color:var(--muted)">Gracias, ${esc(S.nombre.trim())}. Esto es lo que vas a recibir:</div>
-    <ul>${ok.map(o => `<li><i style="${foto(o.sel.plato || o.sel.postre)}"></i><span><b>${esc(fLarga(o.fecha))}</b> <small style="color:var(--muted)">· pedido #${esc(o.numero)}</small><br><small>${o.texto}</small></span></li>`).join('')}</ul>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:18px">Si necesitás cambiar o cancelar algo, avisale a ${esc(S.menu.empresa)}.</div>
+    ${ok.map(o => `<div style="text-align:left;margin-top:16px;font-weight:600">${esc(fLarga(o.fecha))} <small style="color:var(--muted);font-weight:400">· pedido #${esc(o.numero)}</small></div>
+      <ul style="margin:6px 0 0">${o.det.map(d => `<li><i style="${foto(d.pid)}"></i><span><b>${d.n} ×</b> ${esc(d.txt)}</span></li>`).join('')}</ul>`).join('')}
+    <div style="font-size:13px;color:var(--muted);margin:18px 0">Si necesitás cambiar o cancelar algo, avisale a ${esc(S.menu.empresa)}.</div>
     <button class="btn" id="otro">Hacer otro pedido</button></div>`;
-  $('#otro').onclick = () => { Object.assign(S, { nombre:'', apellido:'', sel:{}, err:'' }); S.fecha = S.menu.fechas[0]?.fecha || null; render(); };
+  $('#otro').onclick = () => { Object.assign(S, { nombre:'', apellido:'', sel:{}, open:{}, err:'' }); S.fecha = S.menu.fechas[0]?.fecha || null; render(); };
 }
 
 cargar();
