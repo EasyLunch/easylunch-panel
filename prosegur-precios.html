@@ -344,7 +344,7 @@ function pintarAlertas(){
     var rev=S.prod.filter(function(p){return p.revisar_precio&&enCaja(p);}).length;
     var sin=S.prod.filter(function(p){return enCaja(p)&&precioLista(p)==null;}).length;
     var h='';
-    if(sin)h+='<button class="alerta roja" data-f="sinprecio" type="button">⚠ '+sin+' producto'+(sin>1?'s':'')+' en la caja sin precio — no se pueden vender hasta ponerles precio</button>';
+    if(sin)h+='<button class="alerta roja" data-f="sinprecio" type="button">⚠ '+(sin>1?sin+' productos en la caja sin precio — no se pueden vender hasta ponerles precio':'1 producto en la caja sin precio — no se puede vender hasta ponerle precio')+'</button>';
     if(rev)h+='<button class="alerta" data-f="revisar" type="button">↻ '+rev+' precio'+(rev>1?'s':'')+' de la app cambiaron y tienen precio local: revisalos</button>';
     $('alertas').innerHTML=h;
 }
