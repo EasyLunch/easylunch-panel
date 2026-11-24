@@ -375,6 +375,65 @@ begin
     case when p_activo then 'descuento_activado' else 'descuento_pausado' end, null, public.caja__desc_txt(d), 'manual', p_motivo);
 end $$;
 
+-- Carga masiva de productos del local (pegados desde Excel).
+-- p_items: [{nombre, categoria, precio, iva?, tipo?}]
+-- Si ya existe un producto del local con el mismo nombre, se actualiza (categoría, precio, IVA, tipo); si no, se crea.
+create or replace function public.caja_productos_masivo(p_token text, p_items jsonb, p_motivo text default '')
+returns json language plpgsql security definer set search_path = public as $$
+declare
+  u public.panel_usuarios; quien text; it jsonb; p public.caja_productos;
+  v_nombre text; v_cat text; v_precio numeric; v_iva numeric; v_tipo text; n int := 0;
+  nuevos int := 0; actualizados int := 0; iguales int := 0; vistos text[] := '{}';
+begin
+  u := public.caja__permiso(p_token, 'admin');
+  quien := coalesce(nullif(u.nombre, ''), u.usuario);
+  if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'No hay productos para cargar.'; end if;
+  if jsonb_array_length(p_items) > 500 then raise exception 'Máximo 500 productos por carga.'; end if;
+  -- primero se valida todo: si una fila está mal no se carga nada
+  for it in select * from jsonb_array_elements(p_items) loop
+    n := n + 1;
+    v_nombre := trim(coalesce(it->>'nombre', ''));
+    if v_nombre = '' then raise exception 'Fila %: falta el nombre.', n; end if;
+    if lower(v_nombre) = any(vistos) then raise exception 'Fila %: "%" está repetido en la lista.', n, v_nombre; end if;
+    vistos := vistos || lower(v_nombre);
+    if trim(coalesce(it->>'categoria', '')) = '' then raise exception 'Fila % (%): falta la categoría.', n, v_nombre; end if;
+    if nullif(it->>'precio', '') is null or (it->>'precio')::numeric < 0 then raise exception 'Fila % (%): precio inválido.', n, v_nombre; end if;
+    if coalesce(nullif(it->>'iva', '')::numeric, 21) not in (0, 10.5, 21, 27) then raise exception 'Fila % (%): IVA inválido (0, 10,5, 21 o 27).', n, v_nombre; end if;
+  end loop;
+  for it in select * from jsonb_array_elements(p_items) loop
+    v_nombre := trim(it->>'nombre');
+    v_cat := trim(it->>'categoria');
+    v_precio := (it->>'precio')::numeric;
+    v_iva := coalesce(nullif(it->>'iva', '')::numeric, 21);
+    v_tipo := case when it->>'tipo' in ('vianda','postre','bebida','cafeteria','kiosco','otro') then it->>'tipo' else 'otro' end;
+    select * into p from public.caja_productos
+      where local = 'prosegur' and origen = 'local' and lower(trim(nombre)) = lower(v_nombre) order by id limit 1;
+    if p.id is null then
+      insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo)
+      values ('prosegur', 'local', v_nombre, v_cat, v_tipo, v_precio, v_iva, true) returning * into p;
+      perform public.caja__log('prosegur', quien, p.id, null, p.nombre, 'alta', null, public.caja__plata(v_precio), 'manual',
+                               concat_ws(' · ', 'Carga masiva', nullif(trim(p_motivo), '')));
+      nuevos := nuevos + 1;
+    else
+      if p.precio_base is distinct from v_precio then
+        perform public.caja__log('prosegur', quien, p.id, null, p.nombre, 'precio_base', public.caja__plata(p.precio_base),
+                                 public.caja__plata(v_precio), 'manual', concat_ws(' · ', 'Carga masiva', nullif(trim(p_motivo), '')));
+      end if;
+      if p.iva is distinct from v_iva then
+        perform public.caja__log('prosegur', quien, p.id, null, p.nombre, 'iva', trim_scale(p.iva)::text || '%',
+                                 trim_scale(v_iva)::text || '%', 'manual', concat_ws(' · ', 'Carga masiva', nullif(trim(p_motivo), '')));
+      end if;
+      if p.precio_base is distinct from v_precio or p.iva is distinct from v_iva or p.categoria is distinct from v_cat or p.tipo is distinct from v_tipo then
+        update public.caja_productos set categoria = v_cat, tipo = v_tipo, precio_base = v_precio, iva = v_iva, actualizado = now() where id = p.id;
+        actualizados := actualizados + 1;
+      else
+        iguales := iguales + 1;
+      end if;
+    end if;
+  end loop;
+  return json_build_object('nuevos', nuevos, 'actualizados', actualizados, 'sin_cambios', iguales);
+end $$;
+
 -- Sincronización pedida desde la página (botón "Sincronizar productos")
 create or replace function public.caja_sync_aplicar(p_token text, p_items jsonb, p_fecha date)
 returns json language plpgsql security definer set search_path = public as $$
@@ -405,5 +464,6 @@ grant execute on function public.caja_precio_revisado(text, bigint, text) to ano
 grant execute on function public.caja_descuento_guardar(text, bigint, jsonb, text) to anon, authenticated;
 grant execute on function public.caja_descuento_activar(text, bigint, boolean, text) to anon, authenticated;
 grant execute on function public.caja_sync_aplicar(text, jsonb, date) to anon, authenticated;
+grant execute on function public.caja_productos_masivo(text, jsonb, text) to anon, authenticated;
 
 notify pgrst, 'reload schema';

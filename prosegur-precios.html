@@ -108,6 +108,17 @@
         .pie{display:flex;gap:8px;align-items:center;margin-top:20px;flex-wrap:wrap;}
         .pie .spacer{flex:1;}
         .modal .aviso{margin-top:14px;margin-bottom:0;}
+        .modal.ancho{max-width:860px;}
+        .pegar{width:100%;min-height:150px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;outline:none;resize:vertical;}
+        .pegar:focus{border-color:#16a34a;}
+        .prev{max-height:320px;overflow:auto;border:1px solid #f1f5f9;border-radius:10px;margin-top:12px;}
+        .prev table{width:100%;border-collapse:collapse;font-size:13px;}
+        .prev th{position:sticky;top:0;background:#f9fafb;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;padding:7px 10px;}
+        .prev td{padding:7px 10px;border-top:1px solid #f1f5f9;vertical-align:top;}
+        .prev tr.err td{background:#fef2f2;}
+        .prev .est{font-size:12px;font-weight:600;}
+        .est.nuevo{color:#15803d;} .est.cambia{color:#9a3412;} .est.igual{color:#6b7280;} .est.error{color:#b91c1c;}
+        .cuenta{font-size:13px;color:#4b5563;margin-top:10px;}
         :focus-visible{outline:2px solid #16a34a;outline-offset:2px;}
     </style>
 </head>
@@ -142,6 +153,7 @@
         <section id="sec-productos">
             <div class="barra">
                 <input class="buscar" id="buscar" type="search" placeholder="Buscar producto…" aria-label="Buscar producto">
+                <button class="btn" id="btn-masivo" type="button">⇪ Carga masiva</button>
                 <button class="btn" id="btn-nuevo-prod" type="button">+ Producto del local</button>
             </div>
             <div class="barra filtros" id="filtros">
@@ -201,6 +213,26 @@
             <span class="spacer"></span>
             <button class="btn" id="mp-cancelar" type="button">Cancelar</button>
             <button class="btn primario" id="mp-guardar" type="button">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- modal carga masiva -->
+<div class="fondo" id="m-mas" role="dialog" aria-modal="true" aria-labelledby="mm-titulo">
+    <div class="modal ancho">
+        <h2 id="mm-titulo">Carga masiva de productos del local</h2>
+        <p class="sub">Copiá las filas desde Excel o Google Sheets y pegalas acá. Columnas, en este orden: <b>Nombre · Categoría · Precio</b> y, opcionales, <b>IVA</b> (21, 10,5, 27 o 0; si no ponés nada es 21) y <b>Tipo</b> (cafetería, kiosco, bebida, postre, vianda u otro; si no ponés nada se deduce de la categoría). Si un producto del local ya existe con el mismo nombre, se le actualizan los datos.</p>
+        <textarea class="pegar" id="mm-texto" placeholder="Café con leche&#9;Cafetería&#9;2500&#10;Medialuna&#9;Cafetería&#9;900&#9;10,5&#10;Alfajor Jorgito&#9;Kiosco&#9;1200" aria-label="Productos a cargar"></textarea>
+        <div class="barra" style="margin:8px 0 0">
+            <button class="btn chico" id="mm-plantilla" type="button">Descargar plantilla</button>
+            <span class="muted" style="font-size:12px">La primera fila puede ser de títulos: se saltea sola.</span>
+        </div>
+        <div id="mm-prev"></div>
+        <div class="campo" style="margin-top:14px"><label for="mm-motivo">Motivo (queda en el historial)</label><input type="text" id="mm-motivo" maxlength="200" placeholder="Ej.: carga inicial de cafetería"></div>
+        <div class="aviso" id="mm-aviso"></div>
+        <div class="pie"><span class="spacer"></span>
+            <button class="btn" id="mm-cancelar" type="button">Cancelar</button>
+            <button class="btn primario" id="mm-cargar" type="button" disabled>Cargar productos</button>
         </div>
     </div>
 </div>
@@ -302,6 +334,7 @@ function cargar(){
         $('quien').innerHTML='<b>'+esc(S.yo.nombre)+'</b>'+(S.yo.admin?'Administrador':S.yo.encargado?'Encargado':'Solo lectura');
         $('btn-sync').style.display=S.yo.encargado?'':'none';
         $('btn-nuevo-prod').style.display=S.yo.admin?'':'none';
+        $('btn-masivo').style.display=S.yo.admin?'':'none';
         $('btn-nuevo-desc').style.display=S.yo.admin?'':'none';
         $('tab-historial').style.display=S.yo.encargado?'':'none';
         pintarSync();pintarAlertas();pintarProductos();pintarDescuentos();
@@ -450,6 +483,100 @@ function guardarProducto(){
         .then(function(){$('mp-guardar').disabled=false;});
 }
 
+// ─── carga masiva ───
+var MAS={filas:[]};
+function quitarTildes(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+// precios en formato argentino o con punto: "$2.500" "2.500,50" "2500.5" "2500"
+function parsePrecio(t){
+    var x=String(t==null?'':t).replace(/[$\s]/g,'');
+    if(!x)return null;
+    if(x.indexOf(',')!==-1)x=x.replace(/\./g,'').replace(',','.');
+    else if(/^\d{1,3}(\.\d{3})+$/.test(x))x=x.replace(/\./g,'');
+    var n=Number(x);return isFinite(n)?n:NaN;
+}
+function parseIva(t){
+    var x=String(t==null?'':t).replace(/[%\s]/g,'').replace(',','.');
+    if(!x)return 21;
+    var n=Number(x);return [0,10.5,21,27].indexOf(n)!==-1?n:NaN;
+}
+function parseTipo(t,cat){
+    var x=quitarTildes(t),c=quitarTildes(cat);
+    var mapa={cafeteria:'cafeteria',cafe:'cafeteria',kiosco:'kiosco',kiosko:'kiosco',bebida:'bebida',bebidas:'bebida',postre:'postre',postres:'postre',vianda:'vianda',viandas:'vianda',otro:'otro',otros:'otro'};
+    if(x)return mapa[x]||'invalido';
+    if(/cafe|desayun|merienda|panaderia|facturas/.test(c))return 'cafeteria';
+    if(/kiosc|kiosk|golosin|snack/.test(c))return 'kiosco';
+    if(/bebida|gaseosa|agua|jugo/.test(c))return 'bebida';
+    if(/postre/.test(c))return 'postre';
+    return 'otro';
+}
+function leerPegado(){
+    var lineas=$('mm-texto').value.split(/\r?\n/).filter(function(l){return l.trim();});
+    var filas=lineas.map(function(l){
+        var c=l.indexOf('\t')!==-1?l.split('\t'):l.indexOf(';')!==-1?l.split(';'):l.split(',');
+        return c.map(function(x){return x.trim().replace(/^"|"$/g,'');});
+    });
+    // fila de títulos
+    if(filas.length&&isNaN(parsePrecio(filas[0][2]))&&/nombre|producto/i.test(filas[0][0]||''))filas.shift();
+    var existentes={};S.prod.forEach(function(p){if(p.origen==='local')existentes[p.nombre.trim().toLowerCase()]=p;});
+    var vistos={};
+    MAS.filas=filas.map(function(c){
+        var f={nombre:c[0]||'',categoria:c[1]||'',precio:parsePrecio(c[2]),iva:parseIva(c[3]),tipo:parseTipo(c[4],c[1]),error:'',estado:''};
+        var k=f.nombre.toLowerCase();
+        if(!f.nombre)f.error='Falta el nombre';
+        else if(vistos[k])f.error='Repetido en la lista';
+        else if(!f.categoria)f.error='Falta la categoría';
+        else if(f.precio==null||isNaN(f.precio)||f.precio<0)f.error='Precio inválido';
+        else if(isNaN(f.iva))f.error='IVA inválido';
+        else if(f.tipo==='invalido')f.error='Tipo inválido';
+        vistos[k]=1;
+        if(!f.error){
+            var e=existentes[k];
+            if(!e)f.estado='nuevo';
+            else if(Number(e.precio_base)!==f.precio||Number(e.iva)!==f.iva||e.categoria!==f.categoria||e.tipo!==f.tipo){f.estado='cambia';f.antes=e;}
+            else f.estado='igual';
+        }
+        return f;
+    });
+    pintarMasivo();
+}
+function pintarMasivo(){
+    var l=MAS.filas;
+    if(!l.length){$('mm-prev').innerHTML='';$('mm-cargar').disabled=true;return;}
+    var err=l.filter(function(f){return f.error;}).length;
+    var cnt={nuevo:0,cambia:0,igual:0};l.forEach(function(f){if(f.estado)cnt[f.estado]++;});
+    $('mm-prev').innerHTML='<div class="prev"><table><thead><tr><th>#</th><th>Nombre</th><th>Categoría</th><th>Tipo</th><th style="text-align:right">Precio</th><th>IVA</th><th>Qué pasa</th></tr></thead><tbody>'+
+        l.map(function(f,i){
+            var est=f.error?'<span class="est error">'+esc(f.error)+'</span>':
+                f.estado==='nuevo'?'<span class="est nuevo">Nuevo</span>':
+                f.estado==='igual'?'<span class="est igual">Ya existe, sin cambios</span>':
+                '<span class="est cambia">Actualiza'+(Number(f.antes.precio_base)!==f.precio?' ('+plata(f.antes.precio_base)+' → '+plata(f.precio)+')':'')+'</span>';
+            return '<tr'+(f.error?' class="err"':'')+'><td>'+(i+1)+'</td><td>'+esc(f.nombre)+'</td><td>'+esc(f.categoria)+'</td><td>'+esc(f.tipo==='invalido'?'—':TIPOS[f.tipo]||f.tipo)+'</td><td style="text-align:right">'+(f.precio==null||isNaN(f.precio)?'—':plata(f.precio))+'</td><td>'+(isNaN(f.iva)?'—':String(f.iva).replace('.',',')+'%')+'</td><td>'+est+'</td></tr>';
+        }).join('')+'</tbody></table></div>'+
+        '<div class="cuenta">'+l.length+' fila'+(l.length>1?'s':'')+': <b>'+cnt.nuevo+'</b> nuevo'+(cnt.nuevo===1?'':'s')+', <b>'+cnt.cambia+'</b> a actualizar, '+cnt.igual+' sin cambios'+(err?' · <b style="color:#b91c1c">'+err+' con error — corregilas para poder cargar</b>':'')+'</div>';
+    $('mm-cargar').disabled=!!err||!(cnt.nuevo+cnt.cambia);
+}
+var tMas=null;
+$('mm-texto').addEventListener('input',function(){clearTimeout(tMas);tMas=setTimeout(leerPegado,250);});
+$('btn-masivo').onclick=function(){$('mm-texto').value='';$('mm-motivo').value='';MAS.filas=[];pintarMasivo();aviso('mm-aviso','');$('m-mas').style.display='flex';setTimeout(function(){$('mm-texto').focus();},50);};
+$('mm-cancelar').onclick=function(){$('m-mas').style.display='none';};
+$('mm-plantilla').onclick=function(){
+    var csv='\ufeffNombre;Categoría;Precio;IVA;Tipo\nCafé con leche;Cafetería;2500;21;cafetería\nMedialuna;Cafetería;900;10,5;cafetería\nAlfajor;Kiosco;1200;21;kiosco\nAgua mineral 500 ml;Bebidas;1500;21;bebida\n';
+    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='plantilla-productos-prosegur.csv';document.body.appendChild(a);a.click();a.remove();
+};
+$('mm-cargar').onclick=function(){
+    var items=MAS.filas.filter(function(f){return f.estado==='nuevo'||f.estado==='cambia';}).map(function(f){return {nombre:f.nombre,categoria:f.categoria,precio:f.precio,iva:f.iva,tipo:f.tipo};});
+    if(!items.length)return;
+    $('mm-cargar').disabled=true;$('mm-cargar').textContent='Cargando…';
+    rpc('caja_productos_masivo',{p_token:S.token,p_items:items,p_motivo:$('mm-motivo').value.trim()})
+        .then(function(r){
+            $('m-mas').style.display='none';S.hist=null;
+            aviso('aviso','Carga masiva lista: '+r.nuevos+' producto'+(r.nuevos===1?'':'s')+' nuevo'+(r.nuevos===1?'':'s')+' y '+r.actualizados+' actualizado'+(r.actualizados===1?'':'s')+'.',true);
+            setFiltro('todos');return cargar();
+        })
+        .catch(function(err){aviso('mm-aviso',err.message);$('mm-cargar').disabled=false;})
+        .then(function(){$('mm-cargar').textContent='Cargar productos';});
+};
+
 // ─── descuentos ───
 function pintarDescuentos(){
     if(!S.desc.length){$('lista-desc').innerHTML='<div class="vacio">No hay descuentos cargados.</div>';return;}
@@ -594,7 +721,7 @@ function mostrarTab(t){
     if(t==='historial')cargarHistorial();
 }
 document.querySelector('.tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b)mostrarTab(b.getAttribute('data-tab'));});
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){$('m-prod').style.display='none';$('m-desc').style.display='none';}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){$('m-prod').style.display='none';$('m-desc').style.display='none';$('m-mas').style.display='none';}});
 // los descuentos por horario cambian solos: se repinta cada minuto
 setInterval(function(){if($('contenido').style.display==='block'){pintarProductos();pintarDescuentos();}},60000);
 iniciar();
