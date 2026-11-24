@@ -109,6 +109,12 @@
         .pie .spacer{flex:1;}
         .modal .aviso{margin-top:14px;margin-bottom:0;}
         .modal.ancho{max-width:860px;}
+        .mini{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#f3f4f6;flex:none;}
+        .mini.vacia{display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:18px;}
+        .prod-cel{display:flex;gap:10px;align-items:flex-start;}
+        .foto-edit{display:flex;gap:12px;align-items:center;}
+        .foto-edit img,.foto-edit .vacia{width:96px;height:72px;border-radius:10px;object-fit:cover;background:#f3f4f6;border:1px solid #e5e7eb;}
+        .foto-edit .vacia{display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;}
         .pegar{width:100%;min-height:150px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;outline:none;resize:vertical;}
         .pegar:focus{border-color:#16a34a;}
         .prev{max-height:320px;overflow:auto;border:1px solid #f1f5f9;border-radius:10px;margin-top:12px;}
@@ -204,6 +210,13 @@
             <div class="campo" id="mp-c-precio"><label for="mp-precio">Precio</label><input type="number" id="mp-precio" min="0" step="0.01" inputmode="decimal"></div>
             <div class="campo" id="mp-c-local"><label for="mp-local">Precio local</label><input type="number" id="mp-local" min="0" step="0.01" inputmode="decimal" placeholder="Vacío = precio de la app"><div class="ayuda">Si lo dejás vacío se cobra el precio de la app.</div></div>
             <div class="campo"><label for="mp-iva">IVA</label><select id="mp-iva"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento (0%)</option></select><div class="ayuda">Confirmalo con el contador. Se usa para la factura.</div></div>
+            <div class="campo ancho"><label>Foto (se ve en el botón de la caja)</label>
+                <div class="foto-edit"><span id="mp-foto-prev"></span>
+                    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                        <label class="btn chico" style="margin:0">Subir foto<input type="file" id="mp-foto" accept="image/*" style="display:none"></label>
+                        <button class="btn chico peligro" id="mp-foto-quitar" type="button">Quitar foto</button>
+                        <span class="ayuda" id="mp-foto-ayuda" style="font-size:11px;color:#9ca3af"></span>
+                    </div></div></div>
             <div class="campo ancho"><label class="check"><input type="checkbox" id="mp-activo"><span><b>Mostrar en la caja</b><br><small>Si lo destildás, no aparece para vender (no se borra).</small></span></label></div>
             <div class="campo ancho"><label for="mp-motivo">Motivo del cambio (queda en el historial)</label><input type="text" id="mp-motivo" maxlength="200" placeholder="Ej.: promo de apertura, aumento del proveedor…"></div>
         </div>
@@ -264,6 +277,7 @@
     </div>
 </div>
 
+<script src="/prosegur-comun.js"></script>
 <script>
 var SB='https://xlwcozznliafhouhqjzl.supabase.co/rest/v1';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg';
@@ -289,32 +303,10 @@ function fechaHora(iso){if(!iso)return '';var d=new Date(iso);return d.toLocaleD
 function num(v){if(v===''||v==null)return null;var n=Number(String(v).replace(',','.'));return isFinite(n)?n:NaN;}
 
 // ─── precio final: precio local (si hay) o el de la app, menos el mayor descuento vigente ───
-function enCaja(p){return p.activo&&(p.origen==='local'||p.en_app);}
-function precioLista(p){return p.precio_local!=null?Number(p.precio_local):(p.precio_base!=null?Number(p.precio_base):null);}
-function descuentoVigente(d,p,ahora){
-    if(!d.activo)return false;
-    var hoy=ahora.getFullYear()+'-'+String(ahora.getMonth()+1).padStart(2,'0')+'-'+String(ahora.getDate()).padStart(2,'0');
-    if(d.desde&&hoy<d.desde)return false;
-    if(d.hasta&&hoy>d.hasta)return false;
-    var dow=ahora.getDay()||7;
-    if(d.dias&&d.dias.length&&d.dias.indexOf(dow)===-1)return false;
-    var hm=String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0');
-    if(d.hora_desde&&hm<d.hora_desde)return false;
-    if(d.hora_hasta&&hm>=d.hora_hasta)return false;
-    if(d.alcance==='categoria')return d.alcance_valor===p.categoria;
-    if(d.alcance==='producto')return String(d.alcance_valor)===String(p.id);
-    return true;
-}
-function precioFinal(p,ahora){
-    var lista=precioLista(p);if(lista==null)return {lista:null,final:null,desc:null};
-    var mejor=null,monto=0;
-    S.desc.forEach(function(d){
-        if(!descuentoVigente(d,p,ahora))return;
-        var m=d.tipo==='porcentaje'?lista*Number(d.valor)/100:Math.min(lista,Number(d.valor));
-        if(m>monto){monto=m;mejor=d;}
-    });
-    return {lista:lista,final:Math.round((lista-monto)*100)/100,desc:mejor};
-}
+function enCaja(p){return EL.enCaja(p);}
+function precioLista(p){return EL.precioLista(p);}
+function descuentoVigente(d,p,ahora){return EL.descuentoVigente(d,p,ahora);}
+function precioFinal(p,ahora){return EL.precioFinal(p,S.desc,ahora);}
 
 // ─── carga ───
 function iniciar(){
@@ -409,7 +401,8 @@ function filaProducto(p,ahora){
     var local=p.origen==='app'?(p.precio_local!=null?'<b>'+plata(p.precio_local)+'</b>':'<span class="muted">—</span>'):'<b>'+plata(p.precio_base)+'</b>';
     var desc=pf.desc?'<span class="desc-txt">'+esc(pf.desc.nombre)+'</span>−'+plata(pf.lista-pf.final):'<span class="muted">—</span>';
     var fin=pf.final==null?'<span class="muted">—</span>':(pf.desc?'<span class="tachado">'+plata(pf.lista)+'</span>':'')+'<span class="final">'+plata(pf.final)+'</span>';
-    return '<div class="fila'+(enCaja(p)?'':' apagada')+'"><div><div class="nom">'+esc(p.nombre)+'</div><div class="chips">'+chips.join('')+'</div></div>'+
+    var src=EL.foto(p),mini=src?'<img class="mini" src="'+esc(src)+'" alt="" loading="lazy">':'<span class="mini vacia">◻</span>';
+    return '<div class="fila'+(enCaja(p)?'':' apagada')+'"><div class="prod-cel">'+mini+'<div><div class="nom">'+esc(p.nombre)+'</div><div class="chips">'+chips.join('')+'</div></div></div>'+
         '<div class="num" data-l="Precio app">'+base+'</div><div class="num" data-l="Precio local">'+local+'</div><div class="num" data-l="Descuento">'+desc+'</div><div class="num" data-l="Se cobra hoy">'+fin+'</div>'+
         '<div class="acciones">'+acc+'</div></div>';
 }
@@ -447,11 +440,48 @@ function abrirProducto(p){
     $('mp-iva').value=p?String(Number(p.iva)):'21';
     $('mp-activo').checked=p?!!p.activo:true;
     $('mp-motivo').value='';
+    S.fotoNueva=undefined;$('mp-foto').value='';pintarFotoModal();
     aviso('mp-aviso','');
     $('m-prod').style.display='flex';
     setTimeout(function(){(app?$('mp-local'):$('mp-nombre')).focus();},50);
 }
 function cerrarProducto(){$('m-prod').style.display='none';}
+function pintarFotoModal(){
+    var p=S.edit,src=S.fotoNueva!==undefined?S.fotoNueva:(p?(p.img_local||p.img):'');
+    $('mp-foto-prev').innerHTML=src?'<img src="'+esc(src)+'" alt="">':'<span class="vacia">Sin foto</span>';
+    var tieneLocal=S.fotoNueva!==undefined?!!S.fotoNueva:!!(p&&p.img_local);
+    $('mp-foto-quitar').style.display=tieneLocal?'':'none';
+    $('mp-foto-ayuda').textContent=p&&p.img&&!tieneLocal?'Usa la foto de la app.':(p&&p.img&&tieneLocal?'Si la quitás, vuelve a la foto de la app.':'');
+}
+// achica la foto en el navegador (máx. 480 px, WebP) para que la caja cargue rápido
+function achicarFoto(file){
+    return new Promise(function(ok,mal){
+        var r=new FileReader();
+        r.onerror=function(){mal(new Error('No se pudo leer la foto.'));};
+        r.onload=function(){
+            var im=new Image();
+            im.onerror=function(){mal(new Error('El archivo no es una imagen válida.'));};
+            im.onload=function(){
+                var max=480,k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');
+                c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+                c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+                var d=c.toDataURL('image/webp',0.8);
+                if(d.indexOf('data:image/webp')!==0)d=c.toDataURL('image/jpeg',0.8);
+                ok(d);
+            };
+            im.src=r.result;
+        };
+        r.readAsDataURL(file);
+    });
+}
+$('mp-foto').addEventListener('change',function(){
+    var f=this.files&&this.files[0];if(!f)return;
+    achicarFoto(f).then(function(d){
+        if(d.length>400000){aviso('mp-aviso','La foto quedó muy pesada. Probá con otra.');return;}
+        S.fotoNueva=d;pintarFotoModal();
+    }).catch(function(e){aviso('mp-aviso',e.message);});
+});
+$('mp-foto-quitar').onclick=function(){S.fotoNueva='';$('mp-foto').value='';pintarFotoModal();};
 $('mp-cancelar').onclick=cerrarProducto;
 $('btn-nuevo-prod').onclick=function(){abrirProducto(null);};
 $('mp-quitar').onclick=function(){$('mp-local').value='';guardarProducto();};
@@ -459,13 +489,14 @@ $('mp-guardar').onclick=guardarProducto;
 function guardarProducto(){
     var p=S.edit,app=p&&p.origen==='app',motivo=$('mp-motivo').value.trim();
     var datos={iva:$('mp-iva').value,activo:$('mp-activo').checked};
+    if(S.fotoNueva!==undefined)datos.img_local=S.fotoNueva;
     var pasos=[];
     if(app){
         var loc=num($('mp-local').value);
         if(isNaN(loc)||(loc!=null&&loc<0)){aviso('mp-aviso','Revisá el precio local.');return;}
         var antes=p.precio_local!=null?Number(p.precio_local):null;
         if(loc!==antes)pasos.push(function(){return rpc('caja_precio_local',{p_token:S.token,p_id:p.id,p_precio:loc,p_motivo:motivo});});
-        if(Number(datos.iva)!==Number(p.iva)||datos.activo!==!!p.activo)pasos.push(function(){return rpc('caja_producto_guardar',{p_token:S.token,p_id:p.id,p_datos:datos,p_motivo:motivo});});
+        if(Number(datos.iva)!==Number(p.iva)||datos.activo!==!!p.activo||S.fotoNueva!==undefined)pasos.push(function(){return rpc('caja_producto_guardar',{p_token:S.token,p_id:p.id,p_datos:datos,p_motivo:motivo});});
     }else{
         datos.nombre=$('mp-nombre').value.trim();datos.categoria=$('mp-cat').value.trim();datos.tipo=$('mp-tipo').value;
         var pr=num($('mp-precio').value);

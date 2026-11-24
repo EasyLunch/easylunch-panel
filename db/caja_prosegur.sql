@@ -38,6 +38,9 @@ create table if not exists public.caja_productos (
   actualizado     timestamptz not null default now(),
   unique (local, ref_app)
 );
+-- fotos: img = la de la app (URL) · img_local = subida en el panel (gana sobre la de la app)
+alter table public.caja_productos add column if not exists img text;
+alter table public.caja_productos add column if not exists img_local text;
 
 create table if not exists public.caja_descuentos (
   id              bigint generated always as identity primary key,
@@ -162,9 +165,9 @@ begin
     if v_precio is null then sin_precio := sin_precio || (it->>'nombre'); end if;
     select * into p from public.caja_productos where local = p_local and ref_app = v_ref;
     if p.id is null then
-      insert into public.caja_productos(local, origen, ref_app, nombre, categoria, grupo, tipo, precio_base, del_dia, orden, ultima_sync)
+      insert into public.caja_productos(local, origen, ref_app, nombre, categoria, grupo, tipo, precio_base, del_dia, orden, ultima_sync, img)
       values (p_local, 'app', v_ref, it->>'nombre', coalesce(it->>'categoria', ''), coalesce(it->>'grupo', ''), v_tipo,
-              v_precio, coalesce((it->>'del_dia')::boolean, false), coalesce((it->>'orden')::int, 0), now());
+              v_precio, coalesce((it->>'del_dia')::boolean, false), coalesce((it->>'orden')::int, 0), now(), nullif(trim(it->>'img'), ''));
       nuevos := nuevos || (it->>'nombre');
     else
       if not p.en_app then reactivados := reactivados + 1; end if;
@@ -177,6 +180,7 @@ begin
       end if;
       update public.caja_productos set
         nombre = it->>'nombre', categoria = coalesce(it->>'categoria', ''), grupo = coalesce(it->>'grupo', ''), tipo = v_tipo,
+        img = coalesce(nullif(trim(it->>'img'), ''), img),
         precio_base = coalesce(v_precio, precio_base),
         revisar_precio = revisar_precio or (v_precio is not null and precio_base is distinct from v_precio and precio_local is not null),
         del_dia = coalesce((it->>'del_dia')::boolean, false), orden = coalesce((it->>'orden')::int, 0),
@@ -239,15 +243,19 @@ begin
   v_iva := coalesce(nullif(p_datos->>'iva', '')::numeric, 21);
   if v_iva not in (0, 10.5, 21, 27) then raise exception 'IVA inválido (0, 10,5, 21 o 27).'; end if;
   v_activo := coalesce((p_datos->>'activo')::boolean, true);
+  if p_datos ? 'img_local' and p_datos->>'img_local' is not null and p_datos->>'img_local' <> '' then
+    if p_datos->>'img_local' !~ '^data:image/(webp|jpeg|png);base64,' then raise exception 'La foto tiene un formato inválido.'; end if;
+    if length(p_datos->>'img_local') > 400000 then raise exception 'La foto es muy pesada (máximo ~300 KB).'; end if;
+  end if;
   if p_id is null then
     v_nombre := trim(coalesce(p_datos->>'nombre', ''));
     v_precio := nullif(p_datos->>'precio', '')::numeric;
     v_tipo := case when p_datos->>'tipo' in ('vianda','postre','bebida','cafeteria','kiosco','otro') then p_datos->>'tipo' else 'otro' end;
     if v_nombre = '' then raise exception 'Falta el nombre.'; end if;
     if v_precio is null or v_precio < 0 then raise exception 'Falta el precio.'; end if;
-    insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo, orden)
+    insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo, orden, img_local)
     values ('prosegur', 'local', v_nombre, trim(coalesce(p_datos->>'categoria', '')), v_tipo, v_precio, v_iva, v_activo,
-            coalesce(nullif(p_datos->>'orden', '')::int, 0))
+            coalesce(nullif(p_datos->>'orden', '')::int, 0), nullif(p_datos->>'img_local', ''))
     returning * into p;
     perform public.caja__log('prosegur', coalesce(nullif(u.nombre, ''), u.usuario), p.id, null, p.nombre, 'alta', null,
                              public.caja__plata(v_precio), 'manual', p_motivo);
@@ -267,10 +275,12 @@ begin
       categoria = coalesce(p_datos->>'categoria', categoria),
       tipo = case when p_datos->>'tipo' in ('vianda','postre','bebida','cafeteria','kiosco','otro') then p_datos->>'tipo' else tipo end,
       precio_base = v_precio, iva = v_iva, activo = v_activo,
+      img_local = case when p_datos ? 'img_local' then nullif(p_datos->>'img_local', '') else img_local end,
       orden = coalesce(nullif(p_datos->>'orden', '')::int, orden), actualizado = now()
     where id = p.id;
   else
     update public.caja_productos set iva = v_iva, activo = v_activo,
+      img_local = case when p_datos ? 'img_local' then nullif(p_datos->>'img_local', '') else img_local end,
       orden = coalesce(nullif(p_datos->>'orden', '')::int, orden), actualizado = now()
     where id = p.id;
   end if;

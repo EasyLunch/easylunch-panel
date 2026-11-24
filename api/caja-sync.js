@@ -74,6 +74,15 @@ export function hoyBA() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
 }
 const num = v => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null }
+/** Foto de la app: URL completa (si viene relativa se completa con el dominio de la app). */
+export function foto(v) {
+  const s = String(v || '').trim()
+  if (!s) return null
+  if (/^https:\/\//i.test(s)) return s
+  if (/^http:\/\//i.test(s)) return s.replace(/^http:/i, 'https:')
+  if (/^[\w./-]+\.(webp|jpe?g|png|gif)$/i.test(s)) return 'https://app.easylunch.com.ar/' + s.replace(/^\/+/, '')
+  return null
+}
 const si = v => v === 1 || v === '1' || v === true || String(v).toLowerCase() === 'si'
 
 /**
@@ -113,7 +122,7 @@ export function armarItems(t, empresa, fecha) {
     items.push({
       ref: p ? 'plato:' + p.id : 'nombre:' + norm(nombre),
       nombre: p ? String(p.nombre).replace(/\s+/g, ' ').trim() : nombre,
-      categoria, grupo, tipo, precio: p ? num(p.precio) : null, del_dia: !!del_dia, orden: orden++
+      categoria, grupo, tipo, precio: p ? num(p.precio) : null, del_dia: !!del_dia, orden: orden++, img: p ? foto(p.img) : null
     })
   }
   const nombreCategoria = n => String(n).replace(new RegExp('^\\s*' + empresa.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*-\\s*', 'i'), '').trim() || n
@@ -153,7 +162,7 @@ export function armarItems(t, empresa, fecha) {
       const p = b ? null : platos.get(norm(nb))
       const precio = b ? num(b.precio) : p ? num(p.precio) : null
       if (!precio) avisos.push(`La bebida "${nb}" no tiene precio en la app: entra sin precio (podés ponerle precio local).`)
-      items.push({ ref: b ? 'bebida:' + b.id : p ? 'plato:' + p.id : 'bebida:' + norm(nb), nombre: nb, categoria: 'Bebidas', grupo: 'Bebidas', tipo: 'bebida', precio, del_dia: false, orden: orden++ })
+      items.push({ ref: b ? 'bebida:' + b.id : p ? 'plato:' + p.id : 'bebida:' + norm(nb), nombre: nb, categoria: 'Bebidas', grupo: 'Bebidas', tipo: 'bebida', precio, del_dia: false, orden: orden++, img: foto(b ? b.img : p ? p.img : null) })
     }
   }
   // sin repetidos (gana el primero)
