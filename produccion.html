@@ -132,6 +132,31 @@ header.top{position:sticky;top:0;z-index:20;background:var(--verde);color:#fff;p
 .loading{display:grid;place-items:center;padding:60px 20px;color:var(--gris);gap:12px}
 .spin{width:30px;height:30px;border:3px solid var(--borde);border-top-color:var(--verde);border-radius:50%;animation:s .8s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
+#print-area{display:none}
+.pr{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#111;font-size:12.5px}
+.pr .pr-head{border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:10px}
+.pr .pr-head h1{font-size:19px;margin:0 0 4px;line-height:1.2}
+.pr .pr-head .m{font-size:12px;color:#444}
+.pr h2{font-size:14px;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #999;padding-bottom:3px}
+.pr .fotos{display:flex;gap:10px;flex-wrap:wrap}
+.pr .fotos figure{margin:0;flex:1 1 220px;max-width:330px}
+.pr .fotos img{width:100%;max-height:230px;object-fit:cover;border-radius:6px;border:1px solid #ccc}
+.pr .fotos figcaption{font-size:11px;color:#444;margin-top:2px}
+.pr .box{border:1px solid #ccc;border-radius:6px;padding:8px 10px;margin-bottom:8px;break-inside:avoid;background:#fff}
+.pr .box h3{font-size:13px;margin:0 0 6px}
+.pr .kpis{gap:6px}.pr .kpi{padding:5px;background:#f2f2f2}.pr .kpi .v{font-size:15px}
+.pr .tabla{font-size:12px}.pr .tabla td{padding:4px 3px}.pr .tabla th{padding:2px 3px 4px}
+.pr .prep{margin-top:6px;break-inside:avoid}.pr .prep summary{padding:5px 8px;background:#f5f5f5}.pr .prep summary .ar{display:none}.pr .prep .pb{padding:2px 8px 6px}
+.pr .pasos li{font-size:12.5px;padding:4px 0 4px 30px}.pr .pasos li::before{width:20px;height:20px;font-size:11px;top:3px;background:#111}
+.pr .btn-row,.pr button{display:none!important}
+.pr .estado{background:#fff3cd;color:#7a5200}
+@media print{
+  body > *:not(#print-area){display:none!important}
+  #print-area{display:block!important}
+  html,body{background:#fff!important}
+  @page{size:A4;margin:12mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 @media (min-width:720px){ .lista{grid-template-columns:1fr 1fr} .det-body{max-width:760px;margin:0 auto} .det-head>*{max-width:728px;margin-left:auto;margin-right:auto} }
 </style>
 </head>
@@ -193,6 +218,7 @@ header.top{position:sticky;top:0;z-index:20;background:var(--verde);color:#fff;p
         <h2 id="d-nombre"></h2>
         <div class="badges" id="d-badges"></div>
       </div>
+      <button class="back" id="btn-print" aria-label="Imprimir" title="Imprimir hoja de producción">🖨️</button>
     </div>
     <div class="porc">
       <label style="min-width:66px">Regulares</label>
@@ -220,6 +246,8 @@ header.top{position:sticky;top:0;z-index:20;background:var(--verde);color:#fff;p
   </div>
   <div class="det-body" id="d-body"></div>
 </div>
+
+<div id="print-area"></div>
 
 <script>
 /* =====================================================================
@@ -1447,8 +1475,43 @@ function vistaTotal(p){
 }
 
 /* =====================================================================
+   Impresión: foto (si hay) → detalle de producción → armado
+   ===================================================================== */
+async function imprimir(){
+  const p = platoActual; if(!p) return
+  const btn = $('btn-print'); btn.textContent = '…'
+  try{
+    const a = p._a, t = TIPO_MAP[p.tipo] || { e:'🍽', l:p.tipo || 'Plato' }
+    // fotos del emplatado cargadas (Regular / XL / HIT); si no hay, la de la app de pedidos
+    await Promise.all(EMP_VARS.filter(v => empIds[p.id + v.suf]).map(v => traerEmp(p.id + v.suf)))
+    let fotos = EMP_VARS.map(v => ({ l: 'Emplatado ' + v.l, src: (empCache[p.id + v.suf] || {}).foto })).filter(x => x.src)
+    if(!fotos.length){ const fs = fotoDe(p); if(fs) fotos = [{ l: 'Foto de la app de pedidos', src: fs.img }] }
+    const bandeja = a.envasado ? 'Viene envasado' : (a.bandeja ? a.bandeja.txt + (a.bandeja.negra ? ' negra' : '') : (a.guarnicion ? 'Va en la bandeja del principal' : 'Sin bandeja'))
+    const hoy = new Date()
+    let h = `<div class="pr"><div class="pr-head"><h1>${esc(p.nombre.trim())}</h1>
+      <div class="m">${t.e} ${esc(t.l)} · 📦 ${esc(bandeja)} · <b>${esc(porcTxt())}</b> · ${a.pesoVianda ? fmtG(a.pesoVianda) + ' por vianda' + (NXL ? ' (XL ' + fmtG(a.pesoVianda * XL_EXTRA) + ')' : '') + ' · ' : ''}impreso ${hoy.toLocaleDateString('es-AR')} ${hoy.toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' })}</div></div>`
+    if(fotos.length) h += `<div class="fotos">${fotos.map(f => `<figure><img src="${esc(f.src)}" alt=""><figcaption>${esc(f.l)}</figcaption></figure>`).join('')}</div>`
+    if(a.envasado){
+      h += `<h2>Retirar del stock</h2>` + vistaArmado(p).replace(/<div class="ic">📦<\/div>/, '').replace(/<div class="foto">[\s\S]*?<\/div>/, '')
+    } else {
+      h += `<h2>Producción · ${esc(porcTxt())}</h2>` + vistaIngredientes(p).replace(/<details class="prep" (open)?/g, '<details class="prep" open ').replace('<span class="sub">tocá para ver la receta</span>', '')
+      const ed = editArmado; editArmado = false
+      h += `<h2>Armado</h2>` + boxArmado(p)
+      editArmado = ed
+    }
+    h += `</div>`
+    $('print-area').innerHTML = h
+    const imgs = [...$('print-area').querySelectorAll('img')]
+    await Promise.all(imgs.map(i => i.complete ? null : new Promise(ok => { i.onload = i.onerror = ok; setTimeout(ok, 6000) })))
+    window.print()
+  }catch(e){ console.error(e) }
+  btn.textContent = '🖨️'
+}
+
+/* =====================================================================
    Eventos
    ===================================================================== */
+$('btn-print').onclick = imprimir
 $('q').addEventListener('input', () => { $('q-clear').classList.toggle('hidden', !$('q').value); render() })
 $('q-clear').onclick = () => { $('q').value = ''; $('q-clear').classList.add('hidden'); render(); $('q').focus() }
 $('solo-rot').onchange = render
