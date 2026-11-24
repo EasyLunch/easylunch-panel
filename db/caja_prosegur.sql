@@ -41,6 +41,9 @@ create table if not exists public.caja_productos (
 -- fotos: img = la de la app (URL) · img_local = subida en el panel (gana sobre la de la app)
 alter table public.caja_productos add column if not exists img text;
 alter table public.caja_productos add column if not exists img_local text;
+-- stock (lo usan las ventas: db/caja_prosegur_ventas.sql)
+alter table public.caja_productos add column if not exists control_stock boolean not null default false;
+alter table public.caja_productos add column if not exists stock_minimo numeric(12,3) not null default 0;
 
 create table if not exists public.caja_descuentos (
   id              bigint generated always as identity primary key,
@@ -165,9 +168,10 @@ begin
     if v_precio is null then sin_precio := sin_precio || (it->>'nombre'); end if;
     select * into p from public.caja_productos where local = p_local and ref_app = v_ref;
     if p.id is null then
-      insert into public.caja_productos(local, origen, ref_app, nombre, categoria, grupo, tipo, precio_base, del_dia, orden, ultima_sync, img)
+      insert into public.caja_productos(local, origen, ref_app, nombre, categoria, grupo, tipo, precio_base, del_dia, orden, ultima_sync, img, control_stock)
       values (p_local, 'app', v_ref, it->>'nombre', coalesce(it->>'categoria', ''), coalesce(it->>'grupo', ''), v_tipo,
-              v_precio, coalesce((it->>'del_dia')::boolean, false), coalesce((it->>'orden')::int, 0), now(), nullif(trim(it->>'img'), ''));
+              v_precio, coalesce((it->>'del_dia')::boolean, false), coalesce((it->>'orden')::int, 0), now(), nullif(trim(it->>'img'), ''),
+              v_tipo in ('vianda','postre','bebida'));
       nuevos := nuevos || (it->>'nombre');
     else
       if not p.en_app then reactivados := reactivados + 1; end if;
@@ -253,9 +257,9 @@ begin
     v_tipo := case when p_datos->>'tipo' in ('vianda','postre','bebida','cafeteria','kiosco','otro') then p_datos->>'tipo' else 'otro' end;
     if v_nombre = '' then raise exception 'Falta el nombre.'; end if;
     if v_precio is null or v_precio < 0 then raise exception 'Falta el precio.'; end if;
-    insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo, orden, img_local)
+    insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo, orden, img_local, control_stock)
     values ('prosegur', 'local', v_nombre, trim(coalesce(p_datos->>'categoria', '')), v_tipo, v_precio, v_iva, v_activo,
-            coalesce(nullif(p_datos->>'orden', '')::int, 0), nullif(p_datos->>'img_local', ''))
+            coalesce(nullif(p_datos->>'orden', '')::int, 0), nullif(p_datos->>'img_local', ''), v_tipo in ('kiosco','bebida','postre','vianda'))
     returning * into p;
     perform public.caja__log('prosegur', coalesce(nullif(u.nombre, ''), u.usuario), p.id, null, p.nombre, 'alta', null,
                              public.caja__plata(v_precio), 'manual', p_motivo);
@@ -419,8 +423,8 @@ begin
     select * into p from public.caja_productos
       where local = 'prosegur' and origen = 'local' and lower(trim(nombre)) = lower(v_nombre) order by id limit 1;
     if p.id is null then
-      insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo)
-      values ('prosegur', 'local', v_nombre, v_cat, v_tipo, v_precio, v_iva, true) returning * into p;
+      insert into public.caja_productos(local, origen, nombre, categoria, tipo, precio_base, iva, activo, control_stock)
+      values ('prosegur', 'local', v_nombre, v_cat, v_tipo, v_precio, v_iva, true, v_tipo in ('kiosco','bebida','postre','vianda')) returning * into p;
       perform public.caja__log('prosegur', quien, p.id, null, p.nombre, 'alta', null, public.caja__plata(v_precio), 'manual',
                                concat_ws(' · ', 'Carga masiva', nullif(trim(p_motivo), '')));
       nuevos := nuevos + 1;

@@ -153,6 +153,8 @@
         <div class="tabs" role="tablist">
             <button class="tab on" data-tab="productos" type="button" role="tab">Productos</button>
             <button class="tab" data-tab="descuentos" type="button" role="tab">Descuentos</button>
+            <button class="tab" data-tab="stock" type="button" role="tab" id="tab-stock">Stock</button>
+            <button class="tab" data-tab="cierres" type="button" role="tab" id="tab-cierres">Cierres de caja</button>
             <button class="tab" data-tab="historial" type="button" role="tab" id="tab-historial">Historial de precios</button>
         </div>
 
@@ -179,6 +181,33 @@
                 <button class="btn primario" id="btn-nuevo-desc" type="button">+ Nuevo descuento</button>
             </div>
             <div class="lista" id="lista-desc"></div>
+        </section>
+
+        <section id="sec-stock" style="display:none">
+            <div class="barra">
+                <input class="buscar" id="buscar-s" type="search" placeholder="Buscar producto o insumo…" aria-label="Buscar en stock">
+                <button class="btn primario" id="btn-ingreso" type="button">+ Ingreso de mercadería</button>
+            </div>
+            <div class="barra filtros" id="filtros-s">
+                <button class="filtro on" data-f="control" type="button">Con control de stock</button>
+                <button class="filtro" data-f="bajo" type="button">Bajo el mínimo</button>
+                <button class="filtro" data-f="todos" type="button">Todos los productos</button>
+            </div>
+            <div class="nota">Cada venta descuenta sola. Los productos de cafetería descuentan los insumos de su receta (ej.: café con leche = granos + leche). Si se vende algo sin stock, la venta se hace igual y el stock queda en negativo para que lo revises.</div>
+            <div class="lista" id="lista-stock"></div>
+            <div class="grupo" style="margin-top:22px"><h2 style="display:flex;align-items:center;gap:10px">Insumos de cafetería <button class="btn chico" id="btn-insumo" type="button">+ Insumo</button></h2><div class="lista" id="lista-insumos"></div></div>
+            <div class="grupo"><h2>Recetas (qué insumos descuenta cada producto)</h2><div class="lista" id="lista-recetas"></div></div>
+            <div class="grupo"><h2>Últimos movimientos (ingresos, ajustes, mermas y anulaciones)</h2><div class="lista" id="lista-movs"></div></div>
+        </section>
+
+        <section id="sec-cierres" style="display:none">
+            <div class="lista" style="padding:16px 18px;margin-bottom:16px">
+                <div style="font-weight:700;margin-bottom:4px">Mails que reciben el informe de cierre</div>
+                <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Cuando el cajero cierra la caja se manda el informe de ventas y arqueo a estas direcciones. Separalas con coma.</div>
+                <div class="barra" style="margin:0"><input class="buscar" id="cfg-mails" type="text" placeholder="pablo@easylunch.com.ar, damian@easylunch.com.ar"><button class="btn primario" id="btn-cfg-mails" type="button">Guardar</button></div>
+            </div>
+            <div id="turno-abierto"></div>
+            <div class="lista" id="lista-cierres"></div>
         </section>
 
         <section id="sec-historial" style="display:none">
@@ -247,6 +276,27 @@
             <button class="btn" id="mm-cancelar" type="button">Cancelar</button>
             <button class="btn primario" id="mm-cargar" type="button" disabled>Cargar productos</button>
         </div>
+    </div>
+</div>
+
+<!-- modal genérico (stock) -->
+<div class="fondo" id="m-gen" role="dialog" aria-modal="true" aria-labelledby="mg-titulo">
+    <div class="modal" id="mg-modal">
+        <h2 id="mg-titulo"></h2>
+        <p class="sub" id="mg-sub"></p>
+        <div id="mg-cuerpo"></div>
+        <div class="aviso" id="mg-aviso"></div>
+        <div class="pie"><span class="spacer"></span>
+            <button class="btn" id="mg-cancelar" type="button">Cancelar</button>
+            <button class="btn primario" id="mg-ok" type="button">Guardar</button>
+        </div>
+    </div>
+</div>
+<!-- informe de cierre -->
+<div class="fondo" id="m-inf" role="dialog" aria-modal="true">
+    <div class="modal ancho" style="padding:18px">
+        <div class="pie" style="margin:0 0 12px"><span class="spacer"></span><button class="btn" id="mi-cerrar" type="button">Cerrar</button></div>
+        <div id="mi-cuerpo"></div>
     </div>
 </div>
 
@@ -329,8 +379,12 @@ function cargar(){
         $('btn-masivo').style.display=S.yo.admin?'':'none';
         $('btn-nuevo-desc').style.display=S.yo.admin?'':'none';
         $('tab-historial').style.display=S.yo.encargado?'':'none';
+        $('tab-stock').style.display=S.yo.encargado?'':'none';
+        $('tab-cierres').style.display=S.yo.encargado?'':'none';
         pintarSync();pintarAlertas();pintarProductos();pintarDescuentos();
         if(S.tab==='historial')cargarHistorial();
+        if(S.tab==='stock')cargarStock();
+        if(S.tab==='cierres')cargarCierres();
     });
 }
 function pintarSync(){
@@ -357,7 +411,7 @@ $('buscar').addEventListener('input',pintarProductos);
 function pintarProductos(){
     var q=$('buscar').value.trim().toLowerCase(),f=S.filtro,ahora=new Date();
     var l=S.prod.filter(function(p){
-        if(q&&(p.nombre+' '+p.categoria+' '+p.grupo).toLowerCase().indexOf(q)===-1)return false;
+        if(q&&quitarTildes(p.nombre+' '+p.categoria+' '+p.grupo).indexOf(quitarTildes(q))===-1)return false;
         if(f==='caja')return enCaja(p);
         if(f==='sinprecio')return precioLista(p)==null&&enCaja(p);
         if(f==='revisar')return p.revisar_precio;
@@ -721,6 +775,186 @@ $('btn-csv').onclick=function(){
     a.download='historial-precios-prosegur.csv';document.body.appendChild(a);a.click();a.remove();
 };
 
+// ─── modal genérico ───
+var GEN={ok:null};
+function abrirGen(o){
+    $('mg-titulo').textContent=o.titulo;$('mg-sub').textContent=o.sub||'';$('mg-sub').style.display=o.sub?'':'none';
+    $('mg-cuerpo').innerHTML=o.html;$('mg-ok').textContent=o.boton||'Guardar';$('mg-modal').classList.toggle('ancho',!!o.ancho);
+    aviso('mg-aviso','');GEN.ok=o.ok;$('m-gen').style.display='flex';
+    setTimeout(function(){var f=$('mg-cuerpo').querySelector('input,select');if(f)f.focus();},50);
+}
+$('mg-cancelar').onclick=function(){$('m-gen').style.display='none';};
+$('mg-ok').onclick=function(){
+    if(!GEN.ok)return;
+    var b=$('mg-ok');b.disabled=true;
+    Promise.resolve().then(GEN.ok).then(function(r){if(r!==false)$('m-gen').style.display='none';})
+    .catch(function(err){aviso('mg-aviso',err.message);}).then(function(){b.disabled=false;});
+};
+function campo(id,label,input,ayuda){return '<div class="campo" style="margin-bottom:12px"><label for="'+id+'">'+label+'</label>'+input+(ayuda?'<div class="ayuda">'+ayuda+'</div>':'')+'</div>';}
+function numero(v){var n=Number(String(v).replace(',','.'));return v===''||v==null?null:(isFinite(n)?n:NaN);}
+function fmtCant(n,u){var v=Math.round(Number(n||0)*1000)/1000;return v.toLocaleString('es-AR')+(u&&u!=='u'?' '+u:'');}
+
+// ─── stock ───
+var ST={datos:null,filtro:'control'};
+function cargarStock(){
+    $('lista-stock').innerHTML='<div class="cargando">Cargando…</div>';
+    return rpc('caja_stock',{p_token:S.token}).then(function(d){ST.datos=d;pintarStock();})
+        .catch(function(err){$('lista-stock').innerHTML='<div class="vacio">'+esc(err.message)+'</div>';});
+}
+$('filtros-s').addEventListener('click',function(e){var b=e.target.closest('.filtro');if(!b)return;ST.filtro=b.getAttribute('data-f');[].forEach.call(document.querySelectorAll('#filtros-s .filtro'),function(x){x.classList.toggle('on',x===b);});pintarStock();});
+$('buscar-s').addEventListener('input',function(){if(ST.datos)pintarStock();});
+function estadoStock(st,min){st=Number(st);min=Number(min);
+    if(st<0)return '<span class="chip rojo">Negativo</span>';
+    if(st<=min)return '<span class="chip warn">Bajo el mínimo</span>';
+    return '<span class="chip dia">OK</span>';}
+function pintarStock(){
+    var d=ST.datos,q=$('buscar-s').value.trim().toLowerCase();
+    $('btn-ingreso').style.display=S.yo.encargado?'':'none';$('btn-insumo').style.display=S.yo.admin?'':'none';
+    var l=d.productos.filter(function(p){
+        if(q&&quitarTildes(p.nombre+' '+p.categoria).indexOf(quitarTildes(q))===-1)return false;
+        if(ST.filtro==='control')return p.control_stock&&p.en_caja;
+        if(ST.filtro==='bajo')return p.control_stock&&p.en_caja&&Number(p.stock)<=Number(p.stock_minimo);
+        return true;
+    });
+    $('lista-stock').innerHTML=l.length?'<div class="fila cab" style="grid-template-columns:minmax(220px,2fr) 100px 100px 140px 220px"><div>Producto</div><div class="num">Stock</div><div class="num">Mínimo</div><div>Estado</div><div></div></div>'+
+        l.map(function(p){
+            var acc='';
+            if(S.yo.encargado)acc+='<button class="btn chico" data-st="ajuste" data-id="'+p.id+'" type="button">Ajustar</button>';
+            if(S.yo.admin)acc+='<button class="btn chico" data-st="cfg" data-id="'+p.id+'" type="button">Configurar</button>';
+            return '<div class="fila'+(p.en_caja?'':' apagada')+'" style="grid-template-columns:minmax(220px,2fr) 100px 100px 140px 220px"><div><div class="nom">'+esc(p.nombre)+'</div><div class="chips"><span class="chip">'+esc(p.categoria)+'</span>'+(p.del_dia?'<span class="chip dia">Plato del día</span>':'')+(p.control_stock?'':'<span class="chip">Sin control</span>')+(p.receta?'<span class="chip local">Con receta</span>':'')+'</div></div>'+
+                '<div class="num" data-l="Stock"><b>'+(p.control_stock?fmtCant(p.stock):'—')+'</b></div><div class="num" data-l="Mínimo">'+(p.control_stock?fmtCant(p.stock_minimo):'—')+'</div><div>'+(p.control_stock?estadoStock(p.stock,p.stock_minimo):'')+'</div><div class="acciones">'+acc+'</div></div>';
+        }).join(''):'<div class="vacio">'+(ST.filtro==='bajo'?'Nada bajo el mínimo. 👍':'No hay productos con este filtro.')+'</div>';
+    // insumos
+    $('lista-insumos').innerHTML=d.insumos.length?d.insumos.map(function(i){
+        var acc='';
+        if(S.yo.encargado)acc+='<button class="btn chico" data-st="ajuste-i" data-id="'+i.id+'" type="button">Ajustar</button>';
+        if(S.yo.admin)acc+='<button class="btn chico" data-st="insumo" data-id="'+i.id+'" type="button">Editar</button>';
+        return '<div class="fila'+(i.activo?'':' apagada')+'" style="grid-template-columns:minmax(220px,2fr) 120px 120px 140px 220px"><div class="nom">'+esc(i.nombre)+'</div><div class="num" data-l="Stock"><b>'+fmtCant(i.stock,i.unidad)+'</b></div><div class="num" data-l="Mínimo">'+fmtCant(i.stock_minimo,i.unidad)+'</div><div>'+estadoStock(i.stock,i.stock_minimo)+'</div><div class="acciones">'+acc+'</div></div>';
+    }).join(''):'<div class="vacio">Todavía no hay insumos. Cargá por ejemplo "Café en granos" (g) y "Leche" (ml).</div>';
+    // recetas: productos de cafetería o con receta
+    var conReceta=d.productos.filter(function(p){return (p.tipo==='cafeteria'||p.receta)&&(p.en_caja||p.receta);});
+    var nomIns={};d.insumos.forEach(function(i){nomIns[i.id]=i;});
+    $('lista-recetas').innerHTML=conReceta.length?conReceta.map(function(p){
+        var txt=p.receta?p.receta.map(function(r){var i=nomIns[r.insumo_id];return i?fmtCant(r.cantidad,i.unidad)+' de '+esc(i.nombre):'';}).join(' + '):'<span class="muted">Sin receta (no descuenta insumos)</span>';
+        return '<div class="fila" style="grid-template-columns:minmax(200px,1.2fr) minmax(220px,2fr) 160px"><div class="nom">'+esc(p.nombre)+'</div><div style="font-size:13px">'+txt+'</div><div class="acciones">'+(S.yo.admin?'<button class="btn chico" data-st="receta" data-id="'+p.id+'" type="button">Editar receta</button>':'')+'</div></div>';
+    }).join(''):'<div class="vacio">No hay productos de cafetería todavía.</div>';
+    // movimientos
+    var TM={ingreso:'Ingreso',ajuste:'Ajuste por conteo',merma:'Merma',anulacion:'Anulación de venta'};
+    $('lista-movs').innerHTML=d.movimientos.length?d.movimientos.slice(0,60).map(function(m){
+        var c=Number(m.cantidad);
+        return '<div class="fila-h" style="grid-template-columns:130px 120px minmax(160px,1.2fr) 150px 110px minmax(120px,1fr)"><div>'+esc(fechaHora(m.fecha))+'</div><div>'+esc(m.usuario)+'</div><div><b>'+esc(m.nombre)+'</b></div><div>'+esc(TM[m.tipo]||m.tipo)+'</div><div style="color:'+(c<0?'#b91c1c':'#15803d')+';font-weight:700">'+(c>0?'+':'')+fmtCant(c,m.unidad)+'</div><div>'+esc(m.motivo)+'</div></div>';
+    }).join(''):'<div class="vacio">Sin movimientos todavía.</div>';
+}
+function prodStock(id){return ST.datos.productos.filter(function(p){return String(p.id)===String(id);})[0];}
+function insStock(id){return ST.datos.insumos.filter(function(i){return String(i.id)===String(id);})[0];}
+document.querySelector('#sec-stock').addEventListener('click',function(e){
+    var b=e.target.closest('[data-st]');if(!b)return;
+    var t=b.getAttribute('data-st'),id=b.getAttribute('data-id');
+    if(t==='ajuste'||t==='ajuste-i'){
+        var x=t==='ajuste'?prodStock(id):insStock(id),u=t==='ajuste'?'u':x.unidad;
+        abrirGen({titulo:'Ajustar stock · '+x.nombre,sub:'Stock actual en el sistema: '+fmtCant(x.stock,u),
+            html:'<div class="campo" style="margin-bottom:12px"><label>Tipo</label><select id="g-tipo"><option value="ajuste">Conteo real (cuánto hay)</option><option value="merma">Merma (se tiró, venció o rompió)</option></select></div>'+
+                campo('g-cant','Cantidad'+(u!=='u'?' ('+u+')':''),'<input type="number" id="g-cant" min="0" step="any" inputmode="decimal">','En "Conteo real" poné lo que contaste; en "Merma", cuánto se perdió.')+
+                campo('g-mot','Motivo','<input type="text" id="g-mot" maxlength="150">'),
+            ok:function(){var c=numero($('g-cant').value);if(c==null||isNaN(c)||c<0)throw new Error('Poné la cantidad.');
+                return rpc('caja_stock_ajuste',{p_token:S.token,p_producto_id:t==='ajuste'?Number(id):null,p_insumo_id:t==='ajuste-i'?Number(id):null,p_tipo:$('g-tipo').value,p_cantidad:c,p_motivo:$('g-mot').value.trim()}).then(cargarStock);}});
+    }
+    if(t==='cfg'){
+        var p=prodStock(id);
+        abrirGen({titulo:'Stock · '+p.nombre,
+            html:'<label class="check" style="margin-bottom:12px"><input type="checkbox" id="g-ctl"'+(p.control_stock?' checked':'')+'><span><b>Controlar stock de este producto</b><br><small>Cada venta descuenta una unidad.</small></span></label>'+
+                campo('g-min','Stock mínimo (avisa cuando baja de acá)','<input type="number" id="g-min" min="0" step="1" value="'+Number(p.stock_minimo)+'">'),
+            ok:function(){var m=numero($('g-min').value);if(m==null||isNaN(m)||m<0)throw new Error('Revisá el mínimo.');
+                return rpc('caja_stock_config',{p_token:S.token,p_producto_id:Number(id),p_control:$('g-ctl').checked,p_minimo:m}).then(cargarStock);}});
+    }
+    if(t==='insumo')editarInsumo(insStock(id));
+    if(t==='receta')editarReceta(prodStock(id));
+});
+$('btn-insumo').onclick=function(){editarInsumo(null);};
+function editarInsumo(i){
+    abrirGen({titulo:i?'Editar insumo':'Nuevo insumo',
+        html:campo('g-nom','Nombre','<input type="text" id="g-nom" maxlength="80" value="'+esc(i?i.nombre:'')+'" placeholder="Ej.: Café en granos">')+
+            '<div class="campos">'+campo('g-uni','Unidad','<select id="g-uni"><option value="g">gramos (g)</option><option value="ml">mililitros (ml)</option><option value="u">unidades</option></select>')+
+            campo('g-min','Stock mínimo','<input type="number" id="g-min" min="0" step="any" value="'+(i?Number(i.stock_minimo):0)+'">')+'</div>'+
+            '<label class="check"><input type="checkbox" id="g-act"'+(!i||i.activo?' checked':'')+'><span><b>Activo</b></span></label>',
+        ok:function(){var m=numero($('g-min').value);if(m==null||isNaN(m)||m<0)throw new Error('Revisá el mínimo.');
+            return rpc('caja_insumo_guardar',{p_token:S.token,p_id:i?i.id:null,p_nombre:$('g-nom').value.trim(),p_unidad:$('g-uni').value,p_minimo:m,p_activo:$('g-act').checked}).then(cargarStock);}});
+    if(i)$('g-uni').value=i.unidad;
+}
+function editarReceta(p){
+    var ins=ST.datos.insumos.filter(function(i){return i.activo;});
+    if(!ins.length){aviso('aviso','Primero cargá los insumos (ej.: Café en granos, Leche).');return;}
+    var actual={};(p.receta||[]).forEach(function(r){actual[r.insumo_id]=r.cantidad;});
+    abrirGen({titulo:'Receta · '+p.nombre,sub:'Cuánto de cada insumo se usa por unidad vendida. Dejá vacío lo que no lleva.',
+        html:ins.map(function(i){return campo('g-r'+i.id,esc(i.nombre)+' ('+(i.unidad==='u'?'unidades':i.unidad)+')','<input type="number" id="g-r'+i.id+'" data-ins="'+i.id+'" min="0" step="any" value="'+(actual[i.id]!=null?Number(actual[i.id]):'')+'">');}).join(''),
+        ok:function(){var items=[].map.call($('mg-cuerpo').querySelectorAll('[data-ins]'),function(x){return {insumo_id:Number(x.getAttribute('data-ins')),cantidad:numero(x.value)};})
+                .filter(function(x){return x.cantidad>0;});
+            return rpc('caja_receta_guardar',{p_token:S.token,p_producto_id:p.id,p_items:items}).then(cargarStock);}});
+}
+$('btn-ingreso').onclick=function(){
+    var d=ST.datos;if(!d)return;
+    var prods=d.productos.filter(function(p){return p.en_caja&&(p.control_stock||['vianda','postre','bebida','kiosco'].indexOf(p.tipo)!==-1);});
+    var fila=function(attr,id,nombre,sub,u){return '<div class="fila" style="grid-template-columns:1fr 120px;padding:8px 12px" data-nombre="'+esc(nombre.toLowerCase())+'"><div><div class="nom" style="font-size:13px">'+esc(nombre)+'</div><div class="muted" style="font-size:11px">'+esc(sub)+'</div></div><input type="number" '+attr+'="'+id+'" min="0" step="any" inputmode="decimal" placeholder="'+(u&&u!=='u'?u:'cant.')+'" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;text-align:right"></div>';};
+    abrirGen({titulo:'Ingreso de mercadería',ancho:true,boton:'Cargar ingreso',sub:'Poné la cantidad que llegó de cada producto. Lo que dejes vacío no se toca.',
+        html:'<input class="buscar" id="g-bus" type="search" placeholder="Filtrar…" style="width:100%;margin-bottom:10px">'+
+            '<div class="lista" style="max-height:48vh;overflow:auto" id="g-lista">'+prods.map(function(p){return fila('data-prod',p.id,p.nombre,p.categoria+' · stock '+fmtCant(p.stock));}).join('')+
+            d.insumos.filter(function(i){return i.activo;}).map(function(i){return fila('data-ins',i.id,i.nombre,'Insumo · stock '+fmtCant(i.stock,i.unidad),i.unidad);}).join('')+'</div>'+
+            '<div style="margin-top:12px">'+campo('g-mot','Detalle (queda en los movimientos)','<input type="text" id="g-mot" maxlength="150" placeholder="Ej.: entrega de cocina del 10/12, remito 1234">')+'</div>',
+        ok:function(){
+            var items=[];
+            [].forEach.call($('mg-cuerpo').querySelectorAll('[data-prod],[data-ins]'),function(x){var c=numero(x.value);if(c==null)return;if(isNaN(c)||c<0)throw new Error('Hay una cantidad inválida.');if(c>0)items.push(x.hasAttribute('data-prod')?{producto_id:Number(x.getAttribute('data-prod')),cantidad:c}:{insumo_id:Number(x.getAttribute('data-ins')),cantidad:c});});
+            if(!items.length)throw new Error('No pusiste ninguna cantidad.');
+            return rpc('caja_stock_ingreso',{p_token:S.token,p_items:items,p_motivo:$('g-mot').value.trim()}).then(function(r){aviso('aviso','Ingreso cargado: '+r.cargados+' producto'+(r.cargados===1?'':'s')+'.',true);return cargarStock();});
+        }});
+    $('g-bus').addEventListener('input',function(){var q=this.value.trim().toLowerCase();[].forEach.call($('g-lista').children,function(f){f.style.display=!q||f.getAttribute('data-nombre').indexOf(q)!==-1?'':'none';});});
+};
+
+// ─── cierres de caja ───
+var CI={lista:[]};
+function cargarCierres(){
+    $('lista-cierres').innerHTML='<div class="cargando">Cargando…</div>';
+    $('cfg-mails').disabled=!S.yo.admin;$('btn-cfg-mails').style.display=S.yo.admin?'':'none';
+    rpc('caja_config_leer',{p_token:S.token}).then(function(c){$('cfg-mails').value=(c.mail_cierre||[]).join(', ');}).catch(function(){});
+    return rpc('caja_turnos_listar',{p_token:S.token,p_limite:90}).then(function(l){CI.lista=l||[];pintarCierres();})
+        .catch(function(err){$('lista-cierres').innerHTML='<div class="vacio">'+esc(err.message)+'</div>';});
+}
+$('btn-cfg-mails').onclick=function(){
+    var l=$('cfg-mails').value.split(/[,;\s]+/).map(function(x){return x.trim();}).filter(Boolean);
+    $('btn-cfg-mails').disabled=true;
+    rpc('caja_config_mail',{p_token:S.token,p_destinos:l}).then(function(r){$('cfg-mails').value=(r||[]).join(', ');aviso('aviso',(r&&r.length)?'Listo: el informe de cierre se va a mandar a '+r.join(', ')+'.':'Sin mails: el informe no se va a mandar.',true);})
+    .catch(function(err){aviso('aviso',err.message);}).then(function(){$('btn-cfg-mails').disabled=false;});
+};
+function pintarCierres(){
+    var ab=CI.lista.filter(function(t){return !t.cerrado;})[0];
+    $('turno-abierto').innerHTML=ab?'<div class="aviso ok" style="display:block">Caja abierta desde '+esc(fechaHora(ab.abierto))+' por '+esc(ab.abierto_por)+' · '+esc(ab.resumen.tickets)+' tickets · '+plata(ab.resumen.total)+'</div>':'';
+    var l=CI.lista.filter(function(t){return t.cerrado;});
+    if(!l.length){$('lista-cierres').innerHTML='<div class="vacio">Todavía no hay cierres de caja.</div>';return;}
+    $('lista-cierres').innerHTML='<div class="fila-h cab" style="grid-template-columns:150px minmax(140px,1fr) 80px 110px 140px minmax(150px,1fr) 190px"><div>Cierre</div><div>Abrió / cerró</div><div>Tickets</div><div>Total</div><div>Diferencia</div><div>Mail</div><div></div></div>'+
+        l.map(function(t){
+            var r=t.resumen||{},d=r.diferencia==null?null:Number(r.diferencia);
+            var dif=d==null?'—':d===0?'<span style="color:#15803d;font-weight:700">OK</span>':'<span style="color:'+(d>0?'#1d4ed8':'#b91c1c')+';font-weight:700">'+(d>0?'Sobran ':'Faltan ')+plata(Math.abs(d))+'</span>';
+            var mail=!t.mail_estado?'<span class="muted">No enviado</span>':t.mail_estado==='enviado'?'<span class="chip dia">Enviado</span> <span class="muted" style="font-size:11px">'+esc((t.mail_destinos||[]).join(', '))+'</span>':'<span class="chip warn">'+esc(t.mail_estado.slice(0,60))+'</span>';
+            return '<div class="fila-h" style="grid-template-columns:150px minmax(140px,1fr) 80px 110px 140px minmax(150px,1fr) 190px;align-items:center"><div>'+esc(fechaHora(t.cerrado))+'</div><div>'+esc(t.abierto_por)+' / '+esc(t.cerrado_por)+'</div><div>'+esc(r.tickets)+'</div><div><b>'+plata(r.total)+'</b></div><div>'+dif+'</div><div>'+mail+'</div>'+
+                '<div class="acciones"><button class="btn chico" data-ci="ver" data-id="'+t.id+'" type="button">Ver informe</button><button class="btn chico" data-ci="mail" data-id="'+t.id+'" type="button">Reenviar</button></div></div>';
+        }).join('');
+}
+$('lista-cierres').addEventListener('click',function(e){
+    var b=e.target.closest('[data-ci]');if(!b)return;
+    var t=CI.lista.filter(function(x){return String(x.id)===b.getAttribute('data-id');})[0];if(!t)return;
+    if(b.getAttribute('data-ci')==='ver'){
+        import('/prosegur-informe.js').then(function(m){$('mi-cuerpo').innerHTML=m.informeHTML(t.resumen);$('m-inf').style.display='flex';})
+        .catch(function(err){aviso('aviso','No se pudo mostrar el informe: '+err.message);});
+        return;
+    }
+    b.disabled=true;b.textContent='Enviando…';
+    fetch('/api/caja-cierre',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token,turno:t.id})})
+    .then(function(r){return r.json().catch(function(){return {ok:false,message:'Respuesta inválida ('+r.status+')'};});})
+    .then(function(d){aviso('aviso',d.ok?'Informe enviado a '+d.destinos.join(', ')+'.':'No se pudo enviar: '+(d.estado||d.message),d.ok);return cargarCierres();})
+    .catch(function(err){aviso('aviso','No se pudo enviar: '+err.message);})
+    .then(function(){b.disabled=false;b.textContent='Reenviar';});
+});
+$('mi-cerrar').onclick=function(){$('m-inf').style.display='none';};
+
 // ─── sincronizar ───
 $('btn-sync').onclick=function(){
     var b=$('btn-sync');b.disabled=true;b.textContent='Sincronizando…';
@@ -748,11 +982,13 @@ function mostrarResumen(d){
 function mostrarTab(t){
     S.tab=t;
     [].forEach.call(document.querySelectorAll('.tab'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===t);});
-    ['productos','descuentos','historial'].forEach(function(x){$('sec-'+x).style.display=x===t?'':'none';});
+    ['productos','descuentos','stock','cierres','historial'].forEach(function(x){$('sec-'+x).style.display=x===t?'':'none';});
     if(t==='historial')cargarHistorial();
+    if(t==='stock')cargarStock();
+    if(t==='cierres')cargarCierres();
 }
 document.querySelector('.tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b)mostrarTab(b.getAttribute('data-tab'));});
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){$('m-prod').style.display='none';$('m-desc').style.display='none';$('m-mas').style.display='none';}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){$('m-gen').style.display='none';$('m-inf').style.display='none';$('m-prod').style.display='none';$('m-desc').style.display='none';$('m-mas').style.display='none';}});
 // los descuentos por horario cambian solos: se repinta cada minuto
 setInterval(function(){if($('contenido').style.display==='block'){pintarProductos();pintarDescuentos();}},60000);
 iniciar();
