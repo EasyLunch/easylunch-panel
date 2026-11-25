@@ -501,7 +501,9 @@ $('cobrar').onclick=abrirCobro;$('cobrar2').onclick=abrirCobro;
         billetes.forEach(function(x){var r=Math.ceil(c.total/x)*x;if(r>c.total&&opciones.indexOf(r)===-1&&opciones.length<5)opciones.push(r);});
         $('mc-rapidos').innerHTML=opciones.map(function(v,i){return '<button type="button" data-v="'+v+'">'+(i===0?'Justo':plata(v))+'</button>';}).join('');
         pasoCobro('mc-ef');setTimeout(function(){$('mc-recibido').focus();},50);
-    }else{$('mc-total-qr').textContent=plata(c.total);QR.manual=false;pasoCobro('mc-qr');iniciarQR();}
+    }else{
+        if(c.total<15){errCobro('Mercado Pago no acepta cobros con QR de menos de $15. Cobralo en efectivo.');return;}
+        $('mc-total-qr').textContent=plata(c.total);QR.manual=false;pasoCobro('mc-qr');iniciarQR();}
 };});
 $('mc-rapidos').addEventListener('click',function(e){var b=e.target.closest('button[data-v]');if(!b)return;$('mc-recibido').value=b.getAttribute('data-v');calcVuelto();});
 $('mc-recibido').addEventListener('input',calcVuelto);

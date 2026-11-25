@@ -48,6 +48,8 @@ async function mp(method, path, body, idem) {
     let det = d && (d.message || d.error || '')
     if (d && Array.isArray(d.errors) && d.errors.length) det = (det ? det + ' — ' : '') + d.errors.map(e => [e.code, e.message, e.details && JSON.stringify(e.details)].filter(Boolean).join(': ')).join('; ')
     else if (d && Array.isArray(d.cause) && d.cause.length) det = (det ? det + ' — ' : '') + d.cause.map(c => [c.code, c.description].filter(Boolean).join(': ')).join('; ')
+    const minimo = /greater than or equal to ([\d.]+)/i.exec(String(det))
+    if (minimo) det = 'el monto mínimo para cobrar con QR es $' + Number(minimo[1]).toLocaleString('es-AR') + '.'
     if (/city_name/.test(String(det))) det = 'no reconoce esa localidad. Probá con el nombre del partido (ej.: Vicente López en vez de Florida).'
     if (/state_name/.test(String(det))) det = 'no reconoce esa provincia (ej.: Buenos Aires, Capital Federal).'
     throw Object.assign(err('Mercado Pago: ' + (det || ('error ' + r.status)), r.status >= 500 ? 502 : 400, 'mp'), { mpStatus: r.status, mpBody: d })
