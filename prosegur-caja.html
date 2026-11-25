@@ -315,6 +315,17 @@
     </div>
 </div>
 
+<!-- cambiar de usuario -->
+<div class="fondo" id="m-salir" role="dialog" aria-modal="true" aria-labelledby="ms-tit">
+    <div class="modal" style="max-width:440px;text-align:center">
+        <div style="font-size:44px;line-height:1;margin-bottom:10px" aria-hidden="true">👋</div>
+        <h2 id="ms-tit">¿Cambiamos de usuario?</h2>
+        <p id="ms-txt" style="color:#475569;margin:8px 0 6px;line-height:1.45"></p>
+        <p id="ms-aviso" style="display:none;background:#fef3c7;color:#92400e;border-radius:12px;padding:10px 12px;margin:12px 0 0;font-size:14px;line-height:1.4"></p>
+        <div class="pie" style="justify-content:center"><button type="button" data-cerrar>Seguir con este usuario</button><button class="ok" id="ms-ok" type="button">Sí, cambiar</button></div>
+    </div>
+</div>
+
 <!-- ventas del turno -->
 <div class="fondo" id="m-ventas" role="dialog" aria-modal="true" aria-labelledby="mv-tit">
     <div class="modal" style="max-width:620px">
@@ -819,8 +830,15 @@ function sincronizar(silencioso){
 $('btn-sync').onclick=function(){sincronizar(false);};
 // Cambiar de usuario: cierra la sesión (la caja y el turno quedan abiertos) y vuelve al ingreso del panel.
 $('btn-salir').onclick=function(){
-    var msg=S.ticket&&S.ticket.length?'Hay un ticket sin cobrar. ¿Cerrar la sesión igual? (el ticket se descarta)':'¿Cerrar la sesión para entrar con otro usuario? La caja queda abierta.';
-    if(!confirm(msg))return;
+    var nom=S.yo&&(S.yo.nombre||S.yo.usuario);
+    $('ms-txt').innerHTML=(nom?'Se cierra la sesión de <b>'+esc(nom)+'</b> y entra otra persona. ':'Se cierra esta sesión y entra otra persona. ')+'La caja y el turno siguen abiertos, no se pierde nada.';
+    var n=S.ticket?S.ticket.length:0;
+    $('ms-aviso').style.display=n?'block':'none';
+    $('ms-aviso').textContent=n?'Ojo: hay un ticket sin cobrar ('+n+' producto'+(n>1?'s':'')+'). Si cambiás ahora, se borra.':'';
+    $('m-salir').style.display='flex';
+};
+$('ms-ok').onclick=function(){
+    this.disabled=true;
     var t=S.token;
     try{localStorage.removeItem(EL.TOKEN_KEY);sessionStorage.removeItem('caja_prosegur_ticket');}catch(e){}
     var fin=function(){location.href='index.html?volver=prosegur-caja.html';};
