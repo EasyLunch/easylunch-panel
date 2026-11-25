@@ -195,6 +195,7 @@
         <button class="ico rojo" id="btn-cerrar" type="button" title="Cerrar caja">🔒<span class="txt-l"> Cerrar caja</span></button>
         <button class="ico" id="btn-full" type="button" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
         <a class="ico" href="index.html" title="Volver al panel">Panel</a>
+        <button class="ico" id="btn-salir" type="button" title="Cerrar sesión y entrar con otro usuario">👤<span class="txt-l"> Cambiar usuario</span></button>
     </header>
 
     <section class="izq">
@@ -816,6 +817,16 @@ function sincronizar(silencioso){
     .then(function(){SY.ocupado=false;b.disabled=false;b.firstChild.textContent='⟳';});
 }
 $('btn-sync').onclick=function(){sincronizar(false);};
+// Cambiar de usuario: cierra la sesión (la caja y el turno quedan abiertos) y vuelve al ingreso del panel.
+$('btn-salir').onclick=function(){
+    var msg=S.ticket&&S.ticket.length?'Hay un ticket sin cobrar. ¿Cerrar la sesión igual? (el ticket se descarta)':'¿Cerrar la sesión para entrar con otro usuario? La caja queda abierta.';
+    if(!confirm(msg))return;
+    var t=S.token;
+    try{localStorage.removeItem(EL.TOKEN_KEY);sessionStorage.removeItem('caja_prosegur_ticket');}catch(e){}
+    var fin=function(){location.href='index.html?volver=prosegur-caja.html';};
+    if(!t)return fin();
+    EL.rpc('panel_logout',{p_token:t}).catch(function(){}).then(fin);
+};
 function revisarMenuDelDia(){
     if(SY.auto)return;SY.auto=true;
     var u=S.ultima,f=u&&(u.fecha_menu||(u.resumen&&u.resumen.fecha_menu));

@@ -274,7 +274,11 @@ function doLogin(){
     if(!u||!p){error('login-error','Completá usuario y contraseña.');return;}
     var b=document.getElementById('btn-login');b.disabled=true;error('login-error','');
     rpc('panel_login',{p_usuario:u,p_pass:p}).then(function(r){
-        setToken(r.token);document.getElementById('login-pass').value='';showApp(r.usuario);
+        setToken(r.token);document.getElementById('login-pass').value='';
+        // Si vino desde la caja con "Cambiar usuario", vuelve directo a la caja (si el usuario tiene acceso).
+        var v=new URLSearchParams(location.search).get('volver'),us=r.usuario||{};
+        if(v==='prosegur-caja.html'&&(us.admin||(us.tarjetas||[]).some(function(t){return t==='prosegur-caja'||t==='prosegur-precios';}))){location.href=v;return;}
+        showApp(r.usuario);
     }).catch(function(err){
         error('login-error',err.message);
         document.getElementById('login-pass').value='';document.getElementById('login-pass').focus();
