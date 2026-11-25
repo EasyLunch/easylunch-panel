@@ -194,6 +194,7 @@
         <button class="ico" id="btn-mov" type="button" title="Ingreso o egreso de efectivo">±<span class="txt-l"> Efectivo</span></button>
         <button class="ico rojo" id="btn-cerrar" type="button" title="Cerrar caja">🔒<span class="txt-l"> Cerrar caja</span></button>
         <button class="ico" id="btn-full" type="button" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
+        <a class="ico solo-admin" href="prosegur-precios.html" title="Productos, precios, stock, cierres y configuración (solo administradores)" style="display:none">⚙<span class="txt-l"> Configuración</span></a>
         <button class="ico" id="btn-salir" type="button" title="Cerrar sesión y entrar con otro usuario">👤<span class="txt-l"> Cambiar usuario</span></button>
     </header>
 
@@ -297,7 +298,8 @@
         <p style="font-size:15px;color:#475569;line-height:1.5;margin-top:6px">Contá el efectivo con el que arrancás (el cambio para dar vuelto) y escribilo. Si no hay efectivo, poné 0.</p>
         <div class="campo"><label for="ma-fondo">Fondo inicial</label><input id="ma-fondo" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"></div>
         <div class="err" id="ma-err"></div>
-        <div class="pie"><a href="index.html" style="flex:1;height:54px;border-radius:14px;border:2px solid #e2e8f0;display:flex;align-items:center;justify-content:center;text-decoration:none;color:#334155;font-weight:700">Volver al panel</a><button class="ok" id="ma-ok" type="button">Abrir caja</button></div>
+        <div class="pie"><button type="button" id="ma-salir">Cambiar usuario</button><button class="ok" id="ma-ok" type="button">Abrir caja</button></div>
+        <a class="solo-admin" href="prosegur-precios.html" style="display:none;margin-top:14px;text-align:center;color:#64748b;font-weight:600;text-decoration:none">⚙ Configuración</a>
     </div>
 </div>
 
@@ -374,6 +376,7 @@ function porId(id){for(var i=0;i<S.prod.length;i++)if(String(S.prod[i].id)===Str
 function cargar(primera){
     return EL.rpc('caja_catalogo',{p_token:S.token}).then(function(c){
         S.yo=c.yo;S.prod=c.productos||[];S.desc=c.descuentos||[];S.ultima=c.ultima_sync||null;
+        [].forEach.call(document.querySelectorAll('.solo-admin'),function(e){e.style.display=S.yo.admin?(e.classList.contains('ico')?'inline-flex':'block'):'none';});
         $('quien').innerHTML='<b>'+esc(S.yo.nombre)+'</b><br>'+(S.yo.admin?'Administrador':S.yo.encargado?'Encargado':'Cajero');
         var cats=EL.ordenCategorias(vendibles());
         if(!S.cat||(S.cat!=='__buscar'&&cats.indexOf(S.cat)===-1))S.cat=cats[0]||null;
@@ -830,12 +833,13 @@ $('btn-sync').onclick=function(){sincronizar(false);};
 // Cambiar de usuario: cierra la sesión (la caja y el turno quedan abiertos) y vuelve al ingreso del panel.
 $('btn-salir').onclick=function(){
     var nom=S.yo&&(S.yo.nombre||S.yo.usuario);
-    $('ms-txt').innerHTML=(nom?'Se cierra la sesión de <b>'+esc(nom)+'</b> y entra otra persona. ':'Se cierra esta sesión y entra otra persona. ')+'La caja y el turno siguen abiertos, no se pierde nada.';
+    $('ms-txt').innerHTML=(nom?'Se cierra la sesión de <b>'+esc(nom)+'</b> y entra otra persona. ':'Se cierra esta sesión y entra otra persona. ')+(S.turno?'La caja y el turno siguen abiertos, no se pierde nada.':'');
     var n=S.ticket?S.ticket.length:0;
     $('ms-aviso').style.display=n?'block':'none';
     $('ms-aviso').textContent=n?'Ojo: hay un ticket sin cobrar ('+n+' producto'+(n>1?'s':'')+'). Si cambiás ahora, se borra.':'';
     $('m-salir').style.display='flex';
 };
+$('ma-salir').onclick=function(){$('btn-salir').onclick();};
 $('ms-ok').onclick=function(){
     this.disabled=true;
     var t=S.token;

@@ -241,6 +241,9 @@ function applyAccess(u){
     document.getElementById('vacio').style.display=visibles?'none':'block';
 }
 function showApp(u){
+    // Cajero (solo tiene la tarjeta de la caja): va directo a la caja, sin pasar por el panel.
+    var tj=(u&&u.tarjetas)||[];
+    if(u&&!u.admin&&tj.length===1&&tj[0]==='prosegur-caja'){location.replace('prosegur-caja.html');return;}
     applyAccess(u);
     document.getElementById('quien').innerHTML='<b>'+esc(u.nombre||u.usuario)+'</b>'+(u.admin?'Administrador':esc(u.usuario));
     document.getElementById('login-overlay').style.display='none';
