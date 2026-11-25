@@ -45,7 +45,9 @@ async function mp(method, path, body, idem) {
   const txt = await r.text()
   let d = null; try { d = txt ? JSON.parse(txt) : null } catch (e) { /* */ }
   if (!r.ok) {
-    let det = d && (d.message || (d.errors && d.errors.map(e => e.message || e.code).join('; ')) || d.error)
+    let det = d && (d.message || d.error || '')
+    if (d && Array.isArray(d.errors) && d.errors.length) det = (det ? det + ' — ' : '') + d.errors.map(e => [e.code, e.message, e.details && JSON.stringify(e.details)].filter(Boolean).join(': ')).join('; ')
+    else if (d && Array.isArray(d.cause) && d.cause.length) det = (det ? det + ' — ' : '') + d.cause.map(c => [c.code, c.description].filter(Boolean).join(': ')).join('; ')
     if (/city_name/.test(String(det))) det = 'no reconoce esa localidad. Probá con el nombre del partido (ej.: Vicente López en vez de Florida).'
     if (/state_name/.test(String(det))) det = 'no reconoce esa provincia (ej.: Buenos Aires, Capital Federal).'
     throw Object.assign(err('Mercado Pago: ' + (det || ('error ' + r.status)), r.status >= 500 ? 502 : 400, 'mp'), { mpStatus: r.status, mpBody: d })
