@@ -11,7 +11,7 @@
 //   platos, bebidas → id y PRECIO DEL PRODUCTO (para Prosegur vale el precio del producto, no el del módulo)
 //
 // Cómo se llama:
-//   POST { token, fecha? }          → botón "Sincronizar productos" (token = sesión del panel; encargado o admin)
+//   POST { token, fecha? }          → botón "Sincronizar productos" (token = sesión del panel; cualquier usuario de la caja)
 //   POST { token, fecha?, preview } → solo muestra qué traería, sin guardar nada
 //   GET (cron diario de vercel.json) → sincronización automática a primera hora
 //
