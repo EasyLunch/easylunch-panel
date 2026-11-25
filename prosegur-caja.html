@@ -188,6 +188,7 @@
         <div class="sp"></div>
         <div class="reloj" id="reloj">--:--</div>
         <div class="quien" id="quien"></div>
+        <button class="ico" id="btn-sync" type="button" title="Traer de la app los productos y el plato del día">⟳<span class="txt-l"> Sincronizar</span></button>
         <button class="ico" id="btn-retiros" type="button" title="Retiro de pedidos de la app" style="background:#166534">📦<span class="txt-l"> Retiros app</span></button>
         <button class="ico" id="btn-ventas" type="button" title="Ventas del turno">🧾<span class="txt-l"> Ventas</span></button>
         <button class="ico" id="btn-mov" type="button" title="Ingreso o egreso de efectivo">±<span class="txt-l"> Efectivo</span></button>
@@ -361,12 +362,12 @@ function porId(id){for(var i=0;i<S.prod.length;i++)if(String(S.prod[i].id)===Str
 // ─── carga del catálogo ───
 function cargar(primera){
     return EL.rpc('caja_catalogo',{p_token:S.token}).then(function(c){
-        S.yo=c.yo;S.prod=c.productos||[];S.desc=c.descuentos||[];
+        S.yo=c.yo;S.prod=c.productos||[];S.desc=c.descuentos||[];S.ultima=c.ultima_sync||null;
         $('quien').innerHTML='<b>'+esc(S.yo.nombre)+'</b><br>'+(S.yo.admin?'Administrador':S.yo.encargado?'Encargado':'Cajero');
         var cats=EL.ordenCategorias(vendibles());
         if(!S.cat||(S.cat!=='__buscar'&&cats.indexOf(S.cat)===-1))S.cat=cats[0]||null;
         pintarTabs();pintarGrid();pintarTicket();
-        if(primera){$('carga').style.display='none';$('app').style.display='grid';setTimeout(conciliarQR,1500);}
+        if(primera){$('carga').style.display='none';$('app').style.display='grid';setTimeout(conciliarQR,1500);setTimeout(revisarMenuDelDia,400);}
         return refrescarTurno();
     });
 }
@@ -793,13 +794,42 @@ $('rt-lista').addEventListener('click',function(e){
     .then(function(){RT.ocupado=false;});
 });
 
+// ─── sincronizar con la app (botón y automático si el menú cargado no es el de hoy) ───
+var SY={ocupado:false,auto:false};
+function hoyAR(){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function sincronizar(silencioso){
+    if(SY.ocupado)return Promise.resolve();
+    SY.ocupado=true;var b=$('btn-sync');b.disabled=true;b.firstChild.textContent='⏳';
+    if(!silencioso)aviso('Sincronizando con la app…');
+    return fetch('/api/caja-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token})})
+    .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok||!d.ok)throw new Error(d.message||('Error '+r.status));return d;});})
+    .then(function(d){
+        var r=d.resumen||{},partes=[];
+        if(r.nuevos&&r.nuevos.length)partes.push(r.nuevos.length+' nuevo'+(r.nuevos.length>1?'s':''));
+        if(r.precios&&r.precios.length)partes.push(r.precios.length+' precio'+(r.precios.length>1?'s':'')+' actualizado'+(r.precios.length>1?'s':''));
+        if(r.platos_dia_anteriores)partes.push('plato del día renovado');
+        if(r.quitados&&r.quitados.length)partes.push(r.quitados.length+' quitado'+(r.quitados.length>1?'s':''));
+        aviso((silencioso?'Se actualizó el menú del día':'Productos sincronizados')+(partes.length?': '+partes.join(', '):'')+'.');
+        return cargar(false);
+    })
+    .catch(function(err){aviso('No se pudo sincronizar: '+err.message,true);})
+    .then(function(){SY.ocupado=false;b.disabled=false;b.firstChild.textContent='⟳';});
+}
+$('btn-sync').onclick=function(){sincronizar(false);};
+function revisarMenuDelDia(){
+    if(SY.auto)return;SY.auto=true;
+    var u=S.ultima,f=u&&(u.fecha_menu||(u.resumen&&u.resumen.fecha_menu));
+    if(!f||String(f).slice(0,10)!==hoyAR())sincronizar(true);
+}
+
 // ─── varios ───
 function reloj(){var d=new Date();$('reloj').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 reloj();setInterval(reloj,15000);
 // cada minuto se recalculan precios (descuentos por horario) y cada 5 minutos se relee el catálogo
 setInterval(function(){if($('app').style.display==='grid'){pintarGrid();pintarTicket();}},60000);
 setInterval(function(){if($('app').style.display==='grid')cargar(false).catch(function(){});},300000);
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&$('app').style.display==='grid'){cargar(false).catch(function(){});pedirWakeLock();}});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&$('app').style.display==='grid'){cargar(false).then(function(){SY.auto=false;revisarMenuDelDia();}).catch(function(){});pedirWakeLock();}});
+setInterval(function(){if($('app').style.display==='grid'&&S.ultima){SY.auto=false;revisarMenuDelDia();}},30*60000);
 $('btn-full').onclick=function(){
     var el=document.documentElement;
     if(!document.fullscreenElement){(el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);}

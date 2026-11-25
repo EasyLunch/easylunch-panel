@@ -8,7 +8,7 @@
 --  * Administrador: todo (productos, precio local, descuentos, sincronizar).
 --  * Tarjeta "prosegur-precios" (encargado): ve todo, sincroniza y activa o
 --    pausa descuentos ya creados. No cambia precios.
---  * Tarjeta "prosegur-caja" (cajero): solo lee el catálogo para vender.
+--  * Tarjeta "prosegur-caja" (cajero): lee el catálogo para vender y puede sincronizar con la app.
 --
 -- Seguridad: igual que el panel. Las tablas tienen RLS activado y ninguna
 -- política; con la clave pública solo se accede a través de las funciones
@@ -448,12 +448,13 @@ begin
   return json_build_object('nuevos', nuevos, 'actualizados', actualizados, 'sin_cambios', iguales);
 end $$;
 
--- Sincronización pedida desde la página (botón "Sincronizar productos")
+-- Sincronización pedida desde el panel o desde la caja (botón "Sincronizar productos").
+-- La puede pedir cualquier usuario de la caja: solo trae lo que está habilitado en la app.
 create or replace function public.caja_sync_aplicar(p_token text, p_items jsonb, p_fecha date)
 returns json language plpgsql security definer set search_path = public as $$
 declare u public.panel_usuarios;
 begin
-  u := public.caja__permiso(p_token, 'encargado');
+  u := public.caja__permiso(p_token, 'ver');
   return public.caja__sync('prosegur', p_items, p_fecha, coalesce(nullif(u.nombre, ''), u.usuario), 'manual');
 end $$;
 
