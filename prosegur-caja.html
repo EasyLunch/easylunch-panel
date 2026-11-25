@@ -14,7 +14,7 @@
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#0f172a;touch-action:manipulation;-webkit-tap-highlight-color:transparent;overflow:hidden;}
         button,input{font:inherit;color:inherit;}
         button{cursor:pointer;}
-        .app{display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto 1fr;height:100vh;height:100dvh;}
+        .app{display:grid;grid-template-columns:minmax(0,1fr) var(--ancho-ticket,380px);grid-template-rows:auto 1fr;height:100vh;height:100dvh;}
         /* barra superior */
         .top{grid-column:1/-1;display:flex;align-items:center;gap:14px;background:#0f172a;color:white;padding:10px 18px;padding-top:max(10px,env(safe-area-inset-top));}
         .top img{height:30px;filter:brightness(0) invert(1);}
@@ -26,14 +26,15 @@
         .top .ico{background:#1e293b;border:0;color:white;border-radius:10px;min-width:44px;height:44px;padding:0 12px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;}
         .top .ico:active{background:#334155;}
         /* zona de productos */
-        .izq{display:flex;flex-direction:column;min-height:0;min-width:0;}
-        .tabs{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;background:white;border-bottom:1px solid #e2e8f0;flex:none;}
+        .izq{display:grid;grid-template-columns:210px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);min-height:0;min-width:0;}
+        .izq .tabs{grid-column:1;grid-row:1/3;} .izq .busq{grid-column:2;grid-row:1;} .izq .grid{grid-column:2;grid-row:2;}
+        .tabs{display:flex;flex-direction:column;gap:8px;padding:14px 12px;overflow-y:auto;scrollbar-width:none;background:white;border-right:1px solid #e2e8f0;-webkit-overflow-scrolling:touch;}
         .tabs::-webkit-scrollbar{display:none;}
-        .tab{flex:none;border:2px solid #e2e8f0;background:white;border-radius:999px;height:48px;padding:0 20px;font-size:15px;font-weight:700;color:#334155;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;}
+        .tab{flex:none;border:2px solid #e2e8f0;background:white;border-radius:14px;min-height:54px;padding:8px 14px;font-size:15px;font-weight:700;color:#334155;text-align:left;line-height:1.25;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;}
         .tab .n{background:#f1f5f9;color:#64748b;border-radius:999px;font-size:12px;padding:2px 8px;}
         .tab.on{background:#16a34a;border-color:#16a34a;color:white;}
         .tab.on .n{background:rgba(255,255,255,.25);color:white;}
-        .tab.buscar{padding:0 16px;}
+        .tab.buscar{justify-content:center;font-size:18px;}
         .busq{display:none;padding:10px 16px;background:white;border-bottom:1px solid #e2e8f0;}
         .busq input{width:100%;height:48px;border:2px solid #e2e8f0;border-radius:12px;padding:0 16px;font-size:17px;outline:none;}
         .busq input:focus{border-color:#16a34a;}
@@ -57,7 +58,11 @@
         .prod.nopre .pre b{font-size:13px;color:#b91c1c;}
         .vacio{grid-column:1/-1;text-align:center;color:#64748b;padding:50px 20px;font-size:15px;line-height:1.5;}
         /* ticket */
-        .ticket{background:white;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0;}
+        .ticket{position:relative;background:white;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0;}
+        .divisor{position:absolute;left:-11px;top:0;bottom:0;width:22px;cursor:col-resize;z-index:5;touch-action:none;display:flex;align-items:center;justify-content:center;}
+        .divisor::after{content:"";width:6px;height:56px;border-radius:999px;background:#cbd5e1;box-shadow:0 0 0 3px white;transition:background .15s,height .15s;}
+        .divisor:hover::after,.divisor.arrastrando::after{background:#16a34a;height:84px;}
+        body.redim{cursor:col-resize;user-select:none;-webkit-user-select:none;}
         .t-cab{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f1f5f9;}
         .t-cab h2{font-size:17px;font-weight:800;}
         .t-cab button{background:none;border:0;color:#dc2626;font-weight:600;font-size:14px;padding:10px;}
@@ -164,6 +169,10 @@
         @media (max-width:900px){
             .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto;}
             .top .quien{display:none;}
+            .izq{display:flex;flex-direction:column;}
+            .tabs{flex-direction:row;overflow-x:auto;overflow-y:hidden;padding:12px 16px;border-right:0;border-bottom:1px solid #e2e8f0;}
+            .tab{width:auto;white-space:nowrap;border-radius:999px;min-height:48px;padding:0 20px;}
+            .divisor{display:none;}
             .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));padding-bottom:20px;}
             .ticket{position:fixed;inset:0;z-index:40;transform:translateY(100%);transition:transform .25s;border-left:0;}
             .ticket.abierto{transform:none;}
@@ -174,7 +183,9 @@
             .barra-t .ver b{font-size:20px;font-variant-numeric:tabular-nums;}
             .barra-t .cobrar{width:auto;flex:1;height:60px;}
             .aviso{bottom:100px;}
-            .top .ico.txt-l{display:none;}
+            .top .ico .txt-l{display:none;}
+            .top{gap:8px;padding-left:12px;padding-right:12px;}
+            .top .tit small{display:none;}
         }
     </style>
 </head>
@@ -205,6 +216,7 @@
     </section>
 
     <aside class="ticket" id="ticket" aria-label="Ticket">
+        <div class="divisor" id="divisor" role="separator" aria-orientation="vertical" aria-label="Arrastrá para cambiar el ancho del ticket" title="Arrastrá para cambiar el ancho · doble toque para volver al tamaño normal"></div>
         <div class="t-cab">
             <button class="cerrar-hoja" id="cerrar-hoja" type="button" aria-label="Cerrar ticket">⌄</button>
             <h2>Ticket</h2>
@@ -853,6 +865,26 @@ function revisarMenuDelDia(){
     var u=S.ultima,f=u&&(u.fecha_menu||(u.resumen&&u.resumen.fecha_menu));
     if(!f||String(f).slice(0,10)!==hoyAR())sincronizar(true);
 }
+
+// ─── ancho del ticket: se arrastra el divisor; queda guardado en esta tablet ───
+(function(){
+    var KEY='caja_prosegur_ancho_ticket',MIN=300,DEF=380,d=$('divisor'),app=$('app');
+    function maximo(){return Math.max(MIN,Math.min(700,Math.round(window.innerWidth*0.55)));}
+    function poner(w,guardar){
+        w=Math.round(Math.min(maximo(),Math.max(MIN,w)));
+        app.style.setProperty('--ancho-ticket',w+'px');
+        if(guardar)try{localStorage.setItem(KEY,String(w));}catch(e){}
+    }
+    var g=null;try{g=parseInt(localStorage.getItem(KEY),10);}catch(e){}
+    if(g)poner(g,false);
+    var arr=false;
+    d.addEventListener('pointerdown',function(e){arr=true;d.classList.add('arrastrando');document.body.classList.add('redim');try{d.setPointerCapture(e.pointerId);}catch(x){}e.preventDefault();});
+    d.addEventListener('pointermove',function(e){if(arr)poner(window.innerWidth-e.clientX,false);});
+    function soltar(){if(!arr)return;arr=false;d.classList.remove('arrastrando');document.body.classList.remove('redim');poner($('ticket').getBoundingClientRect().width,true);}
+    d.addEventListener('pointerup',soltar);d.addEventListener('pointercancel',soltar);
+    d.addEventListener('dblclick',function(){poner(DEF,true);});
+    window.addEventListener('resize',function(){var w=parseInt(getComputedStyle(app).getPropertyValue('--ancho-ticket'),10);if(w)poner(w,false);});
+})();
 
 // ─── varios ───
 function reloj(){var d=new Date();$('reloj').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
