@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a">
+    <title>Caja · Local Prosegur · Easy Lunch</title>
+    <link rel="icon" type="image/png" href="/icons/facturacion.png"><link rel="apple-touch-icon" href="/icons/facturacion.png">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        html,body{height:100%;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#0f172a;touch-action:manipulation;-webkit-tap-highlight-color:transparent;overflow:hidden;}
+        button,input{font:inherit;color:inherit;}
+        button{cursor:pointer;}
+        .app{display:grid;grid-template-columns:minmax(0,1fr) 360px;grid-template-rows:auto 1fr;height:100vh;height:100dvh;}
+        /* barra superior */
+        .top{grid-column:1/-1;display:flex;align-items:center;gap:14px;background:#0f172a;color:white;padding:10px 18px;padding-top:max(10px,env(safe-area-inset-top));}
+        .top img{height:30px;filter:brightness(0) invert(1);}
+        .top .tit{font-weight:700;font-size:15px;line-height:1.2;}
+        .top .tit small{display:block;font-weight:500;color:#94a3b8;font-size:12px;}
+        .top .sp{flex:1;}
+        .top .reloj{font-variant-numeric:tabular-nums;font-weight:700;font-size:18px;}
+        .top .quien{font-size:12px;color:#cbd5e1;text-align:right;line-height:1.3;}
+        .top .ico{background:#1e293b;border:0;color:white;border-radius:10px;min-width:44px;height:44px;padding:0 12px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;}
+        .top .ico:active{background:#334155;}
+        /* zona de productos */
+        .izq{display:flex;flex-direction:column;min-height:0;min-width:0;}
+        .tabs{display:flex;gap:8px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;background:white;border-bottom:1px solid #e2e8f0;flex:none;}
+        .tabs::-webkit-scrollbar{display:none;}
+        .tab{flex:none;border:2px solid #e2e8f0;background:white;border-radius:999px;height:48px;padding:0 20px;font-size:15px;font-weight:700;color:#334155;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;}
+        .tab .n{background:#f1f5f9;color:#64748b;border-radius:999px;font-size:12px;padding:2px 8px;}
+        .tab.on{background:#16a34a;border-color:#16a34a;color:white;}
+        .tab.on .n{background:rgba(255,255,255,.25);color:white;}
+        .tab.buscar{padding:0 16px;}
+        .busq{display:none;padding:10px 16px;background:white;border-bottom:1px solid #e2e8f0;}
+        .busq input{width:100%;height:48px;border:2px solid #e2e8f0;border-radius:12px;padding:0 16px;font-size:17px;outline:none;}
+        .busq input:focus{border-color:#16a34a;}
+        .grid{flex:1;overflow-y:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px;align-content:start;-webkit-overflow-scrolling:touch;}
+        .prod{position:relative;background:white;border:2px solid transparent;border-radius:16px;overflow:hidden;text-align:left;display:flex;flex-direction:column;box-shadow:0 1px 3px rgba(15,23,42,.08);user-select:none;-webkit-user-select:none;transition:transform .08s,border-color .15s;padding:0;}
+        .prod:active{transform:scale(.97);}
+        .prod.sel{border-color:#16a34a;}
+        .prod .foto{aspect-ratio:4/3;width:100%;object-fit:cover;background:#e2e8f0;display:block;}
+        .prod .ph{aspect-ratio:4/3;width:100%;display:flex;align-items:center;justify-content:center;font-size:46px;}
+        .ph.vianda{background:linear-gradient(135deg,#fef3c7,#fde68a);} .ph.postre{background:linear-gradient(135deg,#fce7f3,#fbcfe8);}
+        .ph.bebida{background:linear-gradient(135deg,#dbeafe,#bfdbfe);} .ph.cafeteria{background:linear-gradient(135deg,#f5e6d3,#e7c9a4);}
+        .ph.kiosco{background:linear-gradient(135deg,#ede9fe,#ddd6fe);} .ph.otro{background:linear-gradient(135deg,#e2e8f0,#cbd5e1);}
+        .prod .info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1;}
+        .prod .nom{font-size:14px;font-weight:600;line-height:1.3;color:#1e293b;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em;}
+        .prod .pre{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:auto;}
+        .prod .pre b{font-size:19px;font-weight:800;}
+        .prod .pre s{font-size:12px;color:#94a3b8;}
+        .prod .off{position:absolute;top:8px;left:8px;background:#16a34a;color:white;font-size:12px;font-weight:800;border-radius:8px;padding:3px 8px;}
+        .prod .cant{position:absolute;top:8px;right:8px;background:#0f172a;color:white;font-size:15px;font-weight:800;border-radius:999px;min-width:32px;height:32px;display:flex;align-items:center;justify-content:center;padding:0 8px;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+        .prod.nopre{opacity:.55;}
+        .prod.nopre .pre b{font-size:13px;color:#b91c1c;}
+        .vacio{grid-column:1/-1;text-align:center;color:#64748b;padding:50px 20px;font-size:15px;line-height:1.5;}
+        /* ticket */
+        .ticket{background:white;border-left:1px solid #e2e8f0;display:flex;flex-direction:column;min-height:0;}
+        .t-cab{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #f1f5f9;}
+        .t-cab h2{font-size:17px;font-weight:800;}
+        .t-cab button{background:none;border:0;color:#dc2626;font-weight:600;font-size:14px;padding:10px;}
+        .t-cab .cerrar-hoja{display:none;color:#334155;font-size:22px;}
+        .items{flex:1;overflow-y:auto;padding:4px 0;}
+        .item{padding:10px 16px;border-bottom:1px solid #f8fafc;}
+        .item .l1{display:flex;justify-content:space-between;gap:10px;font-size:14px;font-weight:600;line-height:1.3;}
+        .item .l1 span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums;}
+        .item .l2{display:flex;align-items:center;justify-content:space-between;margin-top:8px;gap:8px;}
+        .item .unit{font-size:12px;color:#64748b;}
+        .item .unit .d{color:#15803d;font-weight:600;display:block;}
+        .item.mal{background:#fef2f2;}
+        .item.mal .unit{color:#b91c1c;}
+        .qty{display:flex;align-items:center;gap:4px;}
+        .qty button{width:44px;height:44px;border-radius:12px;border:2px solid #e2e8f0;background:white;font-size:22px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center;}
+        .qty button:active{background:#f1f5f9;}
+        .qty .n{min-width:34px;text-align:center;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}
+        .t-vacio{color:#94a3b8;text-align:center;padding:50px 20px;font-size:14px;line-height:1.6;}
+        .tot{padding:12px 16px 16px;border-top:1px solid #e2e8f0;padding-bottom:max(16px,env(safe-area-inset-bottom));}
+        .tot .f{display:flex;justify-content:space-between;font-size:14px;color:#475569;margin-bottom:4px;font-variant-numeric:tabular-nums;}
+        .tot .f.desc{color:#15803d;}
+        .tot .f.total{font-size:26px;font-weight:800;color:#0f172a;margin:8px 0 12px;}
+        .cobrar{width:100%;height:64px;border:0;border-radius:16px;background:#16a34a;color:white;font-size:20px;font-weight:800;}
+        .cobrar:active{background:#15803d;}
+        .cobrar:disabled{background:#cbd5e1;}
+        /* barra inferior (vertical) */
+        .barra-t{display:none;}
+        /* modal */
+        .fondo{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:20px;z-index:50;}
+        .modal{background:white;border-radius:20px;width:100%;max-width:520px;padding:26px;box-shadow:0 20px 50px rgba(0,0,0,.3);max-height:90vh;overflow:auto;}
+        .modal h2{font-size:22px;font-weight:800;margin-bottom:4px;}
+        .modal .big{font-size:40px;font-weight:800;margin:6px 0 18px;font-variant-numeric:tabular-nums;}
+        .medios{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+        .medio{height:88px;border-radius:16px;border:2px solid #e2e8f0;background:white;font-size:17px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
+        .medio span{font-size:28px;}
+        .medio:active{background:#f8fafc;}
+        .nota{background:#fff7ed;color:#9a3412;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.5;margin-top:16px;display:none;}
+        .pie{display:flex;gap:10px;margin-top:18px;}
+        .pie button{flex:1;height:54px;border-radius:14px;border:2px solid #e2e8f0;background:white;font-size:16px;font-weight:700;}
+        .pie button.ok{background:#16a34a;border-color:#16a34a;color:white;}
+        .aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:white;padding:12px 18px;border-radius:12px;font-size:14px;z-index:60;display:none;max-width:90vw;text-align:center;}
+        .aviso.err{background:#b91c1c;}
+        .carga{position:fixed;inset:0;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#334155;font-weight:600;z-index:70;text-align:center;padding:20px;}
+        .spin{width:30px;height:30px;border:3px solid #e2e8f0;border-top-color:#16a34a;border-radius:50%;animation:g .8s linear infinite;}
+        @keyframes g{to{transform:rotate(360deg)}}
+        :focus-visible{outline:3px solid #16a34a;outline-offset:2px;}
+        .top .ico.rojo{background:#7f1d1d;}
+        .campo{margin-top:14px;}
+        .campo label{display:block;font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;}
+        .campo input,.campo textarea{width:100%;height:56px;border:2px solid #e2e8f0;border-radius:14px;padding:0 16px;font-size:22px;font-weight:700;outline:none;font-variant-numeric:tabular-nums;}
+        .campo textarea{height:80px;font-size:16px;font-weight:500;padding:12px 16px;resize:none;}
+        .campo input.txt{font-size:17px;font-weight:500;}
+        .campo input:focus,.campo textarea:focus{border-color:#16a34a;}
+        .rapidos{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+        .rapidos button{height:48px;padding:0 16px;border-radius:12px;border:2px solid #e2e8f0;background:white;font-size:16px;font-weight:700;}
+        .rapidos button:active{background:#f1f5f9;}
+        .vuelto{margin-top:14px;padding:14px 16px;border-radius:14px;background:#f0fdf4;color:#15803d;font-size:20px;font-weight:800;display:flex;justify-content:space-between;}
+        .vuelto.falta{background:#fef2f2;color:#b91c1c;}
+        .seg{display:flex;gap:8px;margin-top:6px;}
+        .seg button{flex:1;height:52px;border-radius:12px;border:2px solid #e2e8f0;background:white;font-size:16px;font-weight:700;}
+        .seg button.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}
+        .err{background:#fef2f2;color:#b91c1c;border-radius:12px;padding:12px 14px;font-size:14px;margin-top:14px;display:none;line-height:1.45;}
+        .listo{text-align:center;padding:10px 0;}
+        .listo .chk{width:84px;height:84px;border-radius:50%;background:#16a34a;color:white;font-size:46px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;}
+        .resu{background:#f8fafc;border-radius:14px;padding:12px 16px;margin-top:6px;}
+        .resu .f{display:flex;justify-content:space-between;font-size:15px;padding:5px 0;font-variant-numeric:tabular-nums;}
+        .resu .f.b{font-weight:800;font-size:17px;border-top:1px solid #e2e8f0;margin-top:4px;padding-top:9px;}
+        .lv{max-height:60vh;overflow:auto;margin-top:8px;}
+        .lv .v{border-bottom:1px solid #f1f5f9;padding:12px 2px;}
+        .lv .v .a{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:15px;}
+        .lv .v .b{font-size:13px;color:#64748b;margin-top:4px;line-height:1.45;}
+        .lv .v.anul .a{color:#94a3b8;text-decoration:line-through;}
+        .lv .v button{margin-top:8px;height:40px;padding:0 14px;border-radius:10px;border:2px solid #fecaca;background:white;color:#b91c1c;font-weight:700;}
+        .ret{position:fixed;inset:0;background:#f1f5f9;z-index:45;display:none;flex-direction:column;}
+        .ret-top{background:#166534;color:white;padding:12px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:max(12px,env(safe-area-inset-top));}
+        .ret-top h2{font-size:18px;font-weight:800;}
+        .ret-top .cnt{background:rgba(255,255,255,.18);border-radius:999px;padding:6px 12px;font-weight:700;font-size:14px;}
+        .ret-top .sp{flex:1;}
+        .ret-top button{height:44px;border:0;border-radius:10px;padding:0 14px;font-weight:700;background:rgba(255,255,255,.18);color:white;}
+        .ret-bar{display:flex;gap:10px;padding:12px 16px;background:white;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;}
+        .ret-bar input{flex:1;min-width:220px;height:52px;border:2px solid #e2e8f0;border-radius:12px;padding:0 16px;font-size:18px;outline:none;}
+        .ret-bar input:focus{border-color:#16a34a;}
+        .ret-bar .seg{margin:0;}
+        .ret-bar .seg button{height:52px;padding:0 16px;flex:none;}
+        .ret-lista{flex:1;overflow:auto;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-content:start;}
+        .rc{background:white;border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:8px;border:2px solid transparent;}
+        .rc.ok{opacity:.6;}
+        .rc.np{border-color:#fecaca;}
+        .rc .n{font-size:18px;font-weight:800;line-height:1.25;}
+        .rc .d{font-size:13px;color:#64748b;}
+        .rc ul{margin:0 0 0 18px;font-size:14px;line-height:1.5;}
+        .rc .bad{display:inline-block;font-size:12px;font-weight:800;border-radius:8px;padding:3px 8px;}
+        .rc .bad.r{background:#fee2e2;color:#b91c1c;} .rc .bad.g{background:#e2e8f0;color:#334155;}
+        .rc .ent{height:56px;border:0;border-radius:14px;background:#16a34a;color:white;font-size:18px;font-weight:800;margin-top:auto;}
+        .rc .ent:active{background:#15803d;}
+        .rc .des{height:40px;border:2px solid #e2e8f0;border-radius:10px;background:white;font-weight:700;color:#475569;}
+        .modal .x{float:right;background:none;border:0;font-size:26px;line-height:1;color:#64748b;padding:4px 8px;}
+        /* tablet vertical / pantallas angostas: el ticket pasa a una barra abajo que se abre */
+        @media (max-width:900px){
+            .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto;}
+            .top .quien{display:none;}
+            .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));padding-bottom:20px;}
+            .ticket{position:fixed;inset:0;z-index:40;transform:translateY(100%);transition:transform .25s;border-left:0;}
+            .ticket.abierto{transform:none;}
+            .t-cab .cerrar-hoja{display:block;}
+            .barra-t{display:flex;align-items:center;gap:12px;background:white;border-top:1px solid #e2e8f0;padding:10px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom));}
+            .barra-t .ver{flex:1;height:60px;border:2px solid #e2e8f0;border-radius:14px;background:white;text-align:left;padding:0 14px;display:flex;flex-direction:column;justify-content:center;}
+            .barra-t .ver small{color:#64748b;font-size:12px;}
+            .barra-t .ver b{font-size:20px;font-variant-numeric:tabular-nums;}
+            .barra-t .cobrar{width:auto;flex:1;height:60px;}
+            .aviso{bottom:100px;}
+            .top .ico.txt-l{display:none;}
+        }
+    </style>
+</head>
+<body>
+<div class="carga" id="carga"><div class="spin"></div><span>Cargando la caja…</span></div>
+
+<div class="app" id="app" style="display:none">
+    <header class="top">
+        <img src="/icons/logo.png" alt="Easy Lunch">
+        <div class="tit">Caja<small>Local Prosegur</small></div>
+        <div class="sp"></div>
+        <div class="reloj" id="reloj">--:--</div>
+        <div class="quien" id="quien"></div>
+        <button class="ico" id="btn-retiros" type="button" title="Retiro de pedidos de la app" style="background:#166534">📦<span class="txt-l"> Retiros app</span></button>
+        <button class="ico" id="btn-ventas" type="button" title="Ventas del turno">🧾<span class="txt-l"> Ventas</span></button>
+        <button class="ico" id="btn-mov" type="button" title="Ingreso o egreso de efectivo">±<span class="txt-l"> Efectivo</span></button>
+        <button class="ico rojo" id="btn-cerrar" type="button" title="Cerrar caja">🔒<span class="txt-l"> Cerrar caja</span></button>
+        <button class="ico" id="btn-full" type="button" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
+        <a class="ico" href="index.html" title="Volver al panel">Panel</a>
+    </header>
+
+    <section class="izq">
+        <nav class="tabs" id="tabs" role="tablist" aria-label="Categorías"></nav>
+        <div class="busq" id="busq"><input type="search" id="q" placeholder="Buscar producto…" aria-label="Buscar producto" autocomplete="off"></div>
+        <div class="grid" id="grid"></div>
+    </section>
+
+    <aside class="ticket" id="ticket" aria-label="Ticket">
+        <div class="t-cab">
+            <button class="cerrar-hoja" id="cerrar-hoja" type="button" aria-label="Cerrar ticket">⌄</button>
+            <h2>Ticket</h2>
+            <button id="vaciar" type="button">Vaciar</button>
+        </div>
+        <div class="items" id="items"></div>
+        <div class="tot">
+            <div class="f"><span>Subtotal</span><span id="t-sub">$0</span></div>
+            <div class="f desc" id="f-desc" style="display:none"><span>Descuentos</span><span id="t-desc">$0</span></div>
+            <div class="f total"><span>Total</span><span id="t-total">$0</span></div>
+            <button class="cobrar" id="cobrar" type="button" disabled>Cobrar</button>
+        </div>
+    </aside>
+
+    <div class="barra-t">
+        <button class="ver" id="ver-ticket" type="button"><small id="bt-cant">Ticket vacío</small><b id="bt-total">$0</b></button>
+        <button class="cobrar" id="cobrar2" type="button" disabled>Cobrar</button>
+    </div>
+</div>
+
+<!-- cobro -->
+<div class="fondo" id="m-cobro" role="dialog" aria-modal="true" aria-labelledby="mc-tit">
+    <div class="modal">
+        <div id="mc-paso1">
+            <button class="x" type="button" data-cerrar aria-label="Cerrar">×</button>
+            <h2 id="mc-tit">Cobrar</h2>
+            <div class="big" id="mc-total">$0</div>
+            <div class="medios">
+                <button class="medio" data-medio="efectivo" type="button"><span>💵</span>Efectivo</button>
+                <button class="medio" data-medio="qr" type="button"><span>▦</span>QR Mercado Pago</button>
+            </div>
+        </div>
+        <div id="mc-ef" style="display:none">
+            <button class="x" type="button" data-volver aria-label="Volver">‹</button>
+            <h2>Efectivo</h2>
+            <div class="big" id="mc-total-ef">$0</div>
+            <div class="campo"><label for="mc-recibido">¿Con cuánto paga?</label><input id="mc-recibido" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Monto recibido"></div>
+            <div class="rapidos" id="mc-rapidos"></div>
+            <div class="vuelto" id="mc-vuelto" style="display:none"><span>Vuelto</span><span id="mc-vuelto-n">$0</span></div>
+        </div>
+        <div id="mc-qr" style="display:none">
+            <button class="x" type="button" data-volver aria-label="Volver">‹</button>
+            <h2>QR Mercado Pago</h2>
+            <div class="big" id="mc-total-qr">$0</div>
+            <p style="font-size:15px;color:#475569;line-height:1.5">Mostrale al cliente el QR de Mercado Pago del local y confirmá cuando veas el pago acreditado en la cuenta. <br><small style="color:#94a3b8">Próximamente el QR va a salir en esta pantalla con el monto y la venta se va a confirmar sola.</small></p>
+        </div>
+        <div id="mc-listo" style="display:none" class="listo">
+            <div class="chk">✓</div>
+            <h2 id="mc-listo-t">Venta registrada</h2>
+            <div class="big" id="mc-listo-vuelto" style="margin:8px 0 0"></div>
+            <div style="color:#64748b;font-size:14px" id="mc-listo-sub"></div>
+        </div>
+        <div class="err" id="mc-err"></div>
+        <div class="pie" id="mc-pie" style="display:none">
+            <button class="ok" id="mc-confirmar" type="button">Confirmar cobro</button>
+        </div>
+        <div class="pie" id="mc-pie-listo" style="display:none">
+            <button class="ok" id="mc-nueva" type="button">Nueva venta</button>
+        </div>
+    </div>
+</div>
+
+<!-- retiro de pedidos de la app -->
+<div class="ret" id="ret" role="dialog" aria-modal="true" aria-labelledby="rt-tit">
+    <div class="ret-top">
+        <h2 id="rt-tit">Retiro de pedidos de la app</h2>
+        <span class="cnt" id="rt-cnt">—</span>
+        <span class="sp"></span>
+        <button type="button" id="rt-act">⟳ Actualizar</button>
+        <button type="button" id="rt-cerrar">Volver a la caja</button>
+    </div>
+    <div class="ret-bar">
+        <input type="search" id="rt-q" placeholder="Buscar por apellido, nombre o últimos números del DNI" autocomplete="off" aria-label="Buscar persona">
+        <div class="seg" id="rt-f"><button type="button" data-f="pend" class="on">Pendientes</button><button type="button" data-f="ok">Entregados</button><button type="button" data-f="todos">Todos</button></div>
+    </div>
+    <div class="ret-lista" id="rt-lista"></div>
+</div>
+
+<!-- abrir caja -->
+<div class="fondo" id="m-abrir" role="dialog" aria-modal="true" aria-labelledby="ma-tit">
+    <div class="modal">
+        <h2 id="ma-tit">Abrir caja</h2>
+        <p style="font-size:15px;color:#475569;line-height:1.5;margin-top:6px">Contá el efectivo con el que arrancás (el cambio para dar vuelto) y escribilo. Si no hay efectivo, poné 0.</p>
+        <div class="campo"><label for="ma-fondo">Fondo inicial</label><input id="ma-fondo" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0"></div>
+        <div class="err" id="ma-err"></div>
+        <div class="pie"><a href="index.html" style="flex:1;height:54px;border-radius:14px;border:2px solid #e2e8f0;display:flex;align-items:center;justify-content:center;text-decoration:none;color:#334155;font-weight:700">Volver al panel</a><button class="ok" id="ma-ok" type="button">Abrir caja</button></div>
+    </div>
+</div>
+
+<!-- ingreso / egreso de efectivo -->
+<div class="fondo" id="m-mov" role="dialog" aria-modal="true" aria-labelledby="mm-tit">
+    <div class="modal">
+        <button class="x" type="button" data-cerrar aria-label="Cerrar">×</button>
+        <h2 id="mm-tit">Ingreso o egreso de efectivo</h2>
+        <div class="seg" id="mm-tipo"><button type="button" data-t="egreso" class="on">Sale plata</button><button type="button" data-t="ingreso">Entra plata</button></div>
+        <div class="campo"><label for="mm-monto">Monto</label><input id="mm-monto" type="number" inputmode="decimal" min="0" step="0.01"></div>
+        <div class="campo"><label for="mm-motivo">Motivo</label><input id="mm-motivo" class="txt" type="text" maxlength="120" placeholder="Ej.: pago de hielo, retiro de efectivo, cambio"></div>
+        <div class="err" id="mm-err"></div>
+        <div class="pie"><button type="button" data-cerrar>Cancelar</button><button class="ok" id="mm-ok" type="button">Guardar</button></div>
+    </div>
+</div>
+
+<!-- ventas del turno -->
+<div class="fondo" id="m-ventas" role="dialog" aria-modal="true" aria-labelledby="mv-tit">
+    <div class="modal" style="max-width:620px">
+        <button class="x" type="button" data-cerrar aria-label="Cerrar">×</button>
+        <h2 id="mv-tit">Ventas del turno</h2>
+        <div style="font-size:14px;color:#64748b" id="mv-sub"></div>
+        <div class="lv" id="mv-lista"></div>
+    </div>
+</div>
+
+<!-- cierre de caja -->
+<div class="fondo" id="m-cierre" role="dialog" aria-modal="true" aria-labelledby="mz-tit">
+    <div class="modal" style="max-width:560px">
+        <div id="mz-paso1">
+            <button class="x" type="button" data-cerrar aria-label="Cerrar">×</button>
+            <h2 id="mz-tit">Cerrar caja</h2>
+            <div class="resu" id="mz-resu"></div>
+            <div class="campo"><label for="mz-contado">Contá el efectivo de la caja y escribí el total</label><input id="mz-contado" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Efectivo contado"></div>
+            <div class="campo"><label for="mz-notas">Notas (opcional)</label><textarea id="mz-notas" maxlength="500" placeholder="Algo que tenga que saber el encargado"></textarea></div>
+            <div class="err" id="mz-err"></div>
+            <div class="pie"><button type="button" data-cerrar>Cancelar</button><button class="ok" id="mz-ok" type="button">Cerrar caja y enviar informe</button></div>
+        </div>
+        <div id="mz-paso2" style="display:none">
+            <h2>Caja cerrada</h2>
+            <div class="resu" id="mz-final"></div>
+            <div class="err" id="mz-mail" style="display:block"></div>
+            <div class="pie"><button type="button" id="mz-reintentar" style="display:none">Reintentar envío</button><button class="ok" id="mz-listo" type="button">Listo</button></div>
+        </div>
+    </div>
+</div>
+<div class="aviso" id="aviso"></div>
+
+<script src="/prosegur-comun.js"></script>
+<script>
+var S={token:null,yo:null,prod:[],desc:[],cat:null,q:'',ticket:[],turno:null};  // ticket: [{id, cant}]
+var EMOJI={vianda:'🍽️',postre:'🍰',bebida:'🥤',cafeteria:'☕',kiosco:'🍫',otro:'🛒'};
+var $=function(id){return document.getElementById(id);};
+var esc=EL.esc,plata=EL.plata;
+function sinTildes(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+
+function aviso(msg,err){var a=$('aviso');a.textContent=msg;a.className='aviso'+(err?' err':'');a.style.display='block';clearTimeout(aviso.t);aviso.t=setTimeout(function(){a.style.display='none';},3500);}
+function vendibles(){return S.prod.filter(EL.enCaja);}
+function porId(id){for(var i=0;i<S.prod.length;i++)if(String(S.prod[i].id)===String(id))return S.prod[i];return null;}
+
+// ─── carga del catálogo ───
+function cargar(primera){
+    return EL.rpc('caja_catalogo',{p_token:S.token}).then(function(c){
+        S.yo=c.yo;S.prod=c.productos||[];S.desc=c.descuentos||[];
+        $('quien').innerHTML='<b>'+esc(S.yo.nombre)+'</b><br>'+(S.yo.admin?'Administrador':S.yo.encargado?'Encargado':'Cajero');
+        var cats=EL.ordenCategorias(vendibles());
+        if(!S.cat||(S.cat!=='__buscar'&&cats.indexOf(S.cat)===-1))S.cat=cats[0]||null;
+        pintarTabs();pintarGrid();pintarTicket();
+        if(primera){$('carga').style.display='none';$('app').style.display='grid';}
+        return refrescarTurno();
+    });
+}
+function iniciar(){
+    S.token=EL.token();
+    if(!S.token){location.href='index.html';return;}
+    try{var t=JSON.parse(sessionStorage.getItem('caja_prosegur_ticket')||'[]');if(Array.isArray(t))S.ticket=t;}catch(e){}
+    cargar(true).catch(function(err){
+        if(/Sesión vencida/.test(err.message)){location.href='index.html';return;}
+        $('carga').innerHTML='<b>No se pudo abrir la caja</b><span style="font-weight:400">'+esc(err.message)+'</span><button class="cobrar" style="max-width:260px;height:52px;font-size:16px" onclick="location.reload()">Reintentar</button>';
+    });
+}
+
+// ─── solapas ───
+function pintarTabs(){
+    var v=vendibles(),cats=EL.ordenCategorias(v),cuenta={};
+    v.forEach(function(p){var c=p.categoria||'Otros';cuenta[c]=(cuenta[c]||0)+1;});
+    $('tabs').innerHTML='<button class="tab buscar'+(S.cat==='__buscar'?' on':'')+'" data-cat="__buscar" type="button" aria-label="Buscar">🔍</button>'+
+        cats.map(function(c){return '<button class="tab'+(c===S.cat?' on':'')+'" data-cat="'+esc(c)+'" type="button" role="tab">'+esc(c)+'<span class="n">'+cuenta[c]+'</span></button>';}).join('');
+    $('busq').style.display=S.cat==='__buscar'?'block':'none';
+}
+$('tabs').addEventListener('click',function(e){
+    var b=e.target.closest('.tab');if(!b)return;
+    S.cat=b.getAttribute('data-cat');pintarTabs();pintarGrid();
+    $('grid').scrollTop=0;
+    if(S.cat==='__buscar')setTimeout(function(){$('q').focus();},30);
+});
+$('q').addEventListener('input',function(){S.q=this.value;pintarGrid();});
+
+// ─── botones de productos ───
+function cantEnTicket(id){for(var i=0;i<S.ticket.length;i++)if(String(S.ticket[i].id)===String(id))return S.ticket[i].cant;return 0;}
+function pintarGrid(){
+    var v=vendibles(),ahora=new Date(),l;
+    if(S.cat==='__buscar'){
+        var q=sinTildes(S.q.trim());
+        l=q?v.filter(function(p){return sinTildes(p.nombre+' '+p.categoria).indexOf(q)!==-1;}):[];
+        if(!q){$('grid').innerHTML='<div class="vacio">Escribí para buscar entre todos los productos.</div>';return;}
+    }else l=v.filter(function(p){return (p.categoria||'Otros')===S.cat;});
+    if(!l.length){$('grid').innerHTML='<div class="vacio">'+(S.prod.length?'No hay productos acá.':'Todavía no hay productos cargados.<br>Se cargan desde el panel, en "Local Prosegur · Productos y precios".')+'</div>';return;}
+    l.sort(function(a,b){return (a.orden-b.orden)||a.nombre.localeCompare(b.nombre,'es');});
+    $('grid').innerHTML=l.map(function(p){
+        var pf=EL.precioFinal(p,S.desc,ahora),src=EL.foto(p),n=cantEnTicket(p.id);
+        var ph='<div class="ph '+esc(p.tipo)+'"'+(src?' style="display:none"':'')+'>'+(EMOJI[p.tipo]||'🛒')+'</div>';
+        var img=(src?'<img class="foto" src="'+esc(src)+'" alt="" loading="lazy" draggable="false" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">':'')+ph;
+        var off='';
+        if(pf.desc)off='<span class="off">'+(pf.desc.tipo==='porcentaje'?'−'+String(Number(pf.desc.valor)).replace('.',',')+'%':'−'+plata(pf.ahorro))+'</span>';
+        var pre=pf.lista==null?'<b>Sin precio</b>':(pf.desc?'<s>'+plata(pf.lista)+'</s>':'')+'<b>'+plata(pf.final)+'</b>';
+        return '<button class="prod'+(n?' sel':'')+(pf.lista==null?' nopre':'')+'" data-id="'+p.id+'" type="button" aria-label="'+esc(p.nombre)+', '+(pf.final==null?'sin precio':plata(pf.final))+'">'+img+off+(n?'<span class="cant">'+n+'</span>':'')+
+            '<div class="info"><div class="nom">'+esc(p.nombre)+'</div><div class="pre">'+pre+'</div></div></button>';
+    }).join('');
+}
+$('grid').addEventListener('click',function(e){
+    var b=e.target.closest('.prod');if(!b)return;
+    var p=porId(b.getAttribute('data-id'));if(!p)return;
+    if(EL.precioLista(p)==null){aviso('Este producto no tiene precio. Pedile al encargado que lo cargue en el panel.',true);return;}
+    sumar(p.id,1);
+});
+
+// ─── ticket ───
+function guardarTicket(){try{sessionStorage.setItem('caja_prosegur_ticket',JSON.stringify(S.ticket));}catch(e){}}
+function sumar(id,d){
+    var it=null;for(var i=0;i<S.ticket.length;i++)if(String(S.ticket[i].id)===String(id))it=S.ticket[i];
+    if(!it){if(d<=0)return;it={id:id,cant:0};S.ticket.push(it);}
+    it.cant+=d;
+    if(it.cant<=0)S.ticket=S.ticket.filter(function(x){return x!==it;});
+    if(it.cant>99)it.cant=99;
+    guardarTicket();pintarTicket();pintarGrid();
+}
+function calcular(){
+    var ahora=new Date(),lineas=[],sub=0,desc=0,malas=0;
+    S.ticket.forEach(function(it){
+        var p=porId(it.id),ok=p&&EL.enCaja(p)&&EL.precioLista(p)!=null;
+        if(!ok){malas++;lineas.push({it:it,p:p,mal:true});return;}
+        var pf=EL.precioFinal(p,S.desc,ahora);
+        var l={it:it,p:p,pf:pf,lista:pf.lista*it.cant,total:Math.round(pf.final*it.cant*100)/100};
+        sub+=l.lista;desc+=l.lista-l.total;lineas.push(l);
+    });
+    return {lineas:lineas,sub:Math.round(sub*100)/100,desc:Math.round(desc*100)/100,total:Math.round((sub-desc)*100)/100,malas:malas,
+            unidades:S.ticket.reduce(function(a,b){return a+b.cant;},0)};
+}
+function pintarTicket(){
+    var c=calcular();
+    if(!c.lineas.length)$('items').innerHTML='<div class="t-vacio">Tocá un producto para agregarlo al ticket.</div>';
+    else $('items').innerHTML=c.lineas.map(function(l){
+        var nombre=l.p?l.p.nombre:'Producto';
+        if(l.mal)return '<div class="item mal"><div class="l1"><span>'+esc(nombre)+'</span><span>—</span></div><div class="l2"><span class="unit">Ya no está disponible: quitalo del ticket</span><div class="qty"><button type="button" data-id="'+esc(l.it.id)+'" data-d="-999" aria-label="Quitar">✕</button></div></div></div>';
+        return '<div class="item"><div class="l1"><span>'+esc(nombre)+'</span><span>'+plata(l.total)+'</span></div>'+
+            '<div class="l2"><span class="unit">'+plata(l.pf.final)+' c/u'+(l.pf.desc?'<span class="d">'+esc(l.pf.desc.nombre)+' −'+plata(l.pf.ahorro)+'</span>':'')+'</span>'+
+            '<div class="qty"><button type="button" data-id="'+esc(l.it.id)+'" data-d="-1" aria-label="Uno menos">−</button><span class="n">'+l.it.cant+'</span><button type="button" data-id="'+esc(l.it.id)+'" data-d="1" aria-label="Uno más">+</button></div></div></div>';
+    }).join('');
+    $('t-sub').textContent=plata(c.sub);
+    $('f-desc').style.display=c.desc>0?'flex':'none';$('t-desc').textContent='−'+plata(c.desc);
+    $('t-total').textContent=plata(c.total);
+    var puede=c.unidades>0&&!c.malas;
+    $('cobrar').disabled=!puede;$('cobrar2').disabled=!puede;
+    $('cobrar').textContent=puede?'Cobrar '+plata(c.total):(c.malas?'Revisá el ticket':'Cobrar');
+    $('cobrar2').textContent=puede?'Cobrar':'Cobrar';
+    $('bt-cant').textContent=c.unidades?(c.unidades+' producto'+(c.unidades>1?'s':'')+' · ver ticket'):'Ticket vacío';
+    $('bt-total').textContent=plata(c.total);
+}
+$('items').addEventListener('click',function(e){
+    var b=e.target.closest('button[data-d]');if(!b)return;
+    var d=Number(b.getAttribute('data-d'));
+    sumar(b.getAttribute('data-id'),d===-999?-999:d);
+});
+$('vaciar').onclick=function(){if(!S.ticket.length)return;if(!confirm('¿Vaciar el ticket?'))return;S.ticket=[];guardarTicket();pintarTicket();pintarGrid();};
+$('ver-ticket').onclick=function(){$('ticket').classList.add('abierto');};
+$('cerrar-hoja').onclick=function(){$('ticket').classList.remove('abierto');};
+
+// ─── cobro ───
+var C={medio:null,clientId:null,ocupado:false};
+function uuid(){try{return crypto.randomUUID();}catch(e){return Date.now().toString(36)+Math.random().toString(36).slice(2);}}
+function pasoCobro(id){['mc-paso1','mc-ef','mc-qr','mc-listo'].forEach(function(x){$(x).style.display=x===id?'':'none';});
+    $('mc-pie').style.display=(id==='mc-ef'||id==='mc-qr')?'flex':'none';$('mc-pie-listo').style.display=id==='mc-listo'?'flex':'none';}
+function errCobro(m){$('mc-err').textContent=m||'';$('mc-err').style.display=m?'block':'none';}
+function abrirCobro(){
+    if(!S.turno){abrirCaja();return;}
+    var c=calcular();if(!c.unidades||c.malas)return;
+    C.medio=null;C.clientId=uuid();errCobro('');
+    $('mc-total').textContent=plata(c.total);
+    pasoCobro('mc-paso1');$('m-cobro').style.display='flex';
+}
+$('cobrar').onclick=abrirCobro;$('cobrar2').onclick=abrirCobro;
+[].forEach.call(document.querySelectorAll('.medio'),function(b){b.onclick=function(){
+    var c=calcular();C.medio=b.getAttribute('data-medio');errCobro('');
+    if(C.medio==='efectivo'){
+        $('mc-total-ef').textContent=plata(c.total);$('mc-recibido').value='';$('mc-vuelto').style.display='none';
+        var opciones=[c.total],billetes=[1000,2000,5000,10000,20000,50000];
+        billetes.forEach(function(x){var r=Math.ceil(c.total/x)*x;if(r>c.total&&opciones.indexOf(r)===-1&&opciones.length<5)opciones.push(r);});
+        $('mc-rapidos').innerHTML=opciones.map(function(v,i){return '<button type="button" data-v="'+v+'">'+(i===0?'Justo':plata(v))+'</button>';}).join('');
+        pasoCobro('mc-ef');setTimeout(function(){$('mc-recibido').focus();},50);
+    }else{$('mc-total-qr').textContent=plata(c.total);pasoCobro('mc-qr');}
+};});
+$('mc-rapidos').addEventListener('click',function(e){var b=e.target.closest('button[data-v]');if(!b)return;$('mc-recibido').value=b.getAttribute('data-v');calcVuelto();});
+$('mc-recibido').addEventListener('input',calcVuelto);
+function calcVuelto(){
+    var c=calcular(),r=Number(String($('mc-recibido').value).replace(',','.'));
+    if(!$('mc-recibido').value){$('mc-vuelto').style.display='none';return;}
+    var v=Math.round((r-c.total)*100)/100;
+    $('mc-vuelto').style.display='flex';$('mc-vuelto').className='vuelto'+(v<0?' falta':'');
+    $('mc-vuelto').firstChild.textContent=v<0?'Falta':'Vuelto';$('mc-vuelto-n').textContent=plata(Math.abs(v));
+}
+[].forEach.call(document.querySelectorAll('#m-cobro [data-volver]'),function(b){b.onclick=function(){errCobro('');pasoCobro('mc-paso1');};});
+$('mc-confirmar').onclick=function(){
+    if(C.ocupado)return;
+    var c=calcular(),recibido=null;
+    if(C.medio==='efectivo'&&$('mc-recibido').value!==''){
+        recibido=Number(String($('mc-recibido').value).replace(',','.'));
+        if(!(recibido>=c.total)){errCobro('El monto recibido es menor que el total.');return;}
+    }
+    C.ocupado=true;$('mc-confirmar').disabled=true;$('mc-confirmar').textContent='Registrando…';errCobro('');
+    EL.rpc('caja_venta_registrar',{p_token:S.token,p_items:S.ticket.map(function(x){return {id:x.id,cant:x.cant};}),p_medio:C.medio,
+        p_total_esperado:c.total,p_recibido:recibido,p_client_id:C.clientId})
+    .then(function(v){
+        S.ticket=[];guardarTicket();pintarTicket();pintarGrid();
+        $('mc-listo-t').textContent='Venta #'+v.id+' registrada';
+        $('mc-listo-vuelto').textContent=v.vuelto!=null&&Number(v.vuelto)>0?'Vuelto '+plata(v.vuelto):'';
+        $('mc-listo-sub').textContent=(C.medio==='efectivo'?'Efectivo':'QR Mercado Pago')+' · '+plata(v.total);
+        pasoCobro('mc-listo');C.clientId=null;
+        refrescarTurno();
+    })
+    .catch(function(err){
+        errCobro(err.message);
+        if(/precios cambiaron|ya no está disponible|no tiene precio/.test(err.message)){cargar(false).catch(function(){});C.clientId=uuid();}
+        if(/caja está cerrada/.test(err.message)){refrescarTurno();}
+    })
+    .then(function(){C.ocupado=false;$('mc-confirmar').disabled=false;$('mc-confirmar').textContent='Confirmar cobro';});
+};
+$('mc-nueva').onclick=function(){$('m-cobro').style.display='none';$('ticket').classList.remove('abierto');};
+
+// ─── turno: abrir, movimientos, ventas, cierre ───
+function refrescarTurno(){
+    return EL.rpc('caja_turno_estado',{p_token:S.token}).then(function(t){
+        S.turno=t&&t.abierto?t.resumen:null;
+        if(!S.turno&&$('m-cierre').style.display!=='flex')abrirCaja();
+        if(S.turno)$('m-abrir').style.display='none';
+    });
+}
+function abrirCaja(){$('ma-fondo').value='';$('ma-err').style.display='none';$('m-abrir').style.display='flex';setTimeout(function(){$('ma-fondo').focus();},50);}
+$('ma-ok').onclick=function(){
+    var v=$('ma-fondo').value===''?0:Number(String($('ma-fondo').value).replace(',','.'));
+    if(!(v>=0)){$('ma-err').textContent='Revisá el monto.';$('ma-err').style.display='block';return;}
+    $('ma-ok').disabled=true;
+    EL.rpc('caja_turno_abrir',{p_token:S.token,p_fondo:v}).then(function(t){S.turno=t.resumen;$('m-abrir').style.display='none';aviso('Caja abierta. ¡Buenas ventas!');})
+    .catch(function(err){$('ma-err').textContent=err.message;$('ma-err').style.display='block';if(/ya está abierta/.test(err.message))refrescarTurno();})
+    .then(function(){$('ma-ok').disabled=false;});
+};
+[].forEach.call(document.querySelectorAll('[data-cerrar]'),function(b){b.onclick=function(){b.closest('.fondo').style.display='none';};});
+// movimientos de efectivo
+var MOV={tipo:'egreso'};
+$('btn-mov').onclick=function(){if(!S.turno){abrirCaja();return;}MOV.tipo='egreso';pintarMov();$('mm-monto').value='';$('mm-motivo').value='';$('mm-err').style.display='none';$('m-mov').style.display='flex';};
+function pintarMov(){[].forEach.call($('mm-tipo').children,function(b){b.classList.toggle('on',b.getAttribute('data-t')===MOV.tipo);});}
+$('mm-tipo').addEventListener('click',function(e){var b=e.target.closest('button');if(b){MOV.tipo=b.getAttribute('data-t');pintarMov();}});
+$('mm-ok').onclick=function(){
+    var m=Number(String($('mm-monto').value).replace(',','.'));
+    if(!(m>0)){$('mm-err').textContent='Poné el monto.';$('mm-err').style.display='block';return;}
+    $('mm-ok').disabled=true;
+    EL.rpc('caja_movimiento',{p_token:S.token,p_tipo:MOV.tipo,p_monto:m,p_motivo:$('mm-motivo').value.trim()})
+    .then(function(t){S.turno=t.resumen;$('m-mov').style.display='none';aviso((MOV.tipo==='egreso'?'Egreso':'Ingreso')+' de '+plata(m)+' registrado.');})
+    .catch(function(err){$('mm-err').textContent=err.message;$('mm-err').style.display='block';})
+    .then(function(){$('mm-ok').disabled=false;});
+};
+// ventas del turno
+var MEDIO_TXT={efectivo:'Efectivo',qr:'QR',tarjeta:'Tarjeta',otro:'Otro'};
+function horaDe(iso){var d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+$('btn-ventas').onclick=function(){if(!S.turno){abrirCaja();return;}$('m-ventas').style.display='flex';cargarVentas();};
+function cargarVentas(){
+    $('mv-lista').innerHTML='<div class="t-vacio">Cargando…</div>';
+    EL.rpc('caja_ventas_turno',{p_token:S.token}).then(function(l){
+        var ok=l.filter(function(v){return v.estado==='pagada';});
+        $('mv-sub').textContent=ok.length+' venta'+(ok.length===1?'':'s')+' · '+plata(ok.reduce(function(a,v){return a+Number(v.total);},0));
+        if(!l.length){$('mv-lista').innerHTML='<div class="t-vacio">Todavía no hay ventas en este turno.</div>';return;}
+        $('mv-lista').innerHTML=l.map(function(v){
+            var it=(v.items||[]).map(function(i){return i.cantidad+'× '+esc(i.nombre);}).join(' · ');
+            return '<div class="v'+(v.estado==='anulada'?' anul':'')+'"><div class="a"><span>#'+v.id+' · '+horaDe(v.fecha)+' · '+esc(MEDIO_TXT[v.medio]||v.medio)+'</span><span>'+plata(v.total)+'</span></div>'+
+                '<div class="b">'+it+(v.estado==='anulada'?'<br><b style="color:#b91c1c">Anulada por '+esc(v.anulada_por)+': '+esc(v.anulada_motivo)+'</b>':'')+'</div>'+
+                (v.estado==='pagada'&&S.yo&&S.yo.encargado?'<button type="button" data-anular="'+v.id+'">Anular</button>':'')+'</div>';
+        }).join('');
+    }).catch(function(err){$('mv-lista').innerHTML='<div class="t-vacio">'+esc(err.message)+'</div>';});
+}
+$('mv-lista').addEventListener('click',function(e){
+    var b=e.target.closest('[data-anular]');if(!b)return;
+    var motivo=prompt('¿Por qué se anula la venta #'+b.getAttribute('data-anular')+'? (el stock vuelve)','');
+    if(motivo===null)return;
+    if(!motivo.trim()){aviso('Poné el motivo de la anulación.',true);return;}
+    b.disabled=true;
+    EL.rpc('caja_venta_anular',{p_token:S.token,p_id:Number(b.getAttribute('data-anular')),p_motivo:motivo.trim()})
+    .then(function(){aviso('Venta anulada.');cargarVentas();refrescarTurno();})
+    .catch(function(err){b.disabled=false;aviso(err.message,true);});
+});
+// cierre (el cajero cuenta sin ver el esperado; la diferencia aparece al cerrar)
+$('btn-cerrar').onclick=function(){
+    if(!S.turno){abrirCaja();return;}
+    if(S.ticket.length){aviso('Hay un ticket sin cobrar. Cobralo o vacialo antes de cerrar.',true);return;}
+    refrescarTurno().then(function(){
+        var r=S.turno;if(!r)return;
+        var med=r.por_medio||{},f=function(a,b,cls){return '<div class="f'+(cls?' '+cls:'')+'"><span>'+a+'</span><span>'+b+'</span></div>';};
+        $('mz-resu').innerHTML=f('Abrió',esc(r.abierto_por)+' · '+horaDe(r.abierto))+f('Tickets',r.tickets)+
+            Object.keys(med).map(function(m){return f(esc(MEDIO_TXT[m]||m),plata(med[m].total));}).join('')+f('Total vendido',plata(r.total),'b');
+        $('mz-contado').value='';$('mz-notas').value='';$('mz-err').style.display='none';
+        $('mz-paso1').style.display='';$('mz-paso2').style.display='none';$('m-cierre').style.display='flex';
+        setTimeout(function(){$('mz-contado').focus();},50);
+    }).catch(function(err){aviso(err.message,true);});
+};
+var CIERRE={turno:null};
+$('mz-ok').onclick=function(){
+    if($('mz-contado').value===''){$('mz-err').textContent='Contá el efectivo y escribí el total (si no hay, poné 0).';$('mz-err').style.display='block';return;}
+    var v=Number(String($('mz-contado').value).replace(',','.'));
+    if(!(v>=0)){$('mz-err').textContent='Revisá el monto.';$('mz-err').style.display='block';return;}
+    if(!confirm('¿Cerrar la caja? Después de cerrar no se pueden agregar ventas a este turno.'))return;
+    $('mz-ok').disabled=true;
+    EL.rpc('caja_turno_cerrar',{p_token:S.token,p_efectivo_contado:v,p_notas:$('mz-notas').value.trim()})
+    .then(function(res){
+        S.turno=null;CIERRE.turno=res.turno;var r=res.resumen,d=Number(r.diferencia);
+        var f=function(a,b,cls,st){return '<div class="f'+(cls?' '+cls:'')+'"'+(st?' style="'+st+'"':'')+'><span>'+a+'</span><span>'+b+'</span></div>';};
+        $('mz-final').innerHTML=f('Total vendido',plata(r.total))+f('Efectivo esperado',plata(r.efectivo_esperado))+f('Efectivo contado',plata(r.efectivo_contado))+
+            f('Diferencia',d===0?'Sin diferencia':(d>0?'Sobran ':'Faltan ')+plata(Math.abs(d)),'b',d===0?'color:#15803d':'color:#b91c1c');
+        $('mz-paso1').style.display='none';$('mz-paso2').style.display='';
+        enviarInforme();
+    })
+    .catch(function(err){$('mz-err').textContent=err.message;$('mz-err').style.display='block';})
+    .then(function(){$('mz-ok').disabled=false;});
+};
+function enviarInforme(){
+    var m=$('mz-mail');m.style.display='block';m.style.background='#f8fafc';m.style.color='#334155';m.textContent='Enviando el informe por mail…';
+    $('mz-reintentar').style.display='none';
+    fetch('/api/caja-cierre',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token,turno:CIERRE.turno})})
+    .then(function(r){return r.json().catch(function(){return {ok:false,message:'Respuesta inválida ('+r.status+')'};});})
+    .then(function(d){
+        if(d.ok){m.style.background='#f0fdf4';m.style.color='#15803d';m.textContent='Informe enviado a '+d.destinos.join(', ')+'.';return;}
+        m.style.background='#fff7ed';m.style.color='#9a3412';
+        m.textContent=d.estado==='sin destinatarios'?'La caja quedó cerrada, pero no hay mails configurados para el informe. El encargado lo puede reenviar desde el panel.':
+            'La caja quedó cerrada, pero el informe no se pudo enviar: '+(d.estado||d.message||'error')+'. Se puede reintentar acá o reenviar desde el panel.';
+        $('mz-reintentar').style.display='';
+    })
+    .catch(function(){m.style.background='#fff7ed';m.style.color='#9a3412';m.textContent='La caja quedó cerrada, pero no hubo conexión para enviar el informe. Reintentá o reenvialo desde el panel.';$('mz-reintentar').style.display='';});
+}
+$('mz-reintentar').onclick=enviarInforme;
+$('mz-listo').onclick=function(){$('m-cierre').style.display='none';abrirCaja();};
+
+// ─── retiro de pedidos de la app ───
+var RT={pedidos:[],ret:{},fecha:null,f:'pend',t:null,ocupado:false};
+function abrirRetiros(){$('ret').style.display='flex';$('rt-q').value='';cargarRetiros();clearInterval(RT.t);RT.t=setInterval(function(){if($('ret').style.display==='flex')cargarRetiros(true);},60000);setTimeout(function(){$('rt-q').focus();},80);}
+$('btn-retiros').onclick=abrirRetiros;
+$('rt-cerrar').onclick=function(){$('ret').style.display='none';clearInterval(RT.t);};
+$('rt-act').onclick=function(){cargarRetiros();};
+function cargarRetiros(silencio){
+    if(!silencio)$('rt-lista').innerHTML='<div class="vacio">Trayendo los pedidos de hoy…</div>';
+    return fetch('/api/caja-retiros',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token})})
+    .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok)throw new Error(d.message||('Error '+r.status));return d;});})
+    .then(function(d){RT.pedidos=d.pedidos||[];RT.fecha=d.fecha;RT.ret={};(d.retirados||[]).forEach(function(x){RT.ret[x.id_usuario]=x;});pintarRetiros();})
+    .catch(function(err){if(!silencio)$('rt-lista').innerHTML='<div class="vacio">No se pudieron traer los pedidos: '+esc(err.message)+'</div>';});
+}
+$('rt-q').addEventListener('input',pintarRetiros);
+$('rt-f').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;RT.f=b.getAttribute('data-f');[].forEach.call($('rt-f').children,function(x){x.classList.toggle('on',x===b);});pintarRetiros();});
+function pintarRetiros(){
+    var ent=RT.pedidos.filter(function(p){return RT.ret[p.id_usuario];}).length;
+    var f=RT.fecha?RT.fecha.split('-').reverse().slice(0,2).join('/'):'';
+    $('rt-cnt').textContent=f+' · '+ent+' de '+RT.pedidos.length+' entregados';
+    var q=sinTildes($('rt-q').value.trim());
+    var l=RT.pedidos.filter(function(p){
+        var r=!!RT.ret[p.id_usuario];
+        if(RT.f==='pend'&&r)return false;if(RT.f==='ok'&&!r)return false;
+        return !q||sinTildes(p.apellido+' '+p.nombre+' '+p.nombre+' '+p.apellido+' '+p.dni).indexOf(q)!==-1;
+    });
+    if(!RT.pedidos.length){$('rt-lista').innerHTML='<div class="vacio">No hay pedidos de la app para hoy en Prosegur.</div>';return;}
+    if(!l.length){$('rt-lista').innerHTML='<div class="vacio">'+(q?'No encontré a nadie con "'+esc(q)+'".':RT.f==='pend'?'¡Todos retiraron! 🎉':'Nada para mostrar.')+'</div>';return;}
+    $('rt-lista').innerHTML=l.map(function(p){
+        var r=RT.ret[p.id_usuario];
+        return '<div class="rc'+(r?' ok':'')+(p.pago_pendiente&&!r?' np':'')+'"><div class="n">'+esc(p.apellido)+(p.apellido?', ':'')+esc(p.nombre)+'</div>'+
+            '<div class="d">'+(p.dni?'DNI terminado en '+esc(p.dni):'')+'</div>'+
+            '<ul>'+p.items.map(function(i){return '<li>'+esc(i.nombre)+(i.pagado?'':' <b style="color:#b91c1c">(no pagado)</b>')+'</li>';}).join('')+'</ul>'+
+            (p.pago_pendiente&&!r?'<span class="bad r">⚠ Pedido sin pagar</span>':'')+
+            (r?'<span class="bad g">✓ Entregado a las '+horaDe(r.entregado)+' por '+esc(r.entregado_por)+'</span>'+(S.yo&&S.yo.encargado?'<button class="des" type="button" data-des="'+esc(p.id_usuario)+'">Deshacer (fue un error)</button>':''):
+               '<button class="ent" type="button" data-ent="'+esc(p.id_usuario)+'">Entregar</button>')+'</div>';
+    }).join('');
+}
+$('rt-lista').addEventListener('click',function(e){
+    var b=e.target.closest('[data-ent],[data-des]');if(!b||RT.ocupado)return;
+    var id=b.getAttribute('data-ent')||b.getAttribute('data-des');
+    var p=RT.pedidos.filter(function(x){return x.id_usuario===id;})[0];if(!p)return;
+    var nombre=(p.nombre+' '+p.apellido).trim();
+    if(b.hasAttribute('data-des')){
+        if(!confirm('¿Deshacer la entrega de '+nombre+'? Va a volver a aparecer como pendiente.'))return;
+        RT.ocupado=true;
+        EL.rpc('caja_retiro_deshacer',{p_token:S.token,p_fecha:RT.fecha,p_id_usuario:id}).then(function(){delete RT.ret[id];pintarRetiros();})
+        .catch(function(err){aviso(err.message,true);}).then(function(){RT.ocupado=false;});
+        return;
+    }
+    if(p.pago_pendiente&&!confirm('⚠ '+nombre+' tiene el pedido SIN PAGAR en la app. ¿Entregarlo igual?'))return;
+    RT.ocupado=true;b.disabled=true;b.textContent='Entregando…';
+    var detalle=p.items.map(function(i){return i.nombre;}).join(' + ');
+    EL.rpc('caja_retiro_marcar',{p_token:S.token,p_fecha:RT.fecha,p_id_usuario:id,p_nombre:nombre,p_detalle:detalle})
+    .then(function(r){RT.ret[id]={id_usuario:id,nombre:nombre,entregado:r.entregado,entregado_por:r.entregado_por};aviso('Entregado a '+nombre+'.');$('rt-q').value='';pintarRetiros();$('rt-q').focus();})
+    .catch(function(err){aviso(err.message,true);cargarRetiros(true);})
+    .then(function(){RT.ocupado=false;});
+});
+
+// ─── varios ───
+function reloj(){var d=new Date();$('reloj').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+reloj();setInterval(reloj,15000);
+// cada minuto se recalculan precios (descuentos por horario) y cada 5 minutos se relee el catálogo
+setInterval(function(){if($('app').style.display==='grid'){pintarGrid();pintarTicket();}},60000);
+setInterval(function(){if($('app').style.display==='grid')cargar(false).catch(function(){});},300000);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&$('app').style.display==='grid'){cargar(false).catch(function(){});pedirWakeLock();}});
+$('btn-full').onclick=function(){
+    var el=document.documentElement;
+    if(!document.fullscreenElement){(el.requestFullscreen||el.webkitRequestFullscreen||function(){}).call(el);}
+    else{(document.exitFullscreen||document.webkitExitFullscreen||function(){}).call(document);}
+};
+// que la tablet no apague la pantalla mientras la caja está abierta
+var lock=null;
+function pedirWakeLock(){try{if(navigator.wakeLock&&!lock)navigator.wakeLock.request('screen').then(function(l){lock=l;l.addEventListener('release',function(){lock=null;});}).catch(function(){});}catch(e){}}
+pedirWakeLock();
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){['m-cobro','m-mov','m-ventas'].forEach(function(x){$(x).style.display='none';});$('ret').style.display='none';$('ticket').classList.remove('abierto');}});
+iniciar();
+</script>
+</body>
+</html>

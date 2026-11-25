@@ -32,6 +32,10 @@
     {
       "path": "/api/gourmet-feriados",
       "schedule": "17 9 * * *"
+    },
+    {
+      "path": "/api/caja-sync",
+      "schedule": "41 9 * * *"
     }
   ]
 }

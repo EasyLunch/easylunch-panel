@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Productos y precios · Local Prosegur · Easy Lunch</title><link rel="icon" type="image/png" href="/icons/stock.png"><link rel="apple-touch-icon" href="/icons/stock.png">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;color:#111827;min-height:100vh;}
+        button,input,select,textarea{font:inherit;color:inherit;}
+        header{background:white;border-bottom:1px solid #e5e7eb;padding:14px 40px;display:flex;align-items:center;gap:14px;}
+        .quien{font-size:12px;color:#6b7280;margin-left:auto;text-align:right;line-height:1.3;}
+        .quien b{display:block;color:#0f172a;font-size:13px;}
+        .volver{background:#f3f4f6;color:#374151;border:1px solid #e5e7eb;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap;}
+        .volver:hover{border-color:#16a34a;color:#15803d;}
+        main{max-width:1200px;margin:0 auto;padding:36px 40px 60px;}
+        .badge{display:inline-flex;align-items:center;gap:7px;background:#dcfce7;color:#15803d;font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;padding:4px 12px;border-radius:20px;margin-bottom:14px;}
+        .badge::before{content:'';width:7px;height:7px;background:#16a34a;border-radius:50%;}
+        h1{font-size:30px;font-weight:800;color:#0f172a;line-height:1.15;margin-bottom:8px;}
+        .subtitle{color:#6b7280;font-size:14px;margin-bottom:22px;line-height:1.5;max-width:820px;}
+        .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #e5e7eb;background:white;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;}
+        .btn:hover{border-color:#16a34a;}
+        .btn.primario{background:#16a34a;color:white;border-color:#16a34a;}
+        .btn.primario:hover{background:#15803d;}
+        .btn.chico{padding:6px 11px;font-size:12px;}
+        .btn.peligro{color:#dc2626;}
+        .btn.peligro:hover{border-color:#dc2626;background:#fef2f2;}
+        .btn:disabled{opacity:.55;cursor:not-allowed;}
+        .aviso{background:#fef2f2;color:#b91c1c;border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:14px;display:none;line-height:1.45;}
+        .aviso.ok{background:#f0fdf4;color:#15803d;}
+        /* sincronización */
+        .sync{background:white;border:1px solid #f1f5f9;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.07);padding:16px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+        .sync .txt{flex:1;min-width:240px;font-size:13px;color:#4b5563;line-height:1.5;}
+        .sync .txt b{color:#0f172a;}
+        .resumen{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:13px;line-height:1.6;display:none;}
+        .resumen h3{font-size:14px;margin-bottom:6px;color:#0f172a;}
+        .resumen ul{margin:4px 0 4px 18px;}
+        .resumen .cerrar{float:right;background:none;border:0;cursor:pointer;color:#6b7280;font-size:18px;line-height:1;}
+        .alertas{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+        .alerta{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;padding:8px 12px;font-size:13px;cursor:pointer;}
+        .alerta.roja{background:#fef2f2;color:#b91c1c;border-color:#fecaca;}
+        /* pestañas */
+        .tabs{display:flex;gap:4px;border-bottom:1px solid #e5e7eb;margin-bottom:16px;}
+        .tab{background:none;border:0;padding:10px 16px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+        .tab.on{color:#15803d;border-bottom-color:#16a34a;}
+        .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+        .buscar{flex:1;min-width:200px;padding:10px 13px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;outline:none;background:white;}
+        .buscar:focus{border-color:#16a34a;}
+        .filtros{display:flex;gap:6px;flex-wrap:wrap;}
+        .filtro{border:1px solid #e5e7eb;background:white;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#4b5563;}
+        .filtro.on{background:#dcfce7;border-color:#86efac;color:#15803d;}
+        /* listas */
+        .grupo{margin-bottom:18px;}
+        .grupo h2{font-size:12px;font-weight:700;letter-spacing:1px;color:#6b7280;text-transform:uppercase;margin:0 0 8px 4px;}
+        .lista{background:white;border-radius:14px;border:1px solid #f1f5f9;box-shadow:0 1px 3px rgba(0,0,0,.07);overflow:hidden;}
+        .fila{display:grid;grid-template-columns:minmax(220px,2fr) repeat(4,minmax(90px,.7fr)) 220px;gap:12px;align-items:center;padding:12px 18px;border-top:1px solid #f1f5f9;font-size:14px;}
+        .fila:first-child{border-top:0;}
+        .fila.cab{background:#f9fafb;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;padding:9px 18px;}
+        .fila.apagada{background:#fafafa;}
+        .fila.apagada .nom{color:#9ca3af;}
+        .nom{font-weight:600;color:#0f172a;line-height:1.35;}
+        .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+        .chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#f3f4f6;color:#4b5563;}
+        .chip.app{background:#eff6ff;color:#1d4ed8;}
+        .chip.local{background:#f5f3ff;color:#6d28d9;}
+        .chip.dia{background:#dcfce7;color:#15803d;}
+        .chip.warn{background:#fff7ed;color:#9a3412;}
+        .chip.rojo{background:#fee2e2;color:#b91c1c;}
+        .num{text-align:right;font-variant-numeric:tabular-nums;}
+        .tachado{text-decoration:line-through;color:#9ca3af;font-size:12px;display:block;}
+        .final{font-weight:800;color:#0f172a;}
+        .desc-txt{font-size:11px;color:#15803d;display:block;}
+        .muted{color:#9ca3af;}
+        .acciones{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;}
+        .vacio,.cargando{padding:30px;text-align:center;color:#6b7280;font-size:14px;}
+        .fila-d{display:grid;grid-template-columns:minmax(200px,1.2fr) minmax(240px,2fr) auto;gap:14px;align-items:center;padding:14px 18px;border-top:1px solid #f1f5f9;}
+        .fila-d:first-child{border-top:0;}
+        .fila-h{display:grid;grid-template-columns:130px 120px minmax(160px,1.2fr) minmax(220px,2fr) 110px minmax(120px,1fr);gap:12px;padding:10px 18px;border-top:1px solid #f1f5f9;font-size:13px;align-items:start;}
+        .fila-h:first-child{border-top:0;}
+        .fila-h.cab{background:#f9fafb;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;}
+        .flecha{color:#9ca3af;margin:0 4px;}
+        .nota{font-size:12px;color:#6b7280;margin:-4px 0 14px 4px;}
+        @media(max-width:900px){
+            header{padding:12px 16px;} main{padding:24px 16px 48px;}
+            .fila,.fila-d,.fila-h{grid-template-columns:1fr;gap:4px;} .fila.cab,.fila-h.cab{display:none;}
+            .num{text-align:left;} .acciones{justify-content:flex-start;}
+            .num::before{content:attr(data-l) ': ';color:#9ca3af;font-size:12px;}
+        }
+        /* modal */
+        .fondo{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:50;}
+        .modal{background:white;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.25);width:100%;max-width:620px;padding:26px;}
+        .modal h2{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:4px;}
+        .modal .sub{font-size:13px;color:#6b7280;margin-bottom:18px;line-height:1.5;}
+        .campos{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+        .campos .ancho{grid-column:1/-1;}
+        @media(max-width:560px){.campos{grid-template-columns:1fr;}}
+        .campo label{font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;}
+        .campo input[type=text],.campo input[type=number],.campo input[type=date],.campo input[type=time],.campo select,.campo textarea{width:100%;padding:10px 13px;border:1px solid #e5e7eb;border-radius:8px;font-size:14px;outline:none;background:white;}
+        .campo textarea{resize:vertical;min-height:60px;}
+        .campo input:focus,.campo select:focus,.campo textarea:focus{border-color:#16a34a;}
+        .campo .ayuda{font-size:11px;color:#9ca3af;margin-top:4px;line-height:1.4;}
+        .dias{display:flex;gap:6px;flex-wrap:wrap;}
+        .dias label{display:flex;align-items:center;gap:4px;border:1px solid #e5e7eb;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;margin:0;font-weight:500;}
+        .dias input{accent-color:#16a34a;}
+        .check{display:flex;gap:9px;align-items:flex-start;font-size:13px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;cursor:pointer;background:white;}
+        .check input{margin-top:2px;accent-color:#16a34a;width:16px;height:16px;flex:none;}
+        .info{background:#f8fafc;border-radius:10px;padding:10px 12px;font-size:13px;color:#4b5563;margin-bottom:14px;line-height:1.5;}
+        .pie{display:flex;gap:8px;align-items:center;margin-top:20px;flex-wrap:wrap;}
+        .pie .spacer{flex:1;}
+        .modal .aviso{margin-top:14px;margin-bottom:0;}
+        .modal.ancho{max-width:860px;}
+        .mini{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#f3f4f6;flex:none;}
+        .mini.vacia{display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:18px;}
+        .prod-cel{display:flex;gap:10px;align-items:flex-start;}
+        .foto-edit{display:flex;gap:12px;align-items:center;}
+        .foto-edit img,.foto-edit .vacia{width:96px;height:72px;border-radius:10px;object-fit:cover;background:#f3f4f6;border:1px solid #e5e7eb;}
+        .foto-edit .vacia{display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px;}
+        .pegar{width:100%;min-height:150px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;outline:none;resize:vertical;}
+        .pegar:focus{border-color:#16a34a;}
+        .prev{max-height:320px;overflow:auto;border:1px solid #f1f5f9;border-radius:10px;margin-top:12px;}
+        .prev table{width:100%;border-collapse:collapse;font-size:13px;}
+        .prev th{position:sticky;top:0;background:#f9fafb;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;padding:7px 10px;}
+        .prev td{padding:7px 10px;border-top:1px solid #f1f5f9;vertical-align:top;}
+        .prev tr.err td{background:#fef2f2;}
+        .prev .est{font-size:12px;font-weight:600;}
+        .est.nuevo{color:#15803d;} .est.cambia{color:#9a3412;} .est.igual{color:#6b7280;} .est.error{color:#b91c1c;}
+        .cuenta{font-size:13px;color:#4b5563;margin-top:10px;}
+        :focus-visible{outline:2px solid #16a34a;outline-offset:2px;}
+    </style>
+</head>
+<body>
+<header>
+    <img src="/icons/logo.png" alt="Easy Lunch" style="height:38px;">
+    <div class="quien" id="quien"></div>
+    <a class="volver" href="index.html">← Volver al panel</a>
+</header>
+<main>
+    <div class="badge">Local Prosegur</div>
+    <h1>Productos y precios</h1>
+    <p class="subtitle">Los productos habilitados para Prosegur en la app se sincronizan solos todas las mañanas, o con el botón. Acá podés poner un precio distinto para el local, crear descuentos y cargar los productos propios del local (cafetería, kiosco, desayunos). Cada cambio de precio queda registrado en el historial.</p>
+
+    <div class="aviso" id="aviso"></div>
+    <div class="cargando" id="cargando">Cargando…</div>
+
+    <div id="contenido" style="display:none">
+        <div class="sync">
+            <div class="txt" id="sync-txt">—</div>
+            <button class="btn primario" id="btn-sync" type="button">⟳ Sincronizar productos</button>
+        </div>
+        <div class="resumen" id="resumen"></div>
+        <div class="alertas" id="alertas"></div>
+
+        <div class="tabs" role="tablist">
+            <button class="tab on" data-tab="productos" type="button" role="tab">Productos</button>
+            <button class="tab" data-tab="descuentos" type="button" role="tab">Descuentos</button>
+            <button class="tab" data-tab="stock" type="button" role="tab" id="tab-stock">Stock</button>
+            <button class="tab" data-tab="cierres" type="button" role="tab" id="tab-cierres">Cierres de caja</button>
+            <button class="tab" data-tab="historial" type="button" role="tab" id="tab-historial">Historial de precios</button>
+        </div>
+
+        <section id="sec-productos">
+            <div class="barra">
+                <input class="buscar" id="buscar" type="search" placeholder="Buscar producto…" aria-label="Buscar producto">
+                <button class="btn" id="btn-masivo" type="button">⇪ Carga masiva</button>
+                <button class="btn" id="btn-nuevo-prod" type="button">+ Producto del local</button>
+            </div>
+            <div class="barra filtros" id="filtros">
+                <button class="filtro on" data-f="caja" type="button">En la caja</button>
+                <button class="filtro" data-f="todos" type="button">Todos</button>
+                <button class="filtro" data-f="sinprecio" type="button">Sin precio</button>
+                <button class="filtro" data-f="revisar" type="button">Para revisar</button>
+                <button class="filtro" data-f="preciolocal" type="button">Con precio local</button>
+                <button class="filtro" data-f="fuera" type="button">Fuera de la caja</button>
+            </div>
+            <div id="lista-prod"></div>
+        </section>
+
+        <section id="sec-descuentos" style="display:none">
+            <div class="barra">
+                <div style="flex:1;font-size:13px;color:#6b7280;line-height:1.5">Si a un producto le corresponden varios descuentos al mismo tiempo, se aplica <b>el mayor</b> (no se suman). El encargado puede pausar o activar descuentos; crearlos y editarlos es del administrador.</div>
+                <button class="btn primario" id="btn-nuevo-desc" type="button">+ Nuevo descuento</button>
+            </div>
+            <div class="lista" id="lista-desc"></div>
+        </section>
+
+        <section id="sec-stock" style="display:none">
+            <div class="barra">
+                <input class="buscar" id="buscar-s" type="search" placeholder="Buscar producto o insumo…" aria-label="Buscar en stock">
+                <button class="btn primario" id="btn-ingreso" type="button">+ Ingreso de mercadería</button>
+            </div>
+            <div class="barra filtros" id="filtros-s">
+                <button class="filtro on" data-f="control" type="button">Con control de stock</button>
+                <button class="filtro" data-f="bajo" type="button">Bajo el mínimo</button>
+                <button class="filtro" data-f="todos" type="button">Todos los productos</button>
+            </div>
+            <div class="nota">Cada venta descuenta sola. Los productos de cafetería descuentan los insumos de su receta (ej.: café con leche = granos + leche). Si se vende algo sin stock, la venta se hace igual y el stock queda en negativo para que lo revises.</div>
+            <div class="lista" id="lista-stock"></div>
+            <div class="grupo" style="margin-top:22px"><h2 style="display:flex;align-items:center;gap:10px">Insumos de cafetería <button class="btn chico" id="btn-insumo" type="button">+ Insumo</button></h2><div class="lista" id="lista-insumos"></div></div>
+            <div class="grupo"><h2>Recetas (qué insumos descuenta cada producto)</h2><div class="lista" id="lista-recetas"></div></div>
+            <div class="grupo"><h2>Últimos movimientos (ingresos, ajustes, mermas y anulaciones)</h2><div class="lista" id="lista-movs"></div></div>
+        </section>
+
+        <section id="sec-cierres" style="display:none">
+            <div class="lista" style="padding:16px 18px;margin-bottom:16px">
+                <div style="font-weight:700;margin-bottom:4px">Mails que reciben el informe de cierre</div>
+                <div style="font-size:13px;color:#6b7280;margin-bottom:10px">Cuando el cajero cierra la caja se manda el informe de ventas y arqueo a estas direcciones. Separalas con coma.</div>
+                <div class="barra" style="margin:0"><input class="buscar" id="cfg-mails" type="text" placeholder="pablo@easylunch.com.ar, damian@easylunch.com.ar"><button class="btn primario" id="btn-cfg-mails" type="button">Guardar</button></div>
+            </div>
+            <div id="turno-abierto"></div>
+            <div class="lista" id="lista-cierres"></div>
+        </section>
+
+        <section id="sec-historial" style="display:none">
+            <div class="barra">
+                <input class="buscar" id="buscar-h" type="search" placeholder="Buscar por producto, usuario o motivo…" aria-label="Buscar en el historial">
+                <select class="buscar" id="origen-h" style="flex:0 0 auto;min-width:180px" aria-label="Origen">
+                    <option value="">Manual y sincronización</option>
+                    <option value="manual">Solo cambios manuales</option>
+                    <option value="sincronizacion">Solo de la app (sincronización)</option>
+                </select>
+                <button class="btn" id="btn-csv" type="button">Descargar CSV</button>
+            </div>
+            <div class="lista" id="lista-hist"><div class="cargando">Cargando…</div></div>
+        </section>
+    </div>
+</main>
+
+<!-- modal producto -->
+<div class="fondo" id="m-prod" role="dialog" aria-modal="true" aria-labelledby="mp-titulo">
+    <div class="modal">
+        <h2 id="mp-titulo">Producto</h2>
+        <p class="sub" id="mp-sub"></p>
+        <div class="info" id="mp-info" style="display:none"></div>
+        <div class="campos">
+            <div class="campo ancho" id="mp-c-nombre"><label for="mp-nombre">Nombre</label><input type="text" id="mp-nombre" maxlength="120"></div>
+            <div class="campo" id="mp-c-cat"><label for="mp-cat">Categoría (botón de la caja)</label><input type="text" id="mp-cat" list="dl-cats" maxlength="60" placeholder="Ej.: Cafetería"><datalist id="dl-cats"></datalist></div>
+            <div class="campo" id="mp-c-tipo"><label for="mp-tipo">Tipo</label>
+                <select id="mp-tipo"><option value="cafeteria">Cafetería</option><option value="kiosco">Kiosco</option><option value="bebida">Bebida</option><option value="postre">Postre</option><option value="vianda">Vianda</option><option value="otro">Otro</option></select></div>
+            <div class="campo" id="mp-c-precio"><label for="mp-precio">Precio</label><input type="number" id="mp-precio" min="0" step="0.01" inputmode="decimal"></div>
+            <div class="campo" id="mp-c-local"><label for="mp-local">Precio local</label><input type="number" id="mp-local" min="0" step="0.01" inputmode="decimal" placeholder="Vacío = precio de la app"><div class="ayuda">Si lo dejás vacío se cobra el precio de la app.</div></div>
+            <div class="campo"><label for="mp-iva">IVA</label><select id="mp-iva"><option value="21">21%</option><option value="10.5">10,5%</option><option value="27">27%</option><option value="0">Exento (0%)</option></select><div class="ayuda">Confirmalo con el contador. Se usa para la factura.</div></div>
+            <div class="campo ancho"><label>Foto (se ve en el botón de la caja)</label>
+                <div class="foto-edit"><span id="mp-foto-prev"></span>
+                    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                        <label class="btn chico" style="margin:0">Subir foto<input type="file" id="mp-foto" accept="image/*" style="display:none"></label>
+                        <button class="btn chico peligro" id="mp-foto-quitar" type="button">Quitar foto</button>
+                        <span class="ayuda" id="mp-foto-ayuda" style="font-size:11px;color:#9ca3af"></span>
+                    </div></div></div>
+            <div class="campo ancho"><label class="check"><input type="checkbox" id="mp-activo"><span><b>Mostrar en la caja</b><br><small>Si lo destildás, no aparece para vender (no se borra).</small></span></label></div>
+            <div class="campo ancho"><label for="mp-motivo">Motivo del cambio (queda en el historial)</label><input type="text" id="mp-motivo" maxlength="200" placeholder="Ej.: promo de apertura, aumento del proveedor…"></div>
+        </div>
+        <div class="aviso" id="mp-aviso"></div>
+        <div class="pie">
+            <button class="btn peligro" id="mp-quitar" type="button" style="display:none">Quitar precio local</button>
+            <span class="spacer"></span>
+            <button class="btn" id="mp-cancelar" type="button">Cancelar</button>
+            <button class="btn primario" id="mp-guardar" type="button">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- modal carga masiva -->
+<div class="fondo" id="m-mas" role="dialog" aria-modal="true" aria-labelledby="mm-titulo">
+    <div class="modal ancho">
+        <h2 id="mm-titulo">Carga masiva de productos del local</h2>
+        <p class="sub">Copiá las filas desde Excel o Google Sheets y pegalas acá. Columnas, en este orden: <b>Nombre · Categoría · Precio</b> y, opcionales, <b>IVA</b> (21, 10,5, 27 o 0; si no ponés nada es 21) y <b>Tipo</b> (cafetería, kiosco, bebida, postre, vianda u otro; si no ponés nada se deduce de la categoría). Si un producto del local ya existe con el mismo nombre, se le actualizan los datos.</p>
+        <textarea class="pegar" id="mm-texto" placeholder="Café con leche&#9;Cafetería&#9;2500&#10;Medialuna&#9;Cafetería&#9;900&#9;10,5&#10;Alfajor Jorgito&#9;Kiosco&#9;1200" aria-label="Productos a cargar"></textarea>
+        <div class="barra" style="margin:8px 0 0">
+            <button class="btn chico" id="mm-plantilla" type="button">Descargar plantilla</button>
+            <span class="muted" style="font-size:12px">La primera fila puede ser de títulos: se saltea sola.</span>
+        </div>
+        <div id="mm-prev"></div>
+        <div class="campo" style="margin-top:14px"><label for="mm-motivo">Motivo (queda en el historial)</label><input type="text" id="mm-motivo" maxlength="200" placeholder="Ej.: carga inicial de cafetería"></div>
+        <div class="aviso" id="mm-aviso"></div>
+        <div class="pie"><span class="spacer"></span>
+            <button class="btn" id="mm-cancelar" type="button">Cancelar</button>
+            <button class="btn primario" id="mm-cargar" type="button" disabled>Cargar productos</button>
+        </div>
+    </div>
+</div>
+
+<!-- modal genérico (stock) -->
+<div class="fondo" id="m-gen" role="dialog" aria-modal="true" aria-labelledby="mg-titulo">
+    <div class="modal" id="mg-modal">
+        <h2 id="mg-titulo"></h2>
+        <p class="sub" id="mg-sub"></p>
+        <div id="mg-cuerpo"></div>
+        <div class="aviso" id="mg-aviso"></div>
+        <div class="pie"><span class="spacer"></span>
+            <button class="btn" id="mg-cancelar" type="button">Cancelar</button>
+            <button class="btn primario" id="mg-ok" type="button">Guardar</button>
+        </div>
+    </div>
+</div>
+<!-- informe de cierre -->
+<div class="fondo" id="m-inf" role="dialog" aria-modal="true">
+    <div class="modal ancho" style="padding:18px">
+        <div class="pie" style="margin:0 0 12px"><span class="spacer"></span><button class="btn" id="mi-cerrar" type="button">Cerrar</button></div>
+        <div id="mi-cuerpo"></div>
+    </div>
+</div>
+
+<!-- modal descuento -->
+<div class="fondo" id="m-desc" role="dialog" aria-modal="true" aria-labelledby="md-titulo">
+    <div class="modal">
+        <h2 id="md-titulo">Descuento</h2>
+        <p class="sub">Elegí a qué se aplica y, si querés, cuándo. Los campos de vigencia vacíos significan "siempre".</p>
+        <div class="campos">
+            <div class="campo ancho"><label for="md-nombre">Nombre</label><input type="text" id="md-nombre" maxlength="80" placeholder="Ej.: Merienda feliz"></div>
+            <div class="campo"><label for="md-tipo">Tipo</label><select id="md-tipo"><option value="porcentaje">Porcentaje (%)</option><option value="monto">Monto fijo ($)</option></select></div>
+            <div class="campo"><label for="md-valor">Valor</label><input type="number" id="md-valor" min="0" step="0.01" inputmode="decimal"></div>
+            <div class="campo"><label for="md-alcance">Se aplica a</label><select id="md-alcance"><option value="todo">Todo el local</option><option value="categoria">Una categoría</option><option value="producto">Un producto</option></select></div>
+            <div class="campo" id="md-c-av"><label for="md-av" id="md-av-l">Categoría</label><select id="md-av"></select></div>
+            <div class="campo"><label for="md-desde">Desde (fecha)</label><input type="date" id="md-desde"></div>
+            <div class="campo"><label for="md-hasta">Hasta (fecha)</label><input type="date" id="md-hasta"></div>
+            <div class="campo ancho"><label>Días</label><div class="dias" id="md-dias"></div><div class="ayuda">Sin días marcados = todos los días.</div></div>
+            <div class="campo"><label for="md-hd">Desde (hora)</label><input type="time" id="md-hd"></div>
+            <div class="campo"><label for="md-hh">Hasta (hora)</label><input type="time" id="md-hh"></div>
+            <div class="campo ancho"><label class="check"><input type="checkbox" id="md-activo"><span><b>Activo</b></span></label></div>
+            <div class="campo ancho"><label for="md-motivo">Motivo (queda en el historial)</label><input type="text" id="md-motivo" maxlength="200"></div>
+        </div>
+        <div class="aviso" id="md-aviso"></div>
+        <div class="pie"><span class="spacer"></span>
+            <button class="btn" id="md-cancelar" type="button">Cancelar</button>
+            <button class="btn primario" id="md-guardar" type="button">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<script src="/prosegur-comun.js"></script>
+<script>
+var SB='https://xlwcozznliafhouhqjzl.supabase.co/rest/v1';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg';
+var TOKEN_KEY='el_panel_token';
+var S={token:null,yo:null,prod:[],desc:[],ultima:null,hist:null,filtro:'caja',tab:'productos',edit:null,editD:null};
+var TIPOS={vianda:'Viandas',postre:'Postres',bebida:'Bebidas',cafeteria:'Cafetería',kiosco:'Kiosco',otro:'Otros'};
+var ORDEN_TIPO=['vianda','postre','bebida','cafeteria','kiosco','otro'];
+var DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+var $=function(id){return document.getElementById(id);};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function rpc(fn,args){
+    return fetch(SB+'/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args||{})})
+    .then(function(r){return r.text().then(function(t){
+        var d=null;try{d=t?JSON.parse(t):null;}catch(e){}
+        if(!r.ok)throw new Error((d&&(d.message||d.hint))||'Error '+r.status);
+        if(d&&d.error)throw new Error(d.error);
+        return d;
+    });});
+}
+function aviso(id,msg,ok){var e=$(id);e.textContent=msg||'';e.className='aviso'+(ok?' ok':'');e.style.display=msg?'block':'none';}
+function plata(n){if(n==null||n==='')return '—';var v=Number(n);return '$'+v.toLocaleString('es-AR',{minimumFractionDigits:v%1?2:0,maximumFractionDigits:2});}
+function fechaHora(iso){if(!iso)return '';var d=new Date(iso);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});}
+function num(v){if(v===''||v==null)return null;var n=Number(String(v).replace(',','.'));return isFinite(n)?n:NaN;}
+
+// ─── precio final: precio local (si hay) o el de la app, menos el mayor descuento vigente ───
+function enCaja(p){return EL.enCaja(p);}
+function precioLista(p){return EL.precioLista(p);}
+function descuentoVigente(d,p,ahora){return EL.descuentoVigente(d,p,ahora);}
+function precioFinal(p,ahora){return EL.precioFinal(p,S.desc,ahora);}
+
+// ─── carga ───
+function iniciar(){
+    try{S.token=localStorage.getItem(TOKEN_KEY);}catch(e){}
+    if(!S.token){location.href='index.html';return;}
+    cargar().then(function(){
+        $('cargando').style.display='none';$('contenido').style.display='block';
+    }).catch(function(err){
+        $('cargando').style.display='none';
+        if(/Sesión vencida/.test(err.message)){location.href='index.html';return;}
+        aviso('aviso','No se pudo cargar: '+err.message);
+    });
+}
+function cargar(){
+    return rpc('caja_catalogo',{p_token:S.token}).then(function(c){
+        S.yo=c.yo;S.prod=c.productos||[];S.desc=(c.descuentos||[]).map(function(d){d.dias=d.dias||null;return d;});S.ultima=c.ultima_sync;
+        $('quien').innerHTML='<b>'+esc(S.yo.nombre)+'</b>'+(S.yo.admin?'Administrador':S.yo.encargado?'Encargado':'Solo lectura');
+        $('btn-sync').style.display=S.yo.encargado?'':'none';
+        $('btn-nuevo-prod').style.display=S.yo.admin?'':'none';
+        $('btn-masivo').style.display=S.yo.admin?'':'none';
+        $('btn-nuevo-desc').style.display=S.yo.admin?'':'none';
+        $('tab-historial').style.display=S.yo.encargado?'':'none';
+        $('tab-stock').style.display=S.yo.encargado?'':'none';
+        $('tab-cierres').style.display=S.yo.encargado?'':'none';
+        pintarSync();pintarAlertas();pintarProductos();pintarDescuentos();
+        if(S.tab==='historial')cargarHistorial();
+        if(S.tab==='stock')cargarStock();
+        if(S.tab==='cierres')cargarCierres();
+    });
+}
+function pintarSync(){
+    var u=S.ultima;
+    if(!u){$('sync-txt').innerHTML='Todavía no se sincronizó. Apretá <b>Sincronizar productos</b> para traer de la app lo habilitado para Prosegur.';return;}
+    var r=u.resumen||{};
+    $('sync-txt').innerHTML='Última sincronización: <b>'+esc(fechaHora(u.fecha))+'</b> · '+(u.origen==='automatica'?'automática':'por '+esc(u.usuario))+
+        (r.fecha_menu?' · menú del '+esc(String(r.fecha_menu).split('-').reverse().join('/')):'')+' · '+esc(r.total||0)+' productos de la app';
+}
+function pintarAlertas(){
+    var rev=S.prod.filter(function(p){return p.revisar_precio&&enCaja(p);}).length;
+    var sin=S.prod.filter(function(p){return enCaja(p)&&precioLista(p)==null;}).length;
+    var h='';
+    if(sin)h+='<button class="alerta roja" data-f="sinprecio" type="button">⚠ '+(sin>1?sin+' productos en la caja sin precio — no se pueden vender hasta ponerles precio':'1 producto en la caja sin precio — no se puede vender hasta ponerle precio')+'</button>';
+    if(rev)h+='<button class="alerta" data-f="revisar" type="button">↻ '+rev+' precio'+(rev>1?'s':'')+' de la app cambiaron y tienen precio local: revisalos</button>';
+    $('alertas').innerHTML=h;
+}
+$('alertas').addEventListener('click',function(e){var b=e.target.closest('[data-f]');if(b){mostrarTab('productos');setFiltro(b.getAttribute('data-f'));}});
+
+// ─── productos ───
+function setFiltro(f){S.filtro=f;[].forEach.call(document.querySelectorAll('.filtro'),function(b){b.classList.toggle('on',b.getAttribute('data-f')===f);});pintarProductos();}
+$('filtros').addEventListener('click',function(e){var b=e.target.closest('.filtro');if(b)setFiltro(b.getAttribute('data-f'));});
+$('buscar').addEventListener('input',pintarProductos);
+function pintarProductos(){
+    var q=$('buscar').value.trim().toLowerCase(),f=S.filtro,ahora=new Date();
+    var l=S.prod.filter(function(p){
+        if(q&&quitarTildes(p.nombre+' '+p.categoria+' '+p.grupo).indexOf(quitarTildes(q))===-1)return false;
+        if(f==='caja')return enCaja(p);
+        if(f==='sinprecio')return precioLista(p)==null&&enCaja(p);
+        if(f==='revisar')return p.revisar_precio;
+        if(f==='preciolocal')return p.precio_local!=null;
+        if(f==='fuera')return !enCaja(p);
+        return true;
+    });
+    if(!l.length){$('lista-prod').innerHTML='<div class="lista"><div class="vacio">'+(S.prod.length?'No hay productos con este filtro.':'Todavía no hay productos. Sincronizá con la app o cargá los productos del local.')+'</div></div>';return;}
+    // agrupar: tipo → categoría ("Plato del día" primero)
+    var grupos={};
+    l.forEach(function(p){var k=p.tipo+'|'+(p.categoria||'Sin categoría');(grupos[k]=grupos[k]||[]).push(p);});
+    var claves=Object.keys(grupos).sort(function(a,b){
+        var ta=ORDEN_TIPO.indexOf(a.split('|')[0]),tb=ORDEN_TIPO.indexOf(b.split('|')[0]);
+        if(ta!==tb)return ta-tb;
+        var ca=a.split('|')[1],cb=b.split('|')[1];
+        if(ca==='Plato del día')return -1;if(cb==='Plato del día')return 1;
+        return ca.localeCompare(cb,'es');
+    });
+    $('lista-prod').innerHTML=claves.map(function(k){
+        var cat=k.split('|')[1],items=grupos[k];
+        return '<div class="grupo"><h2>'+esc(cat)+' <span class="muted">· '+items.length+'</span></h2><div class="lista">'+
+            '<div class="fila cab"><div>Producto</div><div class="num">Precio app</div><div class="num">Precio local</div><div class="num">Descuento</div><div class="num">Se cobra hoy</div><div></div></div>'+
+            items.map(function(p){return filaProducto(p,ahora);}).join('')+'</div></div>';
+    }).join('');
+}
+function filaProducto(p,ahora){
+    var pf=precioFinal(p,ahora),chips=[];
+    chips.push(p.origen==='app'?'<span class="chip app">App</span>':'<span class="chip local">Local</span>');
+    if(p.del_dia&&p.en_app)chips.push('<span class="chip dia">Plato del día</span>');
+    if(p.origen==='app'&&!p.en_app)chips.push('<span class="chip">Ya no está en la app</span>');
+    if(!p.activo)chips.push('<span class="chip">Oculto en la caja</span>');
+    if(p.revisar_precio)chips.push('<span class="chip warn">Revisar precio</span>');
+    if(pf.lista==null)chips.push('<span class="chip rojo">Sin precio</span>');
+    if(Number(p.iva)!==21)chips.push('<span class="chip">IVA '+esc(String(p.iva).replace('.',','))+'%</span>');
+    var acc='';
+    if(S.yo.admin){
+        if(p.revisar_precio)acc+='<button class="btn chico" data-acc="revisado" data-id="'+p.id+'" type="button" title="Mantener el precio local">Mantener local</button>';
+        acc+='<button class="btn chico" data-acc="editar" data-id="'+p.id+'" type="button">'+(p.origen==='app'?'Precio / editar':'Editar')+'</button>';
+    }
+    var base=p.origen==='app'?plata(p.precio_base):'<span class="muted">—</span>';
+    var local=p.origen==='app'?(p.precio_local!=null?'<b>'+plata(p.precio_local)+'</b>':'<span class="muted">—</span>'):'<b>'+plata(p.precio_base)+'</b>';
+    var desc=pf.desc?'<span class="desc-txt">'+esc(pf.desc.nombre)+'</span>−'+plata(pf.lista-pf.final):'<span class="muted">—</span>';
+    var fin=pf.final==null?'<span class="muted">—</span>':(pf.desc?'<span class="tachado">'+plata(pf.lista)+'</span>':'')+'<span class="final">'+plata(pf.final)+'</span>';
+    var src=EL.foto(p),mini=src?'<img class="mini" src="'+esc(src)+'" alt="" loading="lazy">':'<span class="mini vacia">◻</span>';
+    return '<div class="fila'+(enCaja(p)?'':' apagada')+'"><div class="prod-cel">'+mini+'<div><div class="nom">'+esc(p.nombre)+'</div><div class="chips">'+chips.join('')+'</div></div></div>'+
+        '<div class="num" data-l="Precio app">'+base+'</div><div class="num" data-l="Precio local">'+local+'</div><div class="num" data-l="Descuento">'+desc+'</div><div class="num" data-l="Se cobra hoy">'+fin+'</div>'+
+        '<div class="acciones">'+acc+'</div></div>';
+}
+$('lista-prod').addEventListener('click',function(e){
+    var b=e.target.closest('[data-acc]');if(!b)return;
+    var p=S.prod.filter(function(x){return String(x.id)===b.getAttribute('data-id');})[0];if(!p)return;
+    if(b.getAttribute('data-acc')==='editar')abrirProducto(p);
+    if(b.getAttribute('data-acc')==='revisado'){
+        var motivo=prompt('Se mantiene el precio local de '+plata(p.precio_local)+' (la app ahora dice '+plata(p.precio_base)+'). Motivo (opcional):','');
+        if(motivo===null)return;
+        b.disabled=true;
+        rpc('caja_precio_revisado',{p_token:S.token,p_id:p.id,p_motivo:motivo}).then(cargar).catch(function(err){b.disabled=false;aviso('aviso',err.message);});
+    }
+});
+
+// ─── modal producto ───
+function categoriasUsadas(){var s={};S.prod.forEach(function(p){if(p.categoria)s[p.categoria]=1;});['Cafetería','Kiosco','Desayunos','Meriendas','Bebidas'].forEach(function(c){s[c]=1;});return Object.keys(s).sort(function(a,b){return a.localeCompare(b,'es');});}
+function abrirProducto(p){
+    S.edit=p||null;
+    var app=p&&p.origen==='app';
+    $('mp-titulo').textContent=p?p.nombre:'Nuevo producto del local';
+    $('mp-sub').textContent=app?'Viene de la app ('+(p.grupo||p.categoria)+'). El nombre y el precio de la app se cambian en la app; acá podés poner un precio distinto solo para el local.':
+        p?'Producto propio del local.':'Para cafetería, kiosco, desayunos, meriendas o cualquier producto que no viene de la app.';
+    $('mp-info').style.display=app?'block':'none';
+    if(app)$('mp-info').innerHTML='Precio en la app: <b>'+plata(p.precio_base)+'</b>'+(p.revisar_precio?' · <span style="color:#9a3412">cambió desde que pusiste el precio local</span>':'');
+    ['mp-c-nombre','mp-c-cat','mp-c-tipo','mp-c-precio'].forEach(function(id){$(id).style.display=app?'none':'';});
+    $('mp-c-local').style.display=app?'':'none';
+    $('mp-quitar').style.display=app&&p.precio_local!=null?'':'none';
+    $('dl-cats').innerHTML=categoriasUsadas().map(function(c){return '<option value="'+esc(c)+'">';}).join('');
+    $('mp-nombre').value=p?p.nombre:'';
+    $('mp-cat').value=p?p.categoria:'';
+    $('mp-tipo').value=p?p.tipo:'cafeteria';
+    $('mp-precio').value=p&&!app&&p.precio_base!=null?p.precio_base:'';
+    $('mp-local').value=app&&p.precio_local!=null?p.precio_local:'';
+    $('mp-iva').value=p?String(Number(p.iva)):'21';
+    $('mp-activo').checked=p?!!p.activo:true;
+    $('mp-motivo').value='';
+    S.fotoNueva=undefined;$('mp-foto').value='';pintarFotoModal();
+    aviso('mp-aviso','');
+    $('m-prod').style.display='flex';
+    setTimeout(function(){(app?$('mp-local'):$('mp-nombre')).focus();},50);
+}
+function cerrarProducto(){$('m-prod').style.display='none';}
+function pintarFotoModal(){
+    var p=S.edit,src=S.fotoNueva!==undefined?S.fotoNueva:(p?(p.img_local||p.img):'');
+    $('mp-foto-prev').innerHTML=src?'<img src="'+esc(src)+'" alt="">':'<span class="vacia">Sin foto</span>';
+    var tieneLocal=S.fotoNueva!==undefined?!!S.fotoNueva:!!(p&&p.img_local);
+    $('mp-foto-quitar').style.display=tieneLocal?'':'none';
+    $('mp-foto-ayuda').textContent=p&&p.img&&!tieneLocal?'Usa la foto de la app.':(p&&p.img&&tieneLocal?'Si la quitás, vuelve a la foto de la app.':'');
+}
+// achica la foto en el navegador (máx. 480 px, WebP) para que la caja cargue rápido
+function achicarFoto(file){
+    return new Promise(function(ok,mal){
+        var r=new FileReader();
+        r.onerror=function(){mal(new Error('No se pudo leer la foto.'));};
+        r.onload=function(){
+            var im=new Image();
+            im.onerror=function(){mal(new Error('El archivo no es una imagen válida.'));};
+            im.onload=function(){
+                var max=480,k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');
+                c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);
+                c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+                var d=c.toDataURL('image/webp',0.8);
+                if(d.indexOf('data:image/webp')!==0)d=c.toDataURL('image/jpeg',0.8);
+                ok(d);
+            };
+            im.src=r.result;
+        };
+        r.readAsDataURL(file);
+    });
+}
+$('mp-foto').addEventListener('change',function(){
+    var f=this.files&&this.files[0];if(!f)return;
+    achicarFoto(f).then(function(d){
+        if(d.length>400000){aviso('mp-aviso','La foto quedó muy pesada. Probá con otra.');return;}
+        S.fotoNueva=d;pintarFotoModal();
+    }).catch(function(e){aviso('mp-aviso',e.message);});
+});
+$('mp-foto-quitar').onclick=function(){S.fotoNueva='';$('mp-foto').value='';pintarFotoModal();};
+$('mp-cancelar').onclick=cerrarProducto;
+$('btn-nuevo-prod').onclick=function(){abrirProducto(null);};
+$('mp-quitar').onclick=function(){$('mp-local').value='';guardarProducto();};
+$('mp-guardar').onclick=guardarProducto;
+function guardarProducto(){
+    var p=S.edit,app=p&&p.origen==='app',motivo=$('mp-motivo').value.trim();
+    var datos={iva:$('mp-iva').value,activo:$('mp-activo').checked};
+    if(S.fotoNueva!==undefined)datos.img_local=S.fotoNueva;
+    var pasos=[];
+    if(app){
+        var loc=num($('mp-local').value);
+        if(isNaN(loc)||(loc!=null&&loc<0)){aviso('mp-aviso','Revisá el precio local.');return;}
+        var antes=p.precio_local!=null?Number(p.precio_local):null;
+        if(loc!==antes)pasos.push(function(){return rpc('caja_precio_local',{p_token:S.token,p_id:p.id,p_precio:loc,p_motivo:motivo});});
+        if(Number(datos.iva)!==Number(p.iva)||datos.activo!==!!p.activo||S.fotoNueva!==undefined)pasos.push(function(){return rpc('caja_producto_guardar',{p_token:S.token,p_id:p.id,p_datos:datos,p_motivo:motivo});});
+    }else{
+        datos.nombre=$('mp-nombre').value.trim();datos.categoria=$('mp-cat').value.trim();datos.tipo=$('mp-tipo').value;
+        var pr=num($('mp-precio').value);
+        if(!datos.nombre){aviso('mp-aviso','Falta el nombre.');return;}
+        if(pr==null||isNaN(pr)||pr<0){aviso('mp-aviso','Falta el precio.');return;}
+        if(!datos.categoria){aviso('mp-aviso','Poné una categoría (es el botón de la caja donde aparece).');return;}
+        datos.precio=pr;
+        pasos.push(function(){return rpc('caja_producto_guardar',{p_token:S.token,p_id:p?p.id:null,p_datos:datos,p_motivo:motivo});});
+    }
+    if(!pasos.length){cerrarProducto();return;}
+    $('mp-guardar').disabled=true;
+    pasos.reduce(function(pr,f){return pr.then(f);},Promise.resolve())
+        .then(function(){cerrarProducto();S.hist=null;return cargar();})
+        .catch(function(err){aviso('mp-aviso',err.message);})
+        .then(function(){$('mp-guardar').disabled=false;});
+}
+
+// ─── carga masiva ───
+var MAS={filas:[]};
+function quitarTildes(t){return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+// precios en formato argentino o con punto: "$2.500" "2.500,50" "2500.5" "2500"
+function parsePrecio(t){
+    var x=String(t==null?'':t).replace(/[$\s]/g,'');
+    if(!x)return null;
+    if(x.indexOf(',')!==-1)x=x.replace(/\./g,'').replace(',','.');
+    else if(/^\d{1,3}(\.\d{3})+$/.test(x))x=x.replace(/\./g,'');
+    var n=Number(x);return isFinite(n)?n:NaN;
+}
+function parseIva(t){
+    var x=String(t==null?'':t).replace(/[%\s]/g,'').replace(',','.');
+    if(!x)return 21;
+    var n=Number(x);return [0,10.5,21,27].indexOf(n)!==-1?n:NaN;
+}
+function parseTipo(t,cat){
+    var x=quitarTildes(t),c=quitarTildes(cat);
+    var mapa={cafeteria:'cafeteria',cafe:'cafeteria',kiosco:'kiosco',kiosko:'kiosco',bebida:'bebida',bebidas:'bebida',postre:'postre',postres:'postre',vianda:'vianda',viandas:'vianda',otro:'otro',otros:'otro'};
+    if(x)return mapa[x]||'invalido';
+    if(/cafe|desayun|merienda|panaderia|facturas/.test(c))return 'cafeteria';
+    if(/kiosc|kiosk|golosin|snack/.test(c))return 'kiosco';
+    if(/bebida|gaseosa|agua|jugo/.test(c))return 'bebida';
+    if(/postre/.test(c))return 'postre';
+    return 'otro';
+}
+function leerPegado(){
+    var lineas=$('mm-texto').value.split(/\r?\n/).filter(function(l){return l.trim();});
+    var filas=lineas.map(function(l){
+        var c=l.indexOf('\t')!==-1?l.split('\t'):l.indexOf(';')!==-1?l.split(';'):l.split(',');
+        return c.map(function(x){return x.trim().replace(/^"|"$/g,'');});
+    });
+    // fila de títulos
+    if(filas.length&&isNaN(parsePrecio(filas[0][2]))&&/nombre|producto/i.test(filas[0][0]||''))filas.shift();
+    var existentes={};S.prod.forEach(function(p){if(p.origen==='local')existentes[p.nombre.trim().toLowerCase()]=p;});
+    var vistos={};
+    MAS.filas=filas.map(function(c){
+        var f={nombre:c[0]||'',categoria:c[1]||'',precio:parsePrecio(c[2]),iva:parseIva(c[3]),tipo:parseTipo(c[4],c[1]),error:'',estado:''};
+        var k=f.nombre.toLowerCase();
+        if(!f.nombre)f.error='Falta el nombre';
+        else if(vistos[k])f.error='Repetido en la lista';
+        else if(!f.categoria)f.error='Falta la categoría';
+        else if(f.precio==null||isNaN(f.precio)||f.precio<0)f.error='Precio inválido';
+        else if(isNaN(f.iva))f.error='IVA inválido';
+        else if(f.tipo==='invalido')f.error='Tipo inválido';
+        vistos[k]=1;
+        if(!f.error){
+            var e=existentes[k];
+            if(!e)f.estado='nuevo';
+            else if(Number(e.precio_base)!==f.precio||Number(e.iva)!==f.iva||e.categoria!==f.categoria||e.tipo!==f.tipo){f.estado='cambia';f.antes=e;}
+            else f.estado='igual';
+        }
+        return f;
+    });
+    pintarMasivo();
+}
+function pintarMasivo(){
+    var l=MAS.filas;
+    if(!l.length){$('mm-prev').innerHTML='';$('mm-cargar').disabled=true;return;}
+    var err=l.filter(function(f){return f.error;}).length;
+    var cnt={nuevo:0,cambia:0,igual:0};l.forEach(function(f){if(f.estado)cnt[f.estado]++;});
+    $('mm-prev').innerHTML='<div class="prev"><table><thead><tr><th>#</th><th>Nombre</th><th>Categoría</th><th>Tipo</th><th style="text-align:right">Precio</th><th>IVA</th><th>Qué pasa</th></tr></thead><tbody>'+
+        l.map(function(f,i){
+            var est=f.error?'<span class="est error">'+esc(f.error)+'</span>':
+                f.estado==='nuevo'?'<span class="est nuevo">Nuevo</span>':
+                f.estado==='igual'?'<span class="est igual">Ya existe, sin cambios</span>':
+                '<span class="est cambia">Actualiza'+(Number(f.antes.precio_base)!==f.precio?' ('+plata(f.antes.precio_base)+' → '+plata(f.precio)+')':'')+'</span>';
+            return '<tr'+(f.error?' class="err"':'')+'><td>'+(i+1)+'</td><td>'+esc(f.nombre)+'</td><td>'+esc(f.categoria)+'</td><td>'+esc(f.tipo==='invalido'?'—':TIPOS[f.tipo]||f.tipo)+'</td><td style="text-align:right">'+(f.precio==null||isNaN(f.precio)?'—':plata(f.precio))+'</td><td>'+(isNaN(f.iva)?'—':String(f.iva).replace('.',',')+'%')+'</td><td>'+est+'</td></tr>';
+        }).join('')+'</tbody></table></div>'+
+        '<div class="cuenta">'+l.length+' fila'+(l.length>1?'s':'')+': <b>'+cnt.nuevo+'</b> nuevo'+(cnt.nuevo===1?'':'s')+', <b>'+cnt.cambia+'</b> a actualizar, '+cnt.igual+' sin cambios'+(err?' · <b style="color:#b91c1c">'+err+' con error — corregilas para poder cargar</b>':'')+'</div>';
+    $('mm-cargar').disabled=!!err||!(cnt.nuevo+cnt.cambia);
+}
+var tMas=null;
+$('mm-texto').addEventListener('input',function(){clearTimeout(tMas);tMas=setTimeout(leerPegado,250);});
+$('btn-masivo').onclick=function(){$('mm-texto').value='';$('mm-motivo').value='';MAS.filas=[];pintarMasivo();aviso('mm-aviso','');$('m-mas').style.display='flex';setTimeout(function(){$('mm-texto').focus();},50);};
+$('mm-cancelar').onclick=function(){$('m-mas').style.display='none';};
+$('mm-plantilla').onclick=function(){
+    var csv='\ufeffNombre;Categoría;Precio;IVA;Tipo\nCafé con leche;Cafetería;2500;21;cafetería\nMedialuna;Cafetería;900;10,5;cafetería\nAlfajor;Kiosco;1200;21;kiosco\nAgua mineral 500 ml;Bebidas;1500;21;bebida\n';
+    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='plantilla-productos-prosegur.csv';document.body.appendChild(a);a.click();a.remove();
+};
+$('mm-cargar').onclick=function(){
+    var items=MAS.filas.filter(function(f){return f.estado==='nuevo'||f.estado==='cambia';}).map(function(f){return {nombre:f.nombre,categoria:f.categoria,precio:f.precio,iva:f.iva,tipo:f.tipo};});
+    if(!items.length)return;
+    $('mm-cargar').disabled=true;$('mm-cargar').textContent='Cargando…';
+    rpc('caja_productos_masivo',{p_token:S.token,p_items:items,p_motivo:$('mm-motivo').value.trim()})
+        .then(function(r){
+            $('m-mas').style.display='none';S.hist=null;
+            aviso('aviso','Carga masiva lista: '+r.nuevos+' producto'+(r.nuevos===1?'':'s')+' nuevo'+(r.nuevos===1?'':'s')+' y '+r.actualizados+' actualizado'+(r.actualizados===1?'':'s')+'.',true);
+            setFiltro('todos');return cargar();
+        })
+        .catch(function(err){aviso('mm-aviso',err.message);$('mm-cargar').disabled=false;})
+        .then(function(){$('mm-cargar').textContent='Cargar productos';});
+};
+
+// ─── descuentos ───
+function pintarDescuentos(){
+    if(!S.desc.length){$('lista-desc').innerHTML='<div class="vacio">No hay descuentos cargados.</div>';return;}
+    var ahora=new Date();
+    $('lista-desc').innerHTML=S.desc.map(function(d){
+        var vig=S.prod.some(function(p){return enCaja(p)&&descuentoVigente(d,p,ahora);});
+        var est=!d.activo?'<span class="chip">Pausado</span>':vig?'<span class="chip dia">Vigente ahora</span>':'<span class="chip">Activo, fuera de horario o fecha</span>';
+        var acc='';
+        if(S.yo.encargado)acc+='<button class="btn chico" data-acc="toggle" data-id="'+d.id+'" type="button">'+(d.activo?'Pausar':'Activar')+'</button>';
+        if(S.yo.admin)acc+='<button class="btn chico" data-acc="editar" data-id="'+d.id+'" type="button">Editar</button>';
+        return '<div class="fila-d"><div><div class="nom">'+esc(d.nombre)+'</div><div class="chips">'+est+'</div></div><div style="font-size:13px;color:#4b5563">'+esc(d.texto)+'<div class="muted" style="font-size:11px;margin-top:2px">Creado por '+esc(d.creado_por)+'</div></div><div class="acciones">'+acc+'</div></div>';
+    }).join('');
+}
+$('lista-desc').addEventListener('click',function(e){
+    var b=e.target.closest('[data-acc]');if(!b)return;
+    var d=S.desc.filter(function(x){return String(x.id)===b.getAttribute('data-id');})[0];if(!d)return;
+    if(b.getAttribute('data-acc')==='editar'){abrirDescuento(d);return;}
+    var motivo=prompt((d.activo?'Pausar':'Activar')+' "'+d.nombre+'". Motivo (opcional):','');
+    if(motivo===null)return;
+    b.disabled=true;
+    rpc('caja_descuento_activar',{p_token:S.token,p_id:d.id,p_activo:!d.activo,p_motivo:motivo}).then(function(){S.hist=null;return cargar();}).catch(function(err){b.disabled=false;aviso('aviso',err.message);});
+});
+$('md-dias').innerHTML=DIAS.map(function(n,i){return '<label><input type="checkbox" value="'+(i+1)+'">'+n+'</label>';}).join('');
+function opcionesAlcance(sel){
+    var a=$('md-alcance').value;
+    $('md-c-av').style.display=a==='todo'?'none':'';
+    if(a==='categoria'){
+        $('md-av-l').textContent='Categoría';
+        var cats={};S.prod.forEach(function(p){if(p.categoria)cats[p.categoria]=1;});
+        $('md-av').innerHTML=Object.keys(cats).sort(function(x,y){return x.localeCompare(y,'es');}).map(function(c){return '<option'+(c===sel?' selected':'')+'>'+esc(c)+'</option>';}).join('');
+    }else if(a==='producto'){
+        $('md-av-l').textContent='Producto';
+        $('md-av').innerHTML=S.prod.filter(function(p){return enCaja(p)||String(p.id)===String(sel);}).sort(function(x,y){return x.nombre.localeCompare(y.nombre,'es');})
+            .map(function(p){return '<option value="'+p.id+'"'+(String(p.id)===String(sel)?' selected':'')+'>'+esc(p.nombre)+'</option>';}).join('');
+    }
+}
+$('md-alcance').onchange=function(){opcionesAlcance(null);};
+function abrirDescuento(d){
+    S.editD=d||null;
+    $('md-titulo').textContent=d?'Editar descuento':'Nuevo descuento';
+    $('md-nombre').value=d?d.nombre:'';
+    $('md-tipo').value=d?d.tipo:'porcentaje';
+    $('md-valor').value=d?d.valor:'';
+    $('md-alcance').value=d?d.alcance:'todo';
+    opcionesAlcance(d?d.alcance_valor:null);
+    $('md-desde').value=d&&d.desde?d.desde:'';
+    $('md-hasta').value=d&&d.hasta?d.hasta:'';
+    [].forEach.call($('md-dias').querySelectorAll('input'),function(i){i.checked=!!(d&&d.dias&&d.dias.indexOf(Number(i.value))!==-1);});
+    $('md-hd').value=d&&d.hora_desde?d.hora_desde:'';
+    $('md-hh').value=d&&d.hora_hasta?d.hora_hasta:'';
+    $('md-activo').checked=d?!!d.activo:true;
+    $('md-motivo').value='';
+    aviso('md-aviso','');
+    $('m-desc').style.display='flex';
+    setTimeout(function(){$('md-nombre').focus();},50);
+}
+$('btn-nuevo-desc').onclick=function(){abrirDescuento(null);};
+$('md-cancelar').onclick=function(){$('m-desc').style.display='none';};
+$('md-guardar').onclick=function(){
+    var v=num($('md-valor').value);
+    if(v==null||isNaN(v)||v<=0){aviso('md-aviso','Poné el valor del descuento.');return;}
+    var datos={nombre:$('md-nombre').value.trim(),tipo:$('md-tipo').value,valor:v,alcance:$('md-alcance').value,
+        alcance_valor:$('md-alcance').value==='todo'?null:$('md-av').value,
+        desde:$('md-desde').value||null,hasta:$('md-hasta').value||null,
+        dias:[].slice.call($('md-dias').querySelectorAll('input:checked')).map(function(i){return Number(i.value);}),
+        hora_desde:$('md-hd').value||null,hora_hasta:$('md-hh').value||null,activo:$('md-activo').checked};
+    if(datos.desde&&datos.hasta&&datos.hasta<datos.desde){aviso('md-aviso','La fecha "hasta" es anterior a "desde".');return;}
+    if(datos.hora_desde&&datos.hora_hasta&&datos.hora_hasta<=datos.hora_desde){aviso('md-aviso','La hora "hasta" tiene que ser posterior a "desde".');return;}
+    $('md-guardar').disabled=true;
+    rpc('caja_descuento_guardar',{p_token:S.token,p_id:S.editD?S.editD.id:null,p_datos:datos,p_motivo:$('md-motivo').value.trim()})
+        .then(function(){$('m-desc').style.display='none';S.hist=null;return cargar();})
+        .catch(function(err){aviso('md-aviso',err.message);})
+        .then(function(){$('md-guardar').disabled=false;});
+};
+
+// ─── historial ───
+var TIPO_H={precio_base:'Precio',precio_local:'Precio local',precio_local_confirmado:'Precio local confirmado',alta:'Producto nuevo',
+    producto_activado:'Mostrar en la caja',producto_desactivado:'Ocultar en la caja',iva:'IVA',descuento_nuevo:'Descuento nuevo',
+    descuento_modificado:'Descuento modificado',descuento_activado:'Descuento activado',descuento_pausado:'Descuento pausado'};
+function cargarHistorial(){
+    if(S.hist){pintarHistorial();return;}
+    $('lista-hist').innerHTML='<div class="cargando">Cargando…</div>';
+    rpc('caja_historial',{p_token:S.token,p_limite:2000}).then(function(h){S.hist=h||[];pintarHistorial();})
+        .catch(function(err){$('lista-hist').innerHTML='<div class="vacio">'+esc(err.message)+'</div>';});
+}
+function filtrarHist(){
+    var q=$('buscar-h').value.trim().toLowerCase(),o=$('origen-h').value;
+    return (S.hist||[]).filter(function(h){
+        if(o&&h.origen!==o)return false;
+        return !q||(h.objeto+' '+h.usuario+' '+h.motivo+' '+(TIPO_H[h.tipo]||h.tipo)).toLowerCase().indexOf(q)!==-1;
+    });
+}
+function pintarHistorial(){
+    var l=filtrarHist();
+    if(!l.length){$('lista-hist').innerHTML='<div class="vacio">'+((S.hist||[]).length?'No hay cambios que coincidan.':'Todavía no hay cambios registrados.')+'</div>';return;}
+    $('lista-hist').innerHTML='<div class="fila-h cab"><div>Fecha</div><div>Quién</div><div>Qué</div><div>Cambio</div><div>Origen</div><div>Motivo</div></div>'+
+        l.slice(0,1000).map(function(h){
+            var cambio=(h.antes?esc(h.antes)+'<span class="flecha">→</span>':'')+esc(h.despues||'');
+            return '<div class="fila-h"><div>'+esc(fechaHora(h.fecha))+'</div><div>'+esc(h.usuario)+'</div><div><b>'+esc(h.objeto)+'</b><div class="muted" style="font-size:12px">'+esc(TIPO_H[h.tipo]||h.tipo)+'</div></div>'+
+                '<div>'+cambio+'</div><div>'+(h.origen==='sincronizacion'?'<span class="chip app">App</span>':'<span class="chip">Manual</span>')+'</div><div>'+esc(h.motivo)+'</div></div>';
+        }).join('');
+}
+$('buscar-h').addEventListener('input',pintarHistorial);
+$('origen-h').addEventListener('change',pintarHistorial);
+$('btn-csv').onclick=function(){
+    var l=filtrarHist();if(!l.length)return;
+    var c=function(v){v=String(v==null?'':v);if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
+    var csv='﻿'+['Fecha','Usuario','Producto / descuento','Tipo','Antes','Después','Origen','Motivo'].map(c).join(';')+'\n'+
+        l.map(function(h){return [fechaHora(h.fecha),h.usuario,h.objeto,TIPO_H[h.tipo]||h.tipo,h.antes,h.despues,h.origen==='sincronizacion'?'App':'Manual',h.motivo].map(c).join(';');}).join('\n');
+    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='historial-precios-prosegur.csv';document.body.appendChild(a);a.click();a.remove();
+};
+
+// ─── modal genérico ───
+var GEN={ok:null};
+function abrirGen(o){
+    $('mg-titulo').textContent=o.titulo;$('mg-sub').textContent=o.sub||'';$('mg-sub').style.display=o.sub?'':'none';
+    $('mg-cuerpo').innerHTML=o.html;$('mg-ok').textContent=o.boton||'Guardar';$('mg-modal').classList.toggle('ancho',!!o.ancho);
+    aviso('mg-aviso','');GEN.ok=o.ok;$('m-gen').style.display='flex';
+    setTimeout(function(){var f=$('mg-cuerpo').querySelector('input,select');if(f)f.focus();},50);
+}
+$('mg-cancelar').onclick=function(){$('m-gen').style.display='none';};
+$('mg-ok').onclick=function(){
+    if(!GEN.ok)return;
+    var b=$('mg-ok');b.disabled=true;
+    Promise.resolve().then(GEN.ok).then(function(r){if(r!==false)$('m-gen').style.display='none';})
+    .catch(function(err){aviso('mg-aviso',err.message);}).then(function(){b.disabled=false;});
+};
+function campo(id,label,input,ayuda){return '<div class="campo" style="margin-bottom:12px"><label for="'+id+'">'+label+'</label>'+input+(ayuda?'<div class="ayuda">'+ayuda+'</div>':'')+'</div>';}
+function numero(v){var n=Number(String(v).replace(',','.'));return v===''||v==null?null:(isFinite(n)?n:NaN);}
+function fmtCant(n,u){var v=Math.round(Number(n||0)*1000)/1000;return v.toLocaleString('es-AR')+(u&&u!=='u'?' '+u:'');}
+
+// ─── stock ───
+var ST={datos:null,filtro:'control'};
+function cargarStock(){
+    $('lista-stock').innerHTML='<div class="cargando">Cargando…</div>';
+    return rpc('caja_stock',{p_token:S.token}).then(function(d){ST.datos=d;pintarStock();})
+        .catch(function(err){$('lista-stock').innerHTML='<div class="vacio">'+esc(err.message)+'</div>';});
+}
+$('filtros-s').addEventListener('click',function(e){var b=e.target.closest('.filtro');if(!b)return;ST.filtro=b.getAttribute('data-f');[].forEach.call(document.querySelectorAll('#filtros-s .filtro'),function(x){x.classList.toggle('on',x===b);});pintarStock();});
+$('buscar-s').addEventListener('input',function(){if(ST.datos)pintarStock();});
+function estadoStock(st,min){st=Number(st);min=Number(min);
+    if(st<0)return '<span class="chip rojo">Negativo</span>';
+    if(st<=min)return '<span class="chip warn">Bajo el mínimo</span>';
+    return '<span class="chip dia">OK</span>';}
+function pintarStock(){
+    var d=ST.datos,q=$('buscar-s').value.trim().toLowerCase();
+    $('btn-ingreso').style.display=S.yo.encargado?'':'none';$('btn-insumo').style.display=S.yo.admin?'':'none';
+    var l=d.productos.filter(function(p){
+        if(q&&quitarTildes(p.nombre+' '+p.categoria).indexOf(quitarTildes(q))===-1)return false;
+        if(ST.filtro==='control')return p.control_stock&&p.en_caja;
+        if(ST.filtro==='bajo')return p.control_stock&&p.en_caja&&Number(p.stock)<=Number(p.stock_minimo);
+        return true;
+    });
+    $('lista-stock').innerHTML=l.length?'<div class="fila cab" style="grid-template-columns:minmax(220px,2fr) 100px 100px 140px 220px"><div>Producto</div><div class="num">Stock</div><div class="num">Mínimo</div><div>Estado</div><div></div></div>'+
+        l.map(function(p){
+            var acc='';
+            if(S.yo.encargado)acc+='<button class="btn chico" data-st="ajuste" data-id="'+p.id+'" type="button">Ajustar</button>';
+            if(S.yo.admin)acc+='<button class="btn chico" data-st="cfg" data-id="'+p.id+'" type="button">Configurar</button>';
+            return '<div class="fila'+(p.en_caja?'':' apagada')+'" style="grid-template-columns:minmax(220px,2fr) 100px 100px 140px 220px"><div><div class="nom">'+esc(p.nombre)+'</div><div class="chips"><span class="chip">'+esc(p.categoria)+'</span>'+(p.del_dia?'<span class="chip dia">Plato del día</span>':'')+(p.control_stock?'':'<span class="chip">Sin control</span>')+(p.receta?'<span class="chip local">Con receta</span>':'')+'</div></div>'+
+                '<div class="num" data-l="Stock"><b>'+(p.control_stock?fmtCant(p.stock):'—')+'</b></div><div class="num" data-l="Mínimo">'+(p.control_stock?fmtCant(p.stock_minimo):'—')+'</div><div>'+(p.control_stock?estadoStock(p.stock,p.stock_minimo):'')+'</div><div class="acciones">'+acc+'</div></div>';
+        }).join(''):'<div class="vacio">'+(ST.filtro==='bajo'?'Nada bajo el mínimo. 👍':'No hay productos con este filtro.')+'</div>';
+    // insumos
+    $('lista-insumos').innerHTML=d.insumos.length?d.insumos.map(function(i){
+        var acc='';
+        if(S.yo.encargado)acc+='<button class="btn chico" data-st="ajuste-i" data-id="'+i.id+'" type="button">Ajustar</button>';
+        if(S.yo.admin)acc+='<button class="btn chico" data-st="insumo" data-id="'+i.id+'" type="button">Editar</button>';
+        return '<div class="fila'+(i.activo?'':' apagada')+'" style="grid-template-columns:minmax(220px,2fr) 120px 120px 140px 220px"><div class="nom">'+esc(i.nombre)+'</div><div class="num" data-l="Stock"><b>'+fmtCant(i.stock,i.unidad)+'</b></div><div class="num" data-l="Mínimo">'+fmtCant(i.stock_minimo,i.unidad)+'</div><div>'+estadoStock(i.stock,i.stock_minimo)+'</div><div class="acciones">'+acc+'</div></div>';
+    }).join(''):'<div class="vacio">Todavía no hay insumos. Cargá por ejemplo "Café en granos" (g) y "Leche" (ml).</div>';
+    // recetas: productos de cafetería o con receta
+    var conReceta=d.productos.filter(function(p){return (p.tipo==='cafeteria'||p.receta)&&(p.en_caja||p.receta);});
+    var nomIns={};d.insumos.forEach(function(i){nomIns[i.id]=i;});
+    $('lista-recetas').innerHTML=conReceta.length?conReceta.map(function(p){
+        var txt=p.receta?p.receta.map(function(r){var i=nomIns[r.insumo_id];return i?fmtCant(r.cantidad,i.unidad)+' de '+esc(i.nombre):'';}).join(' + '):'<span class="muted">Sin receta (no descuenta insumos)</span>';
+        return '<div class="fila" style="grid-template-columns:minmax(200px,1.2fr) minmax(220px,2fr) 160px"><div class="nom">'+esc(p.nombre)+'</div><div style="font-size:13px">'+txt+'</div><div class="acciones">'+(S.yo.admin?'<button class="btn chico" data-st="receta" data-id="'+p.id+'" type="button">Editar receta</button>':'')+'</div></div>';
+    }).join(''):'<div class="vacio">No hay productos de cafetería todavía.</div>';
+    // movimientos
+    var TM={ingreso:'Ingreso',ajuste:'Ajuste por conteo',merma:'Merma',anulacion:'Anulación de venta'};
+    $('lista-movs').innerHTML=d.movimientos.length?d.movimientos.slice(0,60).map(function(m){
+        var c=Number(m.cantidad);
+        return '<div class="fila-h" style="grid-template-columns:130px 120px minmax(160px,1.2fr) 150px 110px minmax(120px,1fr)"><div>'+esc(fechaHora(m.fecha))+'</div><div>'+esc(m.usuario)+'</div><div><b>'+esc(m.nombre)+'</b></div><div>'+esc(TM[m.tipo]||m.tipo)+'</div><div style="color:'+(c<0?'#b91c1c':'#15803d')+';font-weight:700">'+(c>0?'+':'')+fmtCant(c,m.unidad)+'</div><div>'+esc(m.motivo)+'</div></div>';
+    }).join(''):'<div class="vacio">Sin movimientos todavía.</div>';
+}
+function prodStock(id){return ST.datos.productos.filter(function(p){return String(p.id)===String(id);})[0];}
+function insStock(id){return ST.datos.insumos.filter(function(i){return String(i.id)===String(id);})[0];}
+document.querySelector('#sec-stock').addEventListener('click',function(e){
+    var b=e.target.closest('[data-st]');if(!b)return;
+    var t=b.getAttribute('data-st'),id=b.getAttribute('data-id');
+    if(t==='ajuste'||t==='ajuste-i'){
+        var x=t==='ajuste'?prodStock(id):insStock(id),u=t==='ajuste'?'u':x.unidad;
+        abrirGen({titulo:'Ajustar stock · '+x.nombre,sub:'Stock actual en el sistema: '+fmtCant(x.stock,u),
+            html:'<div class="campo" style="margin-bottom:12px"><label>Tipo</label><select id="g-tipo"><option value="ajuste">Conteo real (cuánto hay)</option><option value="merma">Merma (se tiró, venció o rompió)</option></select></div>'+
+                campo('g-cant','Cantidad'+(u!=='u'?' ('+u+')':''),'<input type="number" id="g-cant" min="0" step="any" inputmode="decimal">','En "Conteo real" poné lo que contaste; en "Merma", cuánto se perdió.')+
+                campo('g-mot','Motivo','<input type="text" id="g-mot" maxlength="150">'),
+            ok:function(){var c=numero($('g-cant').value);if(c==null||isNaN(c)||c<0)throw new Error('Poné la cantidad.');
+                return rpc('caja_stock_ajuste',{p_token:S.token,p_producto_id:t==='ajuste'?Number(id):null,p_insumo_id:t==='ajuste-i'?Number(id):null,p_tipo:$('g-tipo').value,p_cantidad:c,p_motivo:$('g-mot').value.trim()}).then(cargarStock);}});
+    }
+    if(t==='cfg'){
+        var p=prodStock(id);
+        abrirGen({titulo:'Stock · '+p.nombre,
+            html:'<label class="check" style="margin-bottom:12px"><input type="checkbox" id="g-ctl"'+(p.control_stock?' checked':'')+'><span><b>Controlar stock de este producto</b><br><small>Cada venta descuenta una unidad.</small></span></label>'+
+                campo('g-min','Stock mínimo (avisa cuando baja de acá)','<input type="number" id="g-min" min="0" step="1" value="'+Number(p.stock_minimo)+'">'),
+            ok:function(){var m=numero($('g-min').value);if(m==null||isNaN(m)||m<0)throw new Error('Revisá el mínimo.');
+                return rpc('caja_stock_config',{p_token:S.token,p_producto_id:Number(id),p_control:$('g-ctl').checked,p_minimo:m}).then(cargarStock);}});
+    }
+    if(t==='insumo')editarInsumo(insStock(id));
+    if(t==='receta')editarReceta(prodStock(id));
+});
+$('btn-insumo').onclick=function(){editarInsumo(null);};
+function editarInsumo(i){
+    abrirGen({titulo:i?'Editar insumo':'Nuevo insumo',
+        html:campo('g-nom','Nombre','<input type="text" id="g-nom" maxlength="80" value="'+esc(i?i.nombre:'')+'" placeholder="Ej.: Café en granos">')+
+            '<div class="campos">'+campo('g-uni','Unidad','<select id="g-uni"><option value="g">gramos (g)</option><option value="ml">mililitros (ml)</option><option value="u">unidades</option></select>')+
+            campo('g-min','Stock mínimo','<input type="number" id="g-min" min="0" step="any" value="'+(i?Number(i.stock_minimo):0)+'">')+'</div>'+
+            '<label class="check"><input type="checkbox" id="g-act"'+(!i||i.activo?' checked':'')+'><span><b>Activo</b></span></label>',
+        ok:function(){var m=numero($('g-min').value);if(m==null||isNaN(m)||m<0)throw new Error('Revisá el mínimo.');
+            return rpc('caja_insumo_guardar',{p_token:S.token,p_id:i?i.id:null,p_nombre:$('g-nom').value.trim(),p_unidad:$('g-uni').value,p_minimo:m,p_activo:$('g-act').checked}).then(cargarStock);}});
+    if(i)$('g-uni').value=i.unidad;
+}
+function editarReceta(p){
+    var ins=ST.datos.insumos.filter(function(i){return i.activo;});
+    if(!ins.length){aviso('aviso','Primero cargá los insumos (ej.: Café en granos, Leche).');return;}
+    var actual={};(p.receta||[]).forEach(function(r){actual[r.insumo_id]=r.cantidad;});
+    abrirGen({titulo:'Receta · '+p.nombre,sub:'Cuánto de cada insumo se usa por unidad vendida. Dejá vacío lo que no lleva.',
+        html:ins.map(function(i){return campo('g-r'+i.id,esc(i.nombre)+' ('+(i.unidad==='u'?'unidades':i.unidad)+')','<input type="number" id="g-r'+i.id+'" data-ins="'+i.id+'" min="0" step="any" value="'+(actual[i.id]!=null?Number(actual[i.id]):'')+'">');}).join(''),
+        ok:function(){var items=[].map.call($('mg-cuerpo').querySelectorAll('[data-ins]'),function(x){return {insumo_id:Number(x.getAttribute('data-ins')),cantidad:numero(x.value)};})
+                .filter(function(x){return x.cantidad>0;});
+            return rpc('caja_receta_guardar',{p_token:S.token,p_producto_id:p.id,p_items:items}).then(cargarStock);}});
+}
+$('btn-ingreso').onclick=function(){
+    var d=ST.datos;if(!d)return;
+    var prods=d.productos.filter(function(p){return p.en_caja&&(p.control_stock||['vianda','postre','bebida','kiosco'].indexOf(p.tipo)!==-1);});
+    var fila=function(attr,id,nombre,sub,u){return '<div class="fila" style="grid-template-columns:1fr 120px;padding:8px 12px" data-nombre="'+esc(nombre.toLowerCase())+'"><div><div class="nom" style="font-size:13px">'+esc(nombre)+'</div><div class="muted" style="font-size:11px">'+esc(sub)+'</div></div><input type="number" '+attr+'="'+id+'" min="0" step="any" inputmode="decimal" placeholder="'+(u&&u!=='u'?u:'cant.')+'" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;text-align:right"></div>';};
+    abrirGen({titulo:'Ingreso de mercadería',ancho:true,boton:'Cargar ingreso',sub:'Poné la cantidad que llegó de cada producto. Lo que dejes vacío no se toca.',
+        html:'<input class="buscar" id="g-bus" type="search" placeholder="Filtrar…" style="width:100%;margin-bottom:10px">'+
+            '<div class="lista" style="max-height:48vh;overflow:auto" id="g-lista">'+prods.map(function(p){return fila('data-prod',p.id,p.nombre,p.categoria+' · stock '+fmtCant(p.stock));}).join('')+
+            d.insumos.filter(function(i){return i.activo;}).map(function(i){return fila('data-ins',i.id,i.nombre,'Insumo · stock '+fmtCant(i.stock,i.unidad),i.unidad);}).join('')+'</div>'+
+            '<div style="margin-top:12px">'+campo('g-mot','Detalle (queda en los movimientos)','<input type="text" id="g-mot" maxlength="150" placeholder="Ej.: entrega de cocina del 10/12, remito 1234">')+'</div>',
+        ok:function(){
+            var items=[];
+            [].forEach.call($('mg-cuerpo').querySelectorAll('[data-prod],[data-ins]'),function(x){var c=numero(x.value);if(c==null)return;if(isNaN(c)||c<0)throw new Error('Hay una cantidad inválida.');if(c>0)items.push(x.hasAttribute('data-prod')?{producto_id:Number(x.getAttribute('data-prod')),cantidad:c}:{insumo_id:Number(x.getAttribute('data-ins')),cantidad:c});});
+            if(!items.length)throw new Error('No pusiste ninguna cantidad.');
+            return rpc('caja_stock_ingreso',{p_token:S.token,p_items:items,p_motivo:$('g-mot').value.trim()}).then(function(r){aviso('aviso','Ingreso cargado: '+r.cargados+' producto'+(r.cargados===1?'':'s')+'.',true);return cargarStock();});
+        }});
+    $('g-bus').addEventListener('input',function(){var q=this.value.trim().toLowerCase();[].forEach.call($('g-lista').children,function(f){f.style.display=!q||f.getAttribute('data-nombre').indexOf(q)!==-1?'':'none';});});
+};
+
+// ─── cierres de caja ───
+var CI={lista:[]};
+function cargarCierres(){
+    $('lista-cierres').innerHTML='<div class="cargando">Cargando…</div>';
+    $('cfg-mails').disabled=!S.yo.admin;$('btn-cfg-mails').style.display=S.yo.admin?'':'none';
+    rpc('caja_config_leer',{p_token:S.token}).then(function(c){$('cfg-mails').value=(c.mail_cierre||[]).join(', ');}).catch(function(){});
+    return rpc('caja_turnos_listar',{p_token:S.token,p_limite:90}).then(function(l){CI.lista=l||[];pintarCierres();})
+        .catch(function(err){$('lista-cierres').innerHTML='<div class="vacio">'+esc(err.message)+'</div>';});
+}
+$('btn-cfg-mails').onclick=function(){
+    var l=$('cfg-mails').value.split(/[,;\s]+/).map(function(x){return x.trim();}).filter(Boolean);
+    $('btn-cfg-mails').disabled=true;
+    rpc('caja_config_mail',{p_token:S.token,p_destinos:l}).then(function(r){$('cfg-mails').value=(r||[]).join(', ');aviso('aviso',(r&&r.length)?'Listo: el informe de cierre se va a mandar a '+r.join(', ')+'.':'Sin mails: el informe no se va a mandar.',true);})
+    .catch(function(err){aviso('aviso',err.message);}).then(function(){$('btn-cfg-mails').disabled=false;});
+};
+function pintarCierres(){
+    var ab=CI.lista.filter(function(t){return !t.cerrado;})[0];
+    $('turno-abierto').innerHTML=ab?'<div class="aviso ok" style="display:block">Caja abierta desde '+esc(fechaHora(ab.abierto))+' por '+esc(ab.abierto_por)+' · '+esc(ab.resumen.tickets)+' tickets · '+plata(ab.resumen.total)+'</div>':'';
+    var l=CI.lista.filter(function(t){return t.cerrado;});
+    if(!l.length){$('lista-cierres').innerHTML='<div class="vacio">Todavía no hay cierres de caja.</div>';return;}
+    $('lista-cierres').innerHTML='<div class="fila-h cab" style="grid-template-columns:150px minmax(140px,1fr) 80px 110px 140px minmax(150px,1fr) 190px"><div>Cierre</div><div>Abrió / cerró</div><div>Tickets</div><div>Total</div><div>Diferencia</div><div>Mail</div><div></div></div>'+
+        l.map(function(t){
+            var r=t.resumen||{},d=r.diferencia==null?null:Number(r.diferencia);
+            var dif=d==null?'—':d===0?'<span style="color:#15803d;font-weight:700">OK</span>':'<span style="color:'+(d>0?'#1d4ed8':'#b91c1c')+';font-weight:700">'+(d>0?'Sobran ':'Faltan ')+plata(Math.abs(d))+'</span>';
+            var mail=!t.mail_estado?'<span class="muted">No enviado</span>':t.mail_estado==='enviado'?'<span class="chip dia">Enviado</span> <span class="muted" style="font-size:11px">'+esc((t.mail_destinos||[]).join(', '))+'</span>':'<span class="chip warn">'+esc(t.mail_estado.slice(0,60))+'</span>';
+            return '<div class="fila-h" style="grid-template-columns:150px minmax(140px,1fr) 80px 110px 140px minmax(150px,1fr) 190px;align-items:center"><div>'+esc(fechaHora(t.cerrado))+'</div><div>'+esc(t.abierto_por)+' / '+esc(t.cerrado_por)+'</div><div>'+esc(r.tickets)+'</div><div><b>'+plata(r.total)+'</b></div><div>'+dif+'</div><div>'+mail+'</div>'+
+                '<div class="acciones"><button class="btn chico" data-ci="ver" data-id="'+t.id+'" type="button">Ver informe</button><button class="btn chico" data-ci="mail" data-id="'+t.id+'" type="button">Reenviar</button></div></div>';
+        }).join('');
+}
+$('lista-cierres').addEventListener('click',function(e){
+    var b=e.target.closest('[data-ci]');if(!b)return;
+    var t=CI.lista.filter(function(x){return String(x.id)===b.getAttribute('data-id');})[0];if(!t)return;
+    if(b.getAttribute('data-ci')==='ver'){
+        import('/prosegur-informe.js').then(function(m){$('mi-cuerpo').innerHTML=m.informeHTML(t.resumen);$('m-inf').style.display='flex';})
+        .catch(function(err){aviso('aviso','No se pudo mostrar el informe: '+err.message);});
+        return;
+    }
+    b.disabled=true;b.textContent='Enviando…';
+    fetch('/api/caja-cierre',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token,turno:t.id})})
+    .then(function(r){return r.json().catch(function(){return {ok:false,message:'Respuesta inválida ('+r.status+')'};});})
+    .then(function(d){aviso('aviso',d.ok?'Informe enviado a '+d.destinos.join(', ')+'.':'No se pudo enviar: '+(d.estado||d.message),d.ok);return cargarCierres();})
+    .catch(function(err){aviso('aviso','No se pudo enviar: '+err.message);})
+    .then(function(){b.disabled=false;b.textContent='Reenviar';});
+});
+$('mi-cerrar').onclick=function(){$('m-inf').style.display='none';};
+
+// ─── sincronizar ───
+$('btn-sync').onclick=function(){
+    var b=$('btn-sync');b.disabled=true;b.textContent='Sincronizando…';
+    fetch('/api/caja-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token})})
+    .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok||!d.ok)throw new Error(d.message||('Error '+r.status));return d;});})
+    .then(function(d){mostrarResumen(d);S.hist=null;return cargar();})
+    .catch(function(err){aviso('aviso','No se pudo sincronizar: '+err.message);})
+    .then(function(){b.disabled=false;b.textContent='⟳ Sincronizar productos';});
+};
+function mostrarResumen(d){
+    var r=d.resumen||{},li=function(a){return '<ul>'+a.map(function(x){return '<li>'+x+'</li>';}).join('')+'</ul>';},h='';
+    var cambios=0;
+    if(r.nuevos&&r.nuevos.length){cambios++;h+='<b>'+r.nuevos.length+' producto'+(r.nuevos.length>1?'s':'')+' nuevo'+(r.nuevos.length>1?'s':'')+'</b>'+li(r.nuevos.map(esc));}
+    if(r.precios&&r.precios.length){cambios++;h+='<b>'+r.precios.length+' precio'+(r.precios.length>1?'s':'')+' cambiado'+(r.precios.length>1?'s':'')+' en la app</b>'+li(r.precios.map(function(x){return esc(x.nombre)+': '+plata(x.antes)+' → '+plata(x.despues)+(x.precio_local!=null?' <span style="color:#9a3412">(tiene precio local de '+plata(x.precio_local)+': se mantiene, revisalo)</span>':'');}));}
+    if(r.quitados&&r.quitados.length){cambios++;h+='<b>'+r.quitados.length+' ya no está'+(r.quitados.length>1?'n':'')+' habilitado'+(r.quitados.length>1?'s':'')+' en la app</b> (salen de la caja)'+li(r.quitados.map(esc));}
+    if(r.platos_dia_anteriores)h+='<div>Se renovó el plato del día ('+r.platos_dia_anteriores+' plato'+(r.platos_dia_anteriores>1?'s':'')+' del menú anterior salieron de la caja).</div>';
+    if(r.sin_precio&&r.sin_precio.length)h+='<b style="color:#b91c1c">'+r.sin_precio.length+' sin precio en la app</b> — ponele precio local para poder venderlos'+li(r.sin_precio.map(esc));
+    if(d.avisos&&d.avisos.length){var otros=d.avisos.filter(function(a){return !/sin precio/i.test(a);});if(otros.length)h+='<b>Avisos</b>'+li(otros.map(esc));}
+    if(!cambios&&!h)h='No hubo cambios: la caja ya estaba igual que la app.';
+    $('resumen').innerHTML='<button class="cerrar" type="button" aria-label="Cerrar" onclick="this.parentNode.style.display=\'none\'">×</button><h3>Sincronización lista · '+esc(r.total||0)+' productos de la app'+(d.menuEncontrado===false?' · sin menú del día cargado':'')+'</h3>'+h;
+    $('resumen').style.display='block';
+}
+
+// ─── pestañas ───
+function mostrarTab(t){
+    S.tab=t;
+    [].forEach.call(document.querySelectorAll('.tab'),function(b){b.classList.toggle('on',b.getAttribute('data-tab')===t);});
+    ['productos','descuentos','stock','cierres','historial'].forEach(function(x){$('sec-'+x).style.display=x===t?'':'none';});
+    if(t==='historial')cargarHistorial();
+    if(t==='stock')cargarStock();
+    if(t==='cierres')cargarCierres();
+}
+document.querySelector('.tabs').addEventListener('click',function(e){var b=e.target.closest('.tab');if(b)mostrarTab(b.getAttribute('data-tab'));});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){$('m-gen').style.display='none';$('m-inf').style.display='none';$('m-prod').style.display='none';$('m-desc').style.display='none';$('m-mas').style.display='none';}});
+// los descuentos por horario cambian solos: se repinta cada minuto
+setInterval(function(){if($('contenido').style.display==='block'){pintarProductos();pintarDescuentos();}},60000);
+iniciar();
+</script>
+</body>
+</html>
