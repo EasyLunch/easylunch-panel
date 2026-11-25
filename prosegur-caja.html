@@ -154,6 +154,11 @@
         .rc .ent{height:56px;border:0;border-radius:14px;background:#16a34a;color:white;font-size:18px;font-weight:800;margin-top:auto;}
         .rc .ent:active{background:#15803d;}
         .rc .des{height:40px;border:2px solid #e2e8f0;border-radius:10px;background:white;font-weight:700;color:#475569;}
+        .qr-box{display:flex;justify-content:center;align-items:center;min-height:300px;margin:6px 0 10px;}
+        .qr-box svg{width:300px;height:300px;max-width:72vw;max-height:72vw;}
+        .qr-est{text-align:center;font-size:16px;font-weight:700;color:#334155;display:flex;align-items:center;justify-content:center;gap:10px;min-height:28px;}
+        .qr-est .spin{width:20px;height:20px;border-width:3px;}
+        .qr-sub{text-align:center;font-size:13px;color:#64748b;margin-top:4px;}
         .modal .x{float:right;background:none;border:0;font-size:26px;line-height:1;color:#64748b;padding:4px 8px;}
         /* tablet vertical / pantallas angostas: el ticket pasa a una barra abajo que se abre */
         @media (max-width:900px){
@@ -239,10 +244,11 @@
             <div class="vuelto" id="mc-vuelto" style="display:none"><span>Vuelto</span><span id="mc-vuelto-n">$0</span></div>
         </div>
         <div id="mc-qr" style="display:none">
-            <button class="x" type="button" data-volver aria-label="Volver">‹</button>
             <h2>QR Mercado Pago</h2>
-            <div class="big" id="mc-total-qr">$0</div>
-            <p style="font-size:15px;color:#475569;line-height:1.5">Mostrale al cliente el QR de Mercado Pago del local y confirmá cuando veas el pago acreditado en la cuenta. <br><small style="color:#94a3b8">Próximamente el QR va a salir en esta pantalla con el monto y la venta se va a confirmar sola.</small></p>
+            <div class="big" id="mc-total-qr" style="margin-bottom:4px">$0</div>
+            <div class="qr-box" id="mc-qr-box"></div>
+            <div class="qr-est" id="mc-qr-est"><div class="spin"></div><span>Generando el QR…</span></div>
+            <div class="qr-sub" id="mc-qr-sub">El cliente escanea con la app de Mercado Pago o la de su banco.</div>
         </div>
         <div id="mc-listo" style="display:none" class="listo">
             <div class="chk">✓</div>
@@ -253,6 +259,13 @@
         <div class="err" id="mc-err"></div>
         <div class="pie" id="mc-pie" style="display:none">
             <button class="ok" id="mc-confirmar" type="button">Confirmar cobro</button>
+        </div>
+        <div class="pie" id="mc-pie-qr" style="display:none">
+            <button type="button" id="mc-qr-cancelar">Cancelar cobro</button>
+            <button type="button" id="mc-qr-otro" style="display:none" class="ok">Generar otro QR</button>
+        </div>
+        <div style="text-align:center;margin-top:12px;display:none" id="mc-qr-manual-w">
+            <button type="button" id="mc-qr-manual" style="background:none;border:0;color:#64748b;text-decoration:underline;font-size:14px;padding:8px">El QR no funciona: cobré con el QR fijo del local, registrar a mano</button>
         </div>
         <div class="pie" id="mc-pie-listo" style="display:none">
             <button class="ok" id="mc-nueva" type="button">Nueva venta</button>
@@ -333,6 +346,7 @@
 <div class="aviso" id="aviso"></div>
 
 <script src="/prosegur-comun.js"></script>
+<script src="/qrcode-generator.js"></script>
 <script>
 var S={token:null,yo:null,prod:[],desc:[],cat:null,q:'',ticket:[],turno:null};  // ticket: [{id, cant}]
 var EMOJI={vianda:'🍽️',postre:'🍰',bebida:'🥤',cafeteria:'☕',kiosco:'🍫',otro:'🛒'};
@@ -352,7 +366,7 @@ function cargar(primera){
         var cats=EL.ordenCategorias(vendibles());
         if(!S.cat||(S.cat!=='__buscar'&&cats.indexOf(S.cat)===-1))S.cat=cats[0]||null;
         pintarTabs();pintarGrid();pintarTicket();
-        if(primera){$('carga').style.display='none';$('app').style.display='grid';}
+        if(primera){$('carga').style.display='none';$('app').style.display='grid';setTimeout(conciliarQR,1500);}
         return refrescarTurno();
     });
 }
@@ -466,12 +480,15 @@ $('cerrar-hoja').onclick=function(){$('ticket').classList.remove('abierto');};
 var C={medio:null,clientId:null,ocupado:false};
 function uuid(){try{return crypto.randomUUID();}catch(e){return Date.now().toString(36)+Math.random().toString(36).slice(2);}}
 function pasoCobro(id){['mc-paso1','mc-ef','mc-qr','mc-listo'].forEach(function(x){$(x).style.display=x===id?'':'none';});
-    $('mc-pie').style.display=(id==='mc-ef'||id==='mc-qr')?'flex':'none';$('mc-pie-listo').style.display=id==='mc-listo'?'flex':'none';}
+    $('mc-pie').style.display=id==='mc-ef'||(id==='mc-qr'&&QR.manual)?'flex':'none';
+    $('mc-pie-qr').style.display=id==='mc-qr'&&!QR.manual?'flex':'none';
+    $('mc-pie-listo').style.display=id==='mc-listo'?'flex':'none';
+    if(id!=='mc-qr')$('mc-qr-manual-w').style.display='none';}
 function errCobro(m){$('mc-err').textContent=m||'';$('mc-err').style.display=m?'block':'none';}
 function abrirCobro(){
     if(!S.turno){abrirCaja();return;}
     var c=calcular();if(!c.unidades||c.malas)return;
-    C.medio=null;C.clientId=uuid();errCobro('');
+    C.medio=null;C.clientId=uuid();errCobro('');QR.manual=false;QR.activo=false;clearTimeout(QR.t);
     $('mc-total').textContent=plata(c.total);
     pasoCobro('mc-paso1');$('m-cobro').style.display='flex';
 }
@@ -484,7 +501,7 @@ $('cobrar').onclick=abrirCobro;$('cobrar2').onclick=abrirCobro;
         billetes.forEach(function(x){var r=Math.ceil(c.total/x)*x;if(r>c.total&&opciones.indexOf(r)===-1&&opciones.length<5)opciones.push(r);});
         $('mc-rapidos').innerHTML=opciones.map(function(v,i){return '<button type="button" data-v="'+v+'">'+(i===0?'Justo':plata(v))+'</button>';}).join('');
         pasoCobro('mc-ef');setTimeout(function(){$('mc-recibido').focus();},50);
-    }else{$('mc-total-qr').textContent=plata(c.total);pasoCobro('mc-qr');}
+    }else{$('mc-total-qr').textContent=plata(c.total);QR.manual=false;pasoCobro('mc-qr');iniciarQR();}
 };});
 $('mc-rapidos').addEventListener('click',function(e){var b=e.target.closest('button[data-v]');if(!b)return;$('mc-recibido').value=b.getAttribute('data-v');calcVuelto();});
 $('mc-recibido').addEventListener('input',calcVuelto);
@@ -496,6 +513,89 @@ function calcVuelto(){
     $('mc-vuelto').firstChild.textContent=v<0?'Falta':'Vuelto';$('mc-vuelto-n').textContent=plata(Math.abs(v));
 }
 [].forEach.call(document.querySelectorAll('#m-cobro [data-volver]'),function(b){b.onclick=function(){errCobro('');pasoCobro('mc-paso1');};});
+
+// ─── cobro con QR de Mercado Pago (QR dinámico con el monto; la venta se confirma sola) ───
+var QR={id:null,t:null,activo:false,manual:false,hasta:0};
+function qrEstado(txt,spin,color){$('mc-qr-est').innerHTML=(spin?'<div class="spin"></div>':'')+'<span'+(color?' style="color:'+color+'"':'')+'>'+esc(txt)+'</span>';}
+function apiMP(datos){
+    datos.token=S.token;
+    return fetch('/api/caja-mp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(datos)})
+    .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok)throw Object.assign(new Error(d.message||('Error '+r.status)),{code:d.code});return d;});});
+}
+function iniciarQR(){
+    var c=calcular();clearTimeout(QR.t);QR.activo=true;QR.id=null;errCobro('');
+    $('mc-qr-box').innerHTML='';$('mc-qr-otro').style.display='none';$('mc-qr-cancelar').style.display='';$('mc-qr-manual-w').style.display='none';
+    qrEstado('Generando el QR…',true);$('mc-qr-sub').textContent='El cliente escanea con la app de Mercado Pago o la de su banco.';
+    apiMP({accion:'crear',items:S.ticket.map(function(x){return {id:x.id,cant:x.cant};}),total:c.total,client_id:C.clientId})
+    .then(function(d){
+        if(!QR.activo)return;
+        QR.id=d.id;
+        if(d.estado==='pagada'){qrPagado(d);return;}
+        try{var q=qrcode(0,'M');q.addData(d.qr_data);q.make();$('mc-qr-box').innerHTML=q.createSvgTag({cellSize:6,margin:2,scalable:true});}
+        catch(e){throw new Error('No se pudo dibujar el QR.');}
+        QR.hasta=Date.now()+(d.expira||10)*60000;
+        qrEstado('Esperando el pago…',true);
+        consultarQR();
+    })
+    .catch(function(err){
+        if(!QR.activo)return;
+        qrEstado('No se pudo generar el QR',false,'#b91c1c');errCobro(err.message);
+        if(/precios cambiaron|ya no está disponible|no tiene precio/.test(err.message)){cargar(false).catch(function(){});}
+        $('mc-qr-manual-w').style.display='block';
+    });
+}
+function consultarQR(){
+    clearTimeout(QR.t);
+    if(!QR.activo||!QR.id)return;
+    var restan=Math.max(0,Math.round((QR.hasta-Date.now())/1000));
+    $('mc-qr-sub').textContent='El QR vence en '+Math.floor(restan/60)+':'+String(restan%60).padStart(2,'0')+'. El cliente escanea con la app de Mercado Pago o la de su banco.';
+    QR.t=setTimeout(function(){
+        apiMP({accion:'estado',id:QR.id}).then(function(r){
+            if(!QR.activo)return;
+            if(r.estado==='pagada'){qrPagado(r);return;}
+            if(r.estado==='cancelada'||r.estado==='expirada'||Date.now()>QR.hasta+15000){qrTerminado(r.estado==='cancelada'?'El cobro se canceló.':'El QR venció sin pago.');return;}
+            consultarQR();
+        }).catch(function(){if(QR.activo)consultarQR();});   // sin conexión: se reintenta
+    },2000);
+}
+function qrTerminado(txt){
+    QR.activo=false;clearTimeout(QR.t);$('mc-qr-box').innerHTML='';qrEstado(txt,false,'#9a3412');$('mc-qr-sub').textContent='';
+    $('mc-qr-otro').style.display='';$('mc-qr-cancelar').textContent='Volver';
+}
+function qrPagado(r){
+    QR.activo=false;clearTimeout(QR.t);
+    S.ticket=[];guardarTicket();pintarTicket();pintarGrid();
+    $('mc-listo-t').textContent='Venta #'+r.venta_id+' pagada';
+    $('mc-listo-vuelto').textContent='';
+    $('mc-listo-sub').textContent='QR Mercado Pago · '+plata(r.total);
+    pasoCobro('mc-listo');C.clientId=null;refrescarTurno();
+}
+$('mc-qr-cancelar').onclick=function(){
+    var b=$('mc-qr-cancelar');
+    if(!QR.activo||!QR.id){QR.activo=false;clearTimeout(QR.t);b.textContent='Cancelar cobro';pasoCobro('mc-paso1');C.clientId=uuid();return;}
+    b.disabled=true;b.textContent='Cancelando…';
+    apiMP({accion:'cancelar',id:QR.id}).then(function(r){
+        if(r.estado==='pagada'){qrPagado(r);return;}
+        QR.activo=false;clearTimeout(QR.t);C.clientId=uuid();pasoCobro('mc-paso1');
+    }).catch(function(err){errCobro(err.message);})
+    .then(function(){b.disabled=false;b.textContent='Cancelar cobro';});
+};
+$('mc-qr-otro').onclick=function(){C.clientId=uuid();$('mc-qr-cancelar').textContent='Cancelar cobro';iniciarQR();};
+$('mc-qr-manual').onclick=function(){
+    if(!confirm('¿Confirmás que viste el pago acreditado en la cuenta de Mercado Pago del local?'))return;
+    QR.activo=false;clearTimeout(QR.t);QR.manual=true;C.clientId=uuid();
+    $('mc-qr-box').innerHTML='';qrEstado('Cobro con el QR fijo del local',false);$('mc-qr-sub').textContent='Confirmá solo si viste el pago acreditado.';
+    pasoCobro('mc-qr');$('mc-qr-manual-w').style.display='none';
+};
+// QRs pagados que no se llegaron a confirmar en pantalla (se cerró la caja, se cortó internet, etc.)
+function conciliarQR(){
+    if(!S.token)return;
+    apiMP({accion:'pendientes'}).then(function(r){
+        (r.confirmadas||[]).forEach(function(x){aviso('Se registró la venta #'+x.venta_id+' pagada con QR ('+plata(x.total)+').');});
+        if((r.confirmadas||[]).length)refrescarTurno();
+    }).catch(function(){});
+}
+setInterval(function(){if($('app').style.display==='grid'&&!QR.activo)conciliarQR();},60000);
 $('mc-confirmar').onclick=function(){
     if(C.ocupado)return;
     var c=calcular(),recibido=null;
@@ -707,7 +807,7 @@ $('btn-full').onclick=function(){
 var lock=null;
 function pedirWakeLock(){try{if(navigator.wakeLock&&!lock)navigator.wakeLock.request('screen').then(function(l){lock=l;l.addEventListener('release',function(){lock=null;});}).catch(function(){});}catch(e){}}
 pedirWakeLock();
-document.addEventListener('keydown',function(e){if(e.key==='Escape'){['m-cobro','m-mov','m-ventas'].forEach(function(x){$(x).style.display='none';});$('ret').style.display='none';$('ticket').classList.remove('abierto');}});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){['m-mov','m-ventas'].forEach(function(x){$(x).style.display='none';});if(!QR.activo&&$('mc-listo').style.display==='none')$('m-cobro').style.display='none';$('ret').style.display='none';$('ticket').classList.remove('abierto');}});
 iniciar();
 </script>
 </body>

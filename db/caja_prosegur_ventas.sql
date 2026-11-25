@@ -61,6 +61,7 @@ create table if not exists public.caja_ventas (
   anulada_motivo text
 );
 create index if not exists caja_ventas_turno on public.caja_ventas (turno_id);
+alter table public.caja_ventas add column if not exists mp_order_id text;
 
 create table if not exists public.caja_venta_items (
   id              bigint generated always as identity primary key,
@@ -311,22 +312,12 @@ end $$;
 
 -- ---------- caja: ventas ----------
 -- p_items: [{id, cant}] · p_medio: efectivo | qr | tarjeta | otro
-create or replace function public.caja_venta_registrar(p_token text, p_items jsonb, p_medio text, p_total_esperado numeric,
-                                                       p_recibido numeric default null, p_client_id text default null)
-returns json language plpgsql security definer set search_path = public as $$
-declare
-  u public.panel_usuarios; t public.caja_turnos; it jsonb; p public.caja_productos; pr record;
-  v_cant int; v_sub numeric := 0; v_tot numeric := 0; v_id bigint; lineas jsonb := '[]'; l jsonb; r public.caja_recetas; ya public.caja_ventas;
+-- Calcula las líneas de un ticket con la regla de precio vigente AHORA. p_items: [{id, cant}]
+-- Devuelve {lineas: [...], sub, tot}. Falla si algún producto no está disponible o no tiene precio.
+create or replace function public.caja__calcular(p_items jsonb)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare it jsonb; p public.caja_productos; pr record; v_cant int; v_sub numeric := 0; v_tot numeric := 0; lineas jsonb := '[]';
 begin
-  u := public.caja__permiso(p_token, 'ver');
-  if p_client_id is not null then
-    select * into ya from public.caja_ventas where client_id = p_client_id;
-    if ya.id is not null then return json_build_object('id', ya.id, 'total', ya.total, 'repetida', true,
-                                                       'vuelto', case when ya.recibido is null then null else ya.recibido - ya.total end); end if;
-  end if;
-  t := public.caja__turno_abierto('prosegur');
-  if t.id is null then raise exception 'La caja está cerrada. Abrila para vender.'; end if;
-  if p_medio not in ('efectivo','qr','tarjeta','otro') then raise exception 'Medio de pago inválido.'; end if;
   if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'El ticket está vacío.'; end if;
   for it in select * from jsonb_array_elements(p_items) loop
     v_cant := (it->>'cant')::int;
@@ -337,34 +328,63 @@ begin
     end if;
     select * into pr from public.caja__precio(p, now());
     if pr.lista is null then raise exception '"%" no tiene precio.', p.nombre; end if;
-    l := jsonb_build_object('p', p.id, 'nombre', p.nombre, 'categoria', p.categoria, 'tipo', p.tipo, 'cant', v_cant, 'lista', pr.lista,
+    lineas := lineas || jsonb_build_object('p', p.id, 'nombre', p.nombre, 'categoria', p.categoria, 'tipo', p.tipo, 'cant', v_cant, 'lista', pr.lista,
                             'unit', pr.final, 'desc_id', pr.desc_id, 'desc_nombre', pr.desc_nombre, 'total', round(pr.final * v_cant, 2), 'iva', p.iva);
-    lineas := lineas || l;
     v_sub := v_sub + pr.lista * v_cant;
     v_tot := v_tot + round(pr.final * v_cant, 2);
   end loop;
-  v_sub := round(v_sub, 2); v_tot := round(v_tot, 2);
-  if p_total_esperado is null or abs(v_tot - p_total_esperado) > 0.01 then
-    raise exception 'Los precios cambiaron mientras armabas el ticket (total actualizado: %). Revisá el ticket y cobrá de nuevo.', public.caja__plata(v_tot);
-  end if;
-  if p_medio = 'efectivo' and p_recibido is not null and p_recibido < v_tot then raise exception 'El efectivo recibido es menor que el total.'; end if;
-  insert into public.caja_ventas(local, turno_id, usuario, medio, subtotal, descuento, total, recibido, client_id)
-  values ('prosegur', t.id, public.caja__quien(u), p_medio, v_sub, v_sub - v_tot, v_tot,
-          case when p_medio = 'efectivo' then p_recibido else null end, p_client_id)
+  return jsonb_build_object('lineas', lineas, 'sub', round(v_sub, 2), 'tot', round(v_tot, 2));
+end $$;
+
+-- Inserta una venta ya calculada (líneas con precios congelados) y descuenta stock. Devuelve el id.
+create or replace function public.caja__insertar_venta(p_turno bigint, p_usuario text, p_medio text, p_calc jsonb,
+                                                       p_recibido numeric, p_client_id text, p_mp_order text default null)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; l jsonb; p public.caja_productos; r public.caja_recetas; v_sub numeric := (p_calc->>'sub')::numeric; v_tot numeric := (p_calc->>'tot')::numeric;
+begin
+  insert into public.caja_ventas(local, turno_id, usuario, medio, subtotal, descuento, total, recibido, client_id, mp_order_id)
+  values ('prosegur', p_turno, coalesce(p_usuario, ''), p_medio, v_sub, v_sub - v_tot, v_tot,
+          case when p_medio = 'efectivo' then p_recibido else null end, p_client_id, p_mp_order)
   returning id into v_id;
-  for l in select * from jsonb_array_elements(lineas) loop
+  for l in select * from jsonb_array_elements(p_calc->'lineas') loop
     insert into public.caja_venta_items(venta_id, producto_id, nombre, categoria, tipo, cantidad, precio_lista, precio_unit, descuento_id, descuento_nombre, total, iva)
     values (v_id, (l->>'p')::bigint, l->>'nombre', l->>'categoria', l->>'tipo', (l->>'cant')::int, (l->>'lista')::numeric, (l->>'unit')::numeric,
             nullif(l->>'desc_id', '')::bigint, l->>'desc_nombre', (l->>'total')::numeric, (l->>'iva')::numeric);
     select * into p from public.caja_productos where id = (l->>'p')::bigint;
+    if p.id is null then continue; end if;
     if p.control_stock then
-      insert into public.caja_stock_mov(local, usuario, producto_id, tipo, cantidad, venta_id) values ('prosegur', public.caja__quien(u), p.id, 'venta', -(l->>'cant')::numeric, v_id);
+      insert into public.caja_stock_mov(local, usuario, producto_id, tipo, cantidad, venta_id) values ('prosegur', coalesce(p_usuario, ''), p.id, 'venta', -(l->>'cant')::numeric, v_id);
     end if;
     for r in select * from public.caja_recetas where producto_id = p.id loop
       insert into public.caja_stock_mov(local, usuario, insumo_id, tipo, cantidad, venta_id, motivo)
-      values ('prosegur', public.caja__quien(u), r.insumo_id, 'venta', -(r.cantidad * (l->>'cant')::numeric), v_id, p.nombre);
+      values ('prosegur', coalesce(p_usuario, ''), r.insumo_id, 'venta', -(r.cantidad * (l->>'cant')::numeric), v_id, p.nombre);
     end loop;
   end loop;
+  return v_id;
+end $$;
+
+-- p_items: [{id, cant}] · p_medio: efectivo | qr | tarjeta | otro
+create or replace function public.caja_venta_registrar(p_token text, p_items jsonb, p_medio text, p_total_esperado numeric,
+                                                       p_recibido numeric default null, p_client_id text default null)
+returns json language plpgsql security definer set search_path = public as $$
+declare u public.panel_usuarios; t public.caja_turnos; c jsonb; v_tot numeric; v_id bigint; ya public.caja_ventas;
+begin
+  u := public.caja__permiso(p_token, 'ver');
+  if p_client_id is not null then
+    select * into ya from public.caja_ventas where client_id = p_client_id;
+    if ya.id is not null then return json_build_object('id', ya.id, 'total', ya.total, 'repetida', true,
+                                                       'vuelto', case when ya.recibido is null then null else ya.recibido - ya.total end); end if;
+  end if;
+  t := public.caja__turno_abierto('prosegur');
+  if t.id is null then raise exception 'La caja está cerrada. Abrila para vender.'; end if;
+  if p_medio not in ('efectivo','qr','tarjeta','otro') then raise exception 'Medio de pago inválido.'; end if;
+  c := public.caja__calcular(p_items);
+  v_tot := (c->>'tot')::numeric;
+  if p_total_esperado is null or abs(v_tot - p_total_esperado) > 0.01 then
+    raise exception 'Los precios cambiaron mientras armabas el ticket (total actualizado: %). Revisá el ticket y cobrá de nuevo.', public.caja__plata(v_tot);
+  end if;
+  if p_medio = 'efectivo' and p_recibido is not null and p_recibido < v_tot then raise exception 'El efectivo recibido es menor que el total.'; end if;
+  v_id := public.caja__insertar_venta(t.id, public.caja__quien(u), p_medio, c, p_recibido, p_client_id);
   return json_build_object('id', v_id, 'total', v_tot, 'vuelto', case when p_medio = 'efectivo' and p_recibido is not null then p_recibido - v_tot else null end);
 end $$;
 
@@ -591,6 +611,8 @@ revoke all on function public.caja__precio(public.caja_productos, timestamptz) f
 revoke all on function public.caja__turno_abierto(text) from public, anon, authenticated;
 revoke all on function public.caja__resumen(bigint) from public, anon, authenticated;
 revoke all on function public.caja__stock_bajo(text) from public, anon, authenticated;
+revoke all on function public.caja__calcular(jsonb) from public, anon, authenticated;
+revoke all on function public.caja__insertar_venta(bigint, text, text, jsonb, numeric, text, text) from public, anon, authenticated;
 grant execute on function public.caja_turno_estado(text) to anon, authenticated;
 grant execute on function public.caja_turno_abrir(text, numeric) to anon, authenticated;
 grant execute on function public.caja_movimiento(text, text, numeric, text) to anon, authenticated;
