@@ -38,7 +38,7 @@
       "schedule": "41 9 * * *"
     },
     {
-      "path": "/api/caja-pedidos",
+      "path": "/api/caja-sync?pedidos=1",
       "schedule": "5 16 * * 1-5"
     }
   ]

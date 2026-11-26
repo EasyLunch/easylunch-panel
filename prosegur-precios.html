@@ -1174,7 +1174,7 @@ function editarProveedor(id){
 $('lista-ped').addEventListener('click',function(e){
     var b=e.target.closest('[data-reenv],[data-cancel]');if(!b)return;b.disabled=true;
     if(b.hasAttribute('data-reenv')){
-        fetch('/api/caja-pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token,accion:'reenviar',id:Number(b.getAttribute('data-reenv'))})})
+        fetch('/api/caja-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token,accion:'reenviar',id:Number(b.getAttribute('data-reenv'))})})
         .then(function(r){return r.json();}).then(function(d){aviso('aviso',d.ok?'Mail reenviado a '+d.detalle+'.':'No se pudo enviar: '+(d.detalle||d.message),d.ok);return cargarPedidos();})
         .catch(function(err){aviso('aviso',err.message);b.disabled=false;});
     }else{

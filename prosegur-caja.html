@@ -938,7 +938,7 @@ function fechaTxt(f){if(!f)return '';var x=String(f).slice(0,10).split('-'),dt=n
 function cantTxt(n){var v=Math.round(Number(n||0)*100)/100;return v.toLocaleString('es-AR');}
 function apiPedidos(o){
     o.token=S.token;
-    return fetch('/api/caja-pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)})
+    return fetch('/api/caja-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)})
     .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok||d.ok===false&&d.message)throw new Error(d.message||('Error '+r.status));return d;});});
 }
 function cargarPedidosDatos(){return EL.rpc('caja_pedidos_datos',{p_token:S.token}).then(function(d){PE.d=d;pintarBadgePedidos();return d;});}

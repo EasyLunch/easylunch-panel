@@ -14,11 +14,14 @@
 //   POST { token, fecha? }          → botón "Sincronizar productos" (token = sesión del panel; cualquier usuario de la caja)
 //   POST { token, fecha?, preview } → solo muestra qué traería, sin guardar nada
 //   GET (cron diario de vercel.json) → sincronización automática a primera hora
+//   Además atiende los pedidos a proveedores (lib/caja-pedidos.js): POST { accion: platos|enviar|reenviar|auto } y GET ?pedidos=1
 //
 // Variables de entorno de Vercel que usa (ya existen para Recorridos y Gourmet):
 //   SUPABASE_URL, SUPABASE_ANON_KEY (opcional), SUPABASE_SERVICE_ROLE_KEY (solo para el cron),
 //   EASYLUNCH_ADMIN_USER y EASYLUNCH_ADMIN_PASSWORD (inicia sesión de admin en la app antes de leer).
 //   Opcionales: CAJA_EMPRESA (por defecto "PROSEGUR"), CRON_SECRET (si está, el cron tiene que mandarlo).
+
+import { pedidosHandler, ACCIONES_PEDIDOS } from '../lib/caja-pedidos.js'
 
 const APP = 'https://app.easylunch.com.ar'
 const LOGIN = process.env.EASYLUNCH_LOGIN_URL || APP + '/server/login/login-admin.php'
@@ -220,6 +223,16 @@ const okFecha = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''))
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
+  // pedidos a proveedores (lib/caja-pedidos.js): POST con "accion" o el cron GET ?pedidos=1
+  {
+    let b = req.body
+    if (typeof b === 'string') { try { b = JSON.parse(b) } catch (e) { b = null } }
+    const q = req.query || {}
+    if ((req.method === 'POST' && b && ACCIONES_PEDIDOS.includes(b.accion)) || (req.method === 'GET' && (q.pedidos || /[?&]pedidos=/.test(String(req.url || ''))))) {
+      if (b && typeof req.body === 'string') req.body = b
+      return pedidosHandler(req, res)
+    }
+  }
   try {
     if (req.method === 'POST') {
       let body = req.body
