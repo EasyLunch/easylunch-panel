@@ -1178,7 +1178,9 @@ $('lista-ped').addEventListener('click',function(e){
         .then(function(r){return r.json();}).then(function(d){aviso('aviso',d.ok?'Mail reenviado a '+d.detalle+'.':'No se pudo enviar: '+(d.detalle||d.message),d.ok);return cargarPedidos();})
         .catch(function(err){aviso('aviso',err.message);b.disabled=false;});
     }else{
-        rpc('caja_pedido_cancelar',{p_token:S.token,p_id:Number(b.getAttribute('data-cancel'))}).then(function(){aviso('aviso','Pedido cancelado. Avisale al proveedor si ya lo había recibido.',true);return cargarPedidos();})
+        fetch('/api/caja-sync',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token,accion:'cancelar',id:Number(b.getAttribute('data-cancel'))})})
+        .then(function(r){return r.json().then(function(d){if(!r.ok||!d.ok)throw new Error(d.message||('Error '+r.status));return d;});})
+        .then(function(d){var m=d.pedido.mail_estado;aviso('aviso',m==='enviado'?'Pedido cancelado y avisado al proveedor por mail.':m==='planilla'?'Pedido cancelado (sale de la planilla de Biel).':'Pedido cancelado. El mail no salió: avisale al proveedor.',m==='enviado'||m==='planilla');return cargarPedidos();})
         .catch(function(err){aviso('aviso',err.message);b.disabled=false;});
     }
 });

@@ -62,6 +62,7 @@ create table if not exists public.caja_pedidos (
   recibido_fecha timestamptz,
   recibido_nota  text not null default ''
 );
+alter table public.caja_pedidos add column if not exists editado timestamptz;
 create index if not exists caja_pedidos_fecha on public.caja_pedidos (local, fecha desc);
 
 create table if not exists public.caja_pedido_items (
@@ -156,20 +157,13 @@ begin
   return json_build_object('por_plato', v_base, 'fuente', 'base', 'dias', coalesce(v_dias, 0), 'base', v_base);
 end $$;
 
--- Arma un pedido. p_items: [{producto_id | insumo_id | ref_app, nombre?, cantidad}]
-create or replace function public.caja__pedido_insertar(p_usuario text, p_origen text, p_proveedor bigint, p_parte text,
-  p_fecha_entrega date, p_items jsonb, p_nota text)
-returns bigint language plpgsql security definer set search_path = public as $$
-declare v_id bigint; it jsonb; v_c numeric; pr public.caja_productos; ins public.caja_insumos; n int := 0; v_prov public.caja_proveedores;
+-- Carga los ítems de un pedido (borra los que tenía). p_items: [{producto_id | insumo_id | ref_app, nombre?, grupo?, cantidad}]
+create or replace function public.caja__pedido_items_cargar(v_id bigint, p_items jsonb)
+returns int language plpgsql security definer set search_path = public as $$
+declare it jsonb; v_c numeric; pr public.caja_productos; ins public.caja_insumos; n int := 0;
 begin
-  select * into v_prov from public.caja_proveedores where id = p_proveedor and local = 'prosegur';
-  if v_prov.id is null then raise exception 'Proveedor inexistente.'; end if;
-  if coalesce(p_parte, 'general') not in ('general','platos') then raise exception 'Tipo de pedido inválido.'; end if;
-  if p_parte = 'platos' and v_prov.tipo <> 'easylunch' then raise exception 'Los platos calientes se piden a Easy Lunch.'; end if;
   if jsonb_typeof(p_items) <> 'array' then raise exception 'El pedido está vacío.'; end if;
-  insert into public.caja_pedidos(local, proveedor_id, parte, fecha_entrega, usuario, origen, nota)
-  values ('prosegur', p_proveedor, coalesce(p_parte, 'general'), p_fecha_entrega, coalesce(p_usuario, ''), p_origen, coalesce(trim(p_nota), ''))
-  returning id into v_id;
+  delete from public.caja_pedido_items where pedido_id = v_id;
   for it in select * from jsonb_array_elements(p_items) loop
     v_c := nullif(it->>'cantidad', '')::numeric;
     if v_c is null or v_c <= 0 then continue; end if;
@@ -193,7 +187,39 @@ begin
     n := n + 1;
   end loop;
   if n = 0 then raise exception 'El pedido está vacío: poné al menos una cantidad.'; end if;
+  return n;
+end $$;
+
+-- Arma un pedido. p_items: [{producto_id | insumo_id | ref_app, nombre?, grupo?, cantidad}]
+create or replace function public.caja__pedido_insertar(p_usuario text, p_origen text, p_proveedor bigint, p_parte text,
+  p_fecha_entrega date, p_items jsonb, p_nota text)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare v_id bigint; v_prov public.caja_proveedores;
+begin
+  select * into v_prov from public.caja_proveedores where id = p_proveedor and local = 'prosegur';
+  if v_prov.id is null then raise exception 'Proveedor inexistente.'; end if;
+  if coalesce(p_parte, 'general') not in ('general','platos') then raise exception 'Tipo de pedido inválido.'; end if;
+  if p_parte = 'platos' and v_prov.tipo <> 'easylunch' then raise exception 'Los platos calientes se piden a Easy Lunch.'; end if;
+  insert into public.caja_pedidos(local, proveedor_id, parte, fecha_entrega, usuario, origen, nota)
+  values ('prosegur', p_proveedor, coalesce(p_parte, 'general'), p_fecha_entrega, coalesce(p_usuario, ''), p_origen, coalesce(trim(p_nota), ''))
+  returning id into v_id;
+  perform public.caja__pedido_items_cargar(v_id, p_items);
   return v_id;
+end $$;
+
+-- Hasta cuándo el cajero puede cambiar o cancelar un pedido: la hora de corte del proveedor del último día hábil
+-- anterior a la entrega (para los platos calientes, la hora de corte de platos). Después, solo el encargado.
+create or replace function public.caja__pedido_limite(p_id bigint)
+returns timestamptz language plpgsql stable security definer set search_path = public as $$
+declare p public.caja_pedidos; v public.caja_proveedores; d date; v_hora text; v_cfg jsonb;
+begin
+  select * into p from public.caja_pedidos where id = p_id;
+  select * into v from public.caja_proveedores where id = p.proveedor_id;
+  select valor into v_cfg from public.caja_config where local = 'prosegur' and clave = 'pedidos';
+  v_hora := case when p.parte = 'platos' then coalesce(v_cfg->>'hora_platos', '13:00') else coalesce(v.hora_corte, '15:00') end;
+  d := p.fecha_entrega - 1;
+  while extract(isodow from d) in (6, 7) loop d := d - 1; end loop;
+  return ((d::text || ' ' || v_hora)::timestamp) at time zone 'America/Argentina/Buenos_Aires';
 end $$;
 
 create or replace function public.caja__pedido_json(p_id bigint)
@@ -201,7 +227,7 @@ returns json language sql stable security definer set search_path = public as $$
   select json_build_object('id', p.id, 'proveedor_id', p.proveedor_id, 'proveedor', pv.nombre, 'proveedor_tipo', pv.tipo, 'mails', pv.mails,
     'parte', p.parte, 'fecha_entrega', p.fecha_entrega, 'fecha', p.fecha, 'usuario', p.usuario, 'origen', p.origen, 'estado', p.estado,
     'nota', p.nota, 'mail_estado', p.mail_estado, 'mail_detalle', p.mail_detalle, 'recibido_por', p.recibido_por,
-    'recibido_fecha', p.recibido_fecha, 'recibido_nota', p.recibido_nota,
+    'recibido_fecha', p.recibido_fecha, 'recibido_nota', p.recibido_nota, 'limite', public.caja__pedido_limite(p.id), 'editado', p.editado,
     'items', coalesce((select json_agg(json_build_object('id', i.id, 'producto_id', i.producto_id, 'insumo_id', i.insumo_id, 'ref_app', i.ref_app,
                'nombre', i.nombre, 'unidad', i.unidad, 'factor', i.factor, 'cantidad', i.cantidad, 'recibido', i.recibido) order by i.id)
              from public.caja_pedido_items i where i.pedido_id = p.id), '[]'))
@@ -259,14 +285,46 @@ begin
   where id = p_id and local = 'prosegur';
 end $$;
 
+create or replace function public.caja__pedido_puede_cambiar(p_token text, p_id bigint)
+returns public.panel_usuarios language plpgsql security definer set search_path = public as $$
+declare u public.panel_usuarios; p public.caja_pedidos;
+begin
+  u := public.caja__permiso(p_token, 'ver');
+  select * into p from public.caja_pedidos where id = p_id and local = 'prosegur';
+  if p.id is null then raise exception 'No encontré el pedido.'; end if;
+  if p.estado <> 'enviado' then raise exception 'Ese pedido ya fue recibido o cancelado.'; end if;
+  if now() > public.caja__pedido_limite(p.id) then
+    begin
+      u := public.caja__permiso(p_token, 'encargado');
+    exception when others then
+      raise exception 'Ya pasó la hora de corte: solo el encargado puede cambiarlo o cancelarlo (y avisarle al proveedor).';
+    end;
+  end if;
+  return u;
+end $$;
+
 create or replace function public.caja_pedido_cancelar(p_token text, p_id bigint)
 returns json language plpgsql security definer set search_path = public as $$
 declare u public.panel_usuarios;
 begin
-  u := public.caja__permiso(p_token, 'encargado');
+  u := public.caja__pedido_puede_cambiar(p_token, p_id);
   update public.caja_pedidos set estado = 'cancelado', recibido_nota = 'Cancelado por ' || public.caja__quien(u)
   where id = p_id and local = 'prosegur' and estado = 'enviado';
   if not found then raise exception 'Ese pedido ya no está pendiente.'; end if;
+  return public.caja__pedido_json(p_id);
+end $$;
+
+-- Editar un pedido todavía no recibido: reemplaza los ítems y la nota.
+create or replace function public.caja_pedido_editar(p_token text, p_id bigint, p_items jsonb, p_nota text default '')
+returns json language plpgsql security definer set search_path = public as $$
+declare u public.panel_usuarios;
+begin
+  u := public.caja__pedido_puede_cambiar(p_token, p_id);
+  perform public.caja__pedido_items_cargar(p_id, p_items);
+  update public.caja_pedidos set nota = coalesce(trim(p_nota), ''), editado = now(),
+         recibido_nota = left(trim(recibido_nota || ' Modificado por ' || public.caja__quien(u) || ' el ' ||
+           to_char(now() at time zone 'America/Argentina/Buenos_Aires', 'DD/MM HH24:MI') || '.'), 500)
+  where id = p_id;
   return public.caja__pedido_json(p_id);
 end $$;
 
@@ -510,6 +568,9 @@ grant execute on function public.caja_retiros_planilla_dia(text, date) to anon, 
 revoke all on function public.caja__proxima_entrega(int[], date) from public, anon, authenticated;
 revoke all on function public.caja__estimado_plato(date) from public, anon, authenticated;
 revoke all on function public.caja__pedido_insertar(text, text, bigint, text, date, jsonb, text) from public, anon, authenticated;
+revoke all on function public.caja__pedido_items_cargar(bigint, jsonb) from public, anon, authenticated;
+revoke all on function public.caja__pedido_limite(bigint) from public, anon, authenticated;
+revoke all on function public.caja__pedido_puede_cambiar(text, bigint) from public, anon, authenticated;
 revoke all on function public.caja__pedido_json(bigint) from public, anon, authenticated;
 revoke all on function public.caja_pedidos_auto_info() from public, anon, authenticated;
 revoke all on function public.caja_pedido_sistema(bigint, text, date, jsonb, text) from public, anon, authenticated;
@@ -521,6 +582,7 @@ grant execute on function public.caja_pedidos_datos(text) to anon, authenticated
 grant execute on function public.caja_pedido_crear(text, bigint, text, date, jsonb, text) to anon, authenticated;
 grant execute on function public.caja_pedido_mail_registrar(text, bigint, text, text) to anon, authenticated;
 grant execute on function public.caja_pedido_cancelar(text, bigint) to anon, authenticated;
+grant execute on function public.caja_pedido_editar(text, bigint, jsonb, text) to anon, authenticated;
 grant execute on function public.caja_pedido_recibir(text, bigint, jsonb, text) to anon, authenticated;
 grant execute on function public.caja_proveedor_guardar(text, bigint, jsonb) to anon, authenticated;
 grant execute on function public.caja_pedidos_config_guardar(text, jsonb) to anon, authenticated;

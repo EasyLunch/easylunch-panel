@@ -178,6 +178,10 @@
         .pe-card button.go{height:52px;border-radius:12px;border:0;background:#1d4ed8;color:white;font-size:16px;font-weight:800;margin-top:auto;}
         .pe-card button.go.sec{background:#f1f5f9;color:#334155;}
         .pe-card.urg{border-color:#f59e0b;}
+        .pe-card .acc2{display:flex;gap:8px;}
+        .pe-card .acc2 button{flex:1;height:44px;border-radius:12px;border:2px solid #e2e8f0;background:white;font-size:15px;font-weight:700;color:#334155;}
+        .pe-card .acc2 button.rojo{color:#b91c1c;border-color:#fecaca;}
+        .pe-card .lim{font-size:13px;color:#64748b;}
         .pe-head{max-width:980px;margin:0 auto 12px;background:white;border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(15,23,42,.08);}
         .pe-head .t{font-size:19px;font-weight:800;} .pe-head .s{font-size:14px;color:#475569;margin-top:4px;line-height:1.45;}
         .pe-it{display:flex;align-items:center;gap:12px;background:white;border-radius:14px;padding:10px 12px 10px 16px;margin-bottom:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);border:2px solid transparent;}
@@ -334,6 +338,16 @@
         <div class="seg" id="rt-f"><button type="button" data-f="pend" class="on">Pendientes</button><button type="button" data-f="ok">Entregados</button><button type="button" data-f="todos">Todos</button></div>
     </div>
     <div class="ret-lista" id="rt-lista"></div>
+</div>
+
+<!-- confirmación -->
+<div class="fondo" id="m-conf" role="dialog" aria-modal="true" aria-labelledby="mf-tit" style="z-index:80">
+    <div class="modal" style="max-width:440px;text-align:center">
+        <div style="font-size:40px;line-height:1;margin-bottom:10px" id="mf-ico" aria-hidden="true">⚠️</div>
+        <h2 id="mf-tit"></h2>
+        <p id="mf-txt" style="color:#475569;margin:8px 0 6px;line-height:1.45"></p>
+        <div class="pie" style="justify-content:center"><button type="button" id="mf-no">Volver</button><button class="ok" id="mf-si" type="button"></button></div>
+    </div>
 </div>
 
 <!-- pedidos a proveedores -->
@@ -983,7 +997,7 @@ function pintarPedidosInicio(){
             return '<div class="pe-card'+(hoy?' urg':'')+'"><div class="t">'+esc(p.proveedor)+(p.parte==='platos'?' · platos calientes':'')+'</div>'+
                 '<div class="s">Entrega del '+esc(fechaTxt(p.fecha_entrega))+' · '+p.items.length+' producto'+(p.items.length===1?'':'s')+'<br>Pedido por '+esc(p.usuario)+'</div>'+
                 (hoy?'<span class="b warn">Llega hoy</span>':'')+
-                '<button class="go" type="button" data-rec="'+p.id+'">Recibir</button></div>';
+                '<button class="go" type="button" data-rec="'+p.id+'">Recibir</button>'+accionesPedido(p)+'</div>';
         }).join('')+'</div></div>';
     }
     var cards=[];
@@ -1011,7 +1025,31 @@ function pintarPedidosInicio(){
     }).join('')+'</div>';
     $('pe-cuerpo').innerHTML=html;$('pe-cuerpo').scrollTop=0;
 }
+function puedeCambiar(p){return S.yo&&(S.yo.encargado||!p.limite||Date.now()<new Date(p.limite).getTime());}
+function accionesPedido(p){
+    if(p.estado!=='enviado')return '';
+    var lim=p.limite?new Date(p.limite):null,txt=lim?'Se puede cambiar hasta el '+['dom','lun','mar','mié','jue','vie','sáb'][lim.getDay()]+' '+horaDe(p.limite)+' h':'';
+    if(!puedeCambiar(p))return '<div class="lim">Pasó la hora de corte: si hay que cambiarlo, lo hace el encargado.</div>';
+    return '<div class="acc2"><button type="button" data-edit="'+p.id+'">✎ Editar</button><button type="button" class="rojo" data-canc="'+p.id+'">Cancelar</button></div>'+
+        (txt&&lim>new Date()?'<div class="lim">'+txt+(p.editado?' · modificado':'')+'</div>':'');
+}
+function confirmar(o){
+    $('mf-tit').textContent=o.titulo;$('mf-txt').textContent=o.texto||'';$('mf-ico').textContent=o.ico||'⚠️';
+    $('mf-si').textContent=o.si||'Sí';$('mf-si').disabled=false;$('m-conf').style.display='flex';
+    $('mf-no').onclick=function(){$('m-conf').style.display='none';};
+    $('mf-si').onclick=function(){$('mf-si').disabled=true;Promise.resolve(o.ok()).then(function(){$('m-conf').style.display='none';},function(){$('mf-si').disabled=false;});};
+}
+function cancelarPedido(id){
+    var p=PE.d.pedidos.filter(function(x){return x.id===id;})[0];if(!p)return;
+    confirmar({titulo:'¿Cancelar el pedido a '+p.proveedor+'?',texto:'Entrega del '+fechaTxt(p.fecha_entrega)+' · '+p.items.length+' producto'+(p.items.length===1?'':'s')+'. '+(p.proveedor_tipo==='easylunch'?'Sale de la planilla de Biel.':'Al proveedor le llega un mail avisando que se canceló.'),si:'Sí, cancelar',
+        ok:function(){return apiPedidos({accion:'cancelar',id:id}).then(function(r){
+            var m=r.pedido.mail_estado;aviso(m==='enviado'||m==='planilla'?'Pedido cancelado.':'Pedido cancelado, pero el mail no salió: avisale al proveedor.',!(m==='enviado'||m==='planilla'));
+            return cargarPedidosDatos().then(pintarPedidosInicio);
+        }).catch(function(err){aviso('No se pudo cancelar: '+err.message,true);throw err;});}});
+}
 $('pe-cuerpo').addEventListener('click',function(e){
+    var c=e.target.closest('[data-edit],[data-canc]');
+    if(c){var id=Number(c.getAttribute('data-edit')||c.getAttribute('data-canc'));if(c.hasAttribute('data-canc'))cancelarPedido(id);else{var pp=PE.d.pedidos.filter(function(x){return x.id===id;})[0];if(pp)armarPedido(pp.proveedor_id,pp.parte,pp);}return;}
     var b=e.target.closest('[data-pedir],[data-rec],[data-mas],[data-menos]');if(!b)return;
     if(b.hasAttribute('data-pedir'))return armarPedido(Number(b.getAttribute('data-pedir')),b.getAttribute('data-parte'));
     if(b.hasAttribute('data-rec'))return armarRecepcion(Number(b.getAttribute('data-rec')));
@@ -1028,16 +1066,28 @@ function filaEditor(it,i,info){
     return '<div class="pe-it'+(it.cant>0?' con':'')+'"><div class="n"><b>'+esc(it.nombre)+'</b>'+(info?'<small'+(it.bajo?' class="bajo"':'')+'>'+info+'</small>':'')+'</div>'+
         '<div class="pe-step"><button type="button" data-menos="'+i+'" aria-label="Menos">−</button><input type="number" inputmode="numeric" min="0" step="1" data-i="'+i+'" value="'+esc(it.cant)+'" aria-label="Cantidad de '+esc(it.nombre)+'"><button type="button" data-mas="'+i+'" aria-label="Más">+</button></div></div>';
 }
-function armarPedido(pid,parte){
+function cantDe(ed,x){
+    if(!ed)return null;
+    var m=ed.items.filter(function(i){return (x.producto_id&&i.producto_id===x.producto_id)||(x.insumo_id&&i.insumo_id===x.insumo_id)||(x.ref_app&&i.ref_app===x.ref_app);})[0];
+    return m?Number(m.cantidad):0;
+}
+function faltantes(ed,lista){   // ítems del pedido que ya no están en la lista sugerida (se mantienen al editar)
+    if(!ed)return [];
+    return ed.items.filter(function(i){return !lista.some(function(x){return (i.producto_id&&x.producto_id===i.producto_id)||(i.insumo_id&&x.insumo_id===i.insumo_id)||(i.ref_app&&x.ref_app===i.ref_app);});})
+        .map(function(i){return {producto_id:i.producto_id,insumo_id:i.insumo_id,ref_app:i.ref_app,nombre:i.nombre,cat:'Ya pedido',cant:Number(i.cantidad),stock:null,ideal:0,uni:i.unidad};});
+}
+function armarPedido(pid,parte,editar){
     var pv=PE.d.proveedores.filter(function(p){return p.id===pid;})[0];if(!pv)return;
-    PE.ed={tipo:'pedido',pv:pv,parte:parte,fecha:pv.proxima_entrega,items:[]};
+    PE.ed={tipo:'pedido',pv:pv,parte:parte,fecha:editar?String(editar.fecha_entrega).slice(0,10):pv.proxima_entrega,items:[],editId:editar?editar.id:null,editNota:editar?editar.nota:''};
+    $('pe-pie').removeAttribute('data-t');
     if(parte==='platos'){
-        $('pe-cuerpo').innerHTML='<div class="vacio">Trayendo de la app el menú del '+esc(fechaTxt(pv.proxima_entrega))+'…</div>';
-        apiPedidos({accion:'platos',fecha:pv.proxima_entrega}).then(function(r){
+        $('pe-cuerpo').innerHTML='<div class="vacio">Trayendo de la app el menú del '+esc(fechaTxt(PE.ed.fecha))+'…</div>';
+        apiPedidos({accion:'platos',fecha:PE.ed.fecha}).then(function(r){
             var e=PE.d.platos_estimado||{por_plato:15,fuente:'base'},por=Number(e.por_plato)||0;
-            PE.ed.items=(r.platos||[]).map(function(x){return {ref_app:x.ref_app,nombre:x.nombre,grupo:x.grupo||'',cant:por};});
+            PE.ed.items=(r.platos||[]).map(function(x){var c=cantDe(editar,x);return {ref_app:x.ref_app,nombre:x.nombre,grupo:x.grupo||'',cant:c==null?por:c};});
+            PE.ed.items=PE.ed.items.concat(faltantes(editar,PE.ed.items));
             var quedan=PE.d.productos.filter(function(p){return p.tipo==='vianda'&&(p.del_dia||p.sobrante)&&p.control_stock;}).reduce(function(a,p){return a+Math.max(0,Number(p.stock));},0);
-            var h='<div class="pe-head"><div class="t">Platos calientes para el '+esc(fechaTxt(pv.proxima_entrega))+'</div><div class="s">Sugerido: <b>'+por+' por plato</b> '+
+            var h='<div class="pe-head"><div class="t">'+(editar?'Editar pedido #'+editar.id+' · ':'')+'Platos calientes para el '+esc(fechaTxt(PE.ed.fecha))+'</div><div class="s">Sugerido: <b>'+por+' por plato</b> '+
                 (e.fuente==='historial'?'(promedio vendido los últimos '+e.dias+' '+esc(fechaTxt(pv.proxima_entrega).split(' ')[0])+')':'(cantidad base: todavía no hay historial suficiente)')+'. Corregí lo que haga falta.'+
                 (quedan?'<br>Hoy quedan <b>'+quedan+'</b> platos del día en stock: los que sobren se siguen vendiendo mañana.':'')+'<br>Producción necesita este pedido antes de las <b>'+esc((PE.d.config&&PE.d.config.hora_platos)||'13:00')+' h</b>.</div></div>';
             if(!PE.ed.items.length)h+='<div class="vacio">La app todavía no tiene cargado el menú del '+esc(fechaTxt(pv.proxima_entrega))+' para Prosegur.<br>Avisale a producción o cargalo en la app y volvé a intentar.</div>';
@@ -1046,8 +1096,10 @@ function armarPedido(pid,parte){
         }).catch(function(err){$('pe-cuerpo').innerHTML='<div class="vacio">No se pudo traer el menú: '+esc(err.message)+'<br><button class="go" type="button" onclick="pintarPedidosInicio()" style="margin-top:14px;height:48px;border:0;border-radius:12px;padding:0 18px;background:#e2e8f0;font-weight:700">Volver</button></div>';});
         return;
     }
-    PE.ed.items=itemsProveedor(pv).map(function(x){x.cant=x.sug;return x;});
-    var h='<div class="pe-head"><div class="t">Pedido a '+esc(pv.nombre)+(pv.tipo==='easylunch'?' (sin platos calientes)':'')+'</div><div class="s">Entrega: <b>'+esc(fechaTxt(pv.proxima_entrega))+'</b> · pedir antes de las '+esc(pv.hora_corte)+' h. Ya viene cargado lo que falta para llegar al stock ideal: corregí lo que haga falta.</div></div>';
+    PE.ed.items=itemsProveedor(pv).map(function(x){var c=cantDe(editar,x);x.cant=c==null?x.sug:c;return x;});
+    PE.ed.items=PE.ed.items.concat(faltantes(editar,PE.ed.items));
+    var h='<div class="pe-head"><div class="t">'+(editar?'Editar pedido #'+editar.id+' a ':'Pedido a ')+esc(pv.nombre)+(pv.tipo==='easylunch'?' (sin platos calientes)':'')+'</div><div class="s">Entrega: <b>'+esc(fechaTxt(PE.ed.fecha))+'</b>'+
+        (editar?'. Están cargadas las cantidades del pedido: cambiá lo que haga falta y guardá.':' · pedir antes de las '+esc(pv.hora_corte)+' h. Ya viene cargado lo que falta para llegar al stock ideal: corregí lo que haga falta.')+'</div></div>';
     if(!PE.ed.items.length)h+='<div class="vacio">Todavía no hay productos asignados a '+esc(pv.nombre)+'.<br>Se asignan en Configuración → Proveedores y pedidos.</div>';
     var cat=null;
     PE.ed.items.forEach(function(it,i){
@@ -1065,20 +1117,22 @@ function pieEditor(){
         p.innerHTML='<button class="vol" type="button" id="pe-vol">← Volver</button><input type="text" id="pe-nota" maxlength="300" placeholder="'+(ed.tipo==='pedido'?'Nota para el proveedor (opcional)':'Algo para aclarar (opcional): faltó, llegó roto…')+'"><button class="env" type="button" id="pe-env"></button>';
         $('pe-vol').onclick=pintarPedidosInicio;
         $('pe-env').onclick=ed.tipo==='pedido'?enviarPedido:confirmarRecepcion;
+        if(ed.editNota)$('pe-nota').value=ed.editNota;
     }
-    $('pe-env').textContent=ed.tipo==='pedido'?(n?'Enviar pedido ('+n+')':'Poné alguna cantidad'):'Confirmar recepción';
+    $('pe-env').textContent=ed.tipo==='pedido'?(n?(ed.editId?'Guardar cambios ('+n+')':'Enviar pedido ('+n+')'):'Poné alguna cantidad'):'Confirmar recepción';
     $('pe-env').disabled=ed.tipo==='pedido'&&!n;
     p.style.display='flex';
 }
 function enviarPedido(){
     var ed=PE.ed,b=$('pe-env');if(!ed||b.disabled)return;
     var items=ed.items.filter(function(x){return x.cant>0;}).map(function(x){return {producto_id:x.producto_id||null,insumo_id:x.insumo_id||null,ref_app:x.ref_app||null,nombre:x.nombre,grupo:x.grupo||'',cantidad:x.cant};});
-    b.disabled=true;b.textContent='Enviando…';
-    apiPedidos({accion:'enviar',proveedor_id:ed.pv.id,parte:ed.parte,fecha_entrega:ed.fecha,items:items,nota:$('pe-nota').value.trim()})
+    b.disabled=true;b.textContent=ed.editId?'Guardando…':'Enviando…';
+    (ed.editId?apiPedidos({accion:'editar',id:ed.editId,items:items,nota:$('pe-nota').value.trim()}):
+        apiPedidos({accion:'enviar',proveedor_id:ed.pv.id,parte:ed.parte,fecha_entrega:ed.fecha,items:items,nota:$('pe-nota').value.trim()}))
     .then(function(r){
         var m=r.pedido.mail_estado;
         var ok=m==='enviado'||m==='planilla';
-        aviso(ok?'Pedido enviado a '+ed.pv.nombre+(m==='planilla'?' (entra en la planilla de Biel).':'.'):'El pedido quedó guardado, pero el mail no salió ('+(r.pedido.mail_detalle||m)+'). Avisale al proveedor.',!ok);
+        aviso(ok?(ed.editId?'Pedido #'+ed.editId+' modificado'+(m==='enviado'?' y avisado a '+ed.pv.nombre+'.':' (se actualiza en la planilla de Biel).'):'Pedido enviado a '+ed.pv.nombre+(m==='planilla'?' (entra en la planilla de Biel).':'.')):'El pedido quedó guardado, pero el mail no salió ('+(r.pedido.mail_detalle||m)+'). Avisale al proveedor.',!ok);
         return cargarPedidosDatos().then(pintarPedidosInicio);
     }).catch(function(err){aviso('No se pudo enviar: '+err.message,true);b.disabled=false;pieEditor();});
 }
