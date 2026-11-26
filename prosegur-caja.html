@@ -817,7 +817,7 @@ function cargarRetiros(silencio){
     if(!silencio)$('rt-lista').innerHTML='<div class="vacio">Trayendo los pedidos de hoy…</div>';
     return fetch('/api/caja-retiros',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:S.token})})
     .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok)throw new Error(d.message||('Error '+r.status));return d;});})
-    .then(function(d){RT.pedidos=d.pedidos||[];RT.fecha=d.fecha;RT.ret={};(d.retirados||[]).forEach(function(x){RT.ret[x.id_usuario]=x;});pintarRetiros();})
+    .then(function(d){RT.pedidos=d.pedidos||[];RT.fecha=d.fecha;RT.fuente=d.fuente;RT.act=d.actualizado;RT.ret={};(d.retirados||[]).forEach(function(x){RT.ret[x.id_usuario]=x;});pintarRetiros();})
     .catch(function(err){if(!silencio)$('rt-lista').innerHTML='<div class="vacio">No se pudieron traer los pedidos: '+esc(err.message)+'</div>';});
 }
 $('rt-q').addEventListener('input',pintarRetiros);
@@ -826,13 +826,14 @@ function pintarRetiros(){
     var ent=RT.pedidos.filter(function(p){return RT.ret[p.id_usuario];}).length;
     var f=RT.fecha?RT.fecha.split('-').reverse().slice(0,2).join('/'):'';
     $('rt-cnt').textContent=f+' · '+ent+' de '+RT.pedidos.length+' entregados';
+    $('rt-cnt').title=RT.fuente==='planilla'?'Lista de la planilla de Biel (con altas, bajas y cambios), actualizada '+horaDe(RT.act):'Pedidos de la app (la planilla de Biel todavía no publicó la lista de hoy)';
     var q=sinTildes($('rt-q').value.trim());
     var l=RT.pedidos.filter(function(p){
         var r=!!RT.ret[p.id_usuario];
         if(RT.f==='pend'&&r)return false;if(RT.f==='ok'&&!r)return false;
         return !q||sinTildes(p.apellido+' '+p.nombre+' '+p.nombre+' '+p.apellido+' '+p.dni).indexOf(q)!==-1;
     });
-    if(!RT.pedidos.length){$('rt-lista').innerHTML='<div class="vacio">No hay pedidos de la app para hoy en Prosegur.</div>';return;}
+    if(!RT.pedidos.length){$('rt-lista').innerHTML='<div class="vacio">No hay pedidos para retirar hoy en Prosegur.</div>';return;}
     if(!l.length){$('rt-lista').innerHTML='<div class="vacio">'+(q?'No encontré a nadie con "'+esc(q)+'".':RT.f==='pend'?'¡Todos retiraron! 🎉':'Nada para mostrar.')+'</div>';return;}
     $('rt-lista').innerHTML=l.map(function(p){
         var r=RT.ret[p.id_usuario];

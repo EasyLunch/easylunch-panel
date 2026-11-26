@@ -1,5 +1,6 @@
 // Vercel Serverless Function · /api/caja-retiros
-// Local Prosegur: pedidos del día hechos por la app (app.easylunch.com.ar) para retirar en el local.
+// Local Prosegur: pedidos del día para retirar en el local. Usa la lista final de la planilla de modificaciones
+// de Biel (con altas, bajas y cambios; la publica el Apps Script en Supabase) y, si no está, los pedidos de la app.
 // Devuelve solo lo necesario para entregar (nombre, apellido, últimos dígitos del DNI y qué pidió),
 // sin mail ni celular. Las entregas se marcan en Supabase (caja_retiro_marcar), así nadie retira dos veces.
 //
@@ -92,8 +93,16 @@ export default async function handler(req, res) {
   if (!token) return res.status(401).json({ message: 'Volvé a ingresar al panel.' })
   try {
     const retirados = await rpc('caja_retiros_dia', { p_token: token, p_fecha: fecha })   // valida la sesión y el permiso
+    // Primero, la lista final de la planilla de modificaciones de Biel (con altas, bajas, cambios y temporales).
+    // La publica el Apps Script cada 10 minutos y al guardar un cambio. Si no está (o tiene más de 3 horas), los pedidos crudos de la app.
+    let pl = null
+    try { pl = await rpc('caja_retiros_planilla_dia', { p_token: token, p_fecha: fecha }) } catch (e) { pl = null }
+    if (pl && Array.isArray(pl.pedidos) && Date.now() - new Date(pl.actualizado).getTime() < 3 * 3600 * 1000) {
+      const pedidos = pl.pedidos.slice().sort((a, b) => (a.apellido + ' ' + a.nombre).localeCompare(b.apellido + ' ' + b.nombre, 'es'))
+      return res.status(200).json({ fecha, pedidos, retirados, fuente: 'planilla', actualizado: pl.actualizado })
+    }
     const pedidos = pedidosDelDia(await traerPedidos(), fecha)
-    return res.status(200).json({ fecha, pedidos, retirados })
+    return res.status(200).json({ fecha, pedidos, retirados, fuente: 'app' })
   } catch (e) {
     return res.status(e.status === 400 ? 400 : 502).json({ message: String((e && e.message) || e) })
   }

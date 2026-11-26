@@ -463,6 +463,49 @@ begin
 end $$;
 grant execute on function public.caja_pedidos_export(text, date, date) to anon, authenticated;
 
+-- ---------- retiros con las modificaciones de Biel ----------
+-- El Apps Script publica, cada vez que recalcula (al guardar un cambio y cada 10 minutos), la lista FINAL de pedidos
+-- de PROSEGUR por persona y día (sistema + altas, bajas, cambios y temporales de la planilla; sin lo del local).
+-- "Retiros app" de la caja la usa en vez de los pedidos crudos de la app. Solo se lee con sesión de la caja.
+create table if not exists public.caja_retiros_planilla (
+  local       text not null default 'prosegur',
+  fecha       date not null,
+  pedidos     jsonb not null default '[]',
+  actualizado timestamptz not null default now(),
+  version     text not null default '',
+  primary key (local, fecha)
+);
+alter table public.caja_retiros_planilla enable row level security;
+revoke all on public.caja_retiros_planilla from anon, authenticated;
+
+-- p_dias: { "AAAA-MM-DD": [ {id_usuario, nombre, apellido, dni (últimos 3), items: [{tipo, nombre, pagado}], pago_pendiente, alta} ] }
+-- Reemplaza todo el período (los días sin pedidos quedan con lista vacía).
+create or replace function public.caja_retiros_planilla_publicar(p_token text, p_desde date, p_hasta date, p_dias jsonb, p_version text default '')
+returns int language plpgsql security definer set search_path = public as $$
+declare v_tok text; d date; n int := 0;
+begin
+  select valor #>> '{}' into v_tok from public.caja_config where local = 'prosegur' and clave = 'export_planilla';
+  if v_tok is null or p_token is distinct from v_tok then raise exception 'Token inválido.'; end if;
+  if p_hasta < p_desde or p_hasta > p_desde + 31 then raise exception 'Período inválido.'; end if;
+  for d in select generate_series(p_desde, p_hasta, interval '1 day')::date loop
+    insert into public.caja_retiros_planilla(local, fecha, pedidos, actualizado, version)
+    values ('prosegur', d, coalesce(p_dias->(d::text), '[]'), now(), left(coalesce(p_version, ''), 80))
+    on conflict (local, fecha) do update set pedidos = excluded.pedidos, actualizado = excluded.actualizado, version = excluded.version;
+    n := n + jsonb_array_length(coalesce(p_dias->(d::text), '[]'));
+  end loop;
+  return n;
+end $$;
+
+create or replace function public.caja_retiros_planilla_dia(p_token text, p_fecha date)
+returns json language plpgsql stable security definer set search_path = public as $$
+begin
+  perform public.caja__permiso(p_token, 'ver');
+  return (select json_build_object('pedidos', pedidos, 'actualizado', actualizado, 'version', version)
+          from public.caja_retiros_planilla where local = 'prosegur' and fecha = p_fecha);
+end $$;
+grant execute on function public.caja_retiros_planilla_publicar(text, date, date, jsonb, text) to anon, authenticated;
+grant execute on function public.caja_retiros_planilla_dia(text, date) to anon, authenticated;
+
 -- ---------- permisos ----------
 revoke all on function public.caja__proxima_entrega(int[], date) from public, anon, authenticated;
 revoke all on function public.caja__estimado_plato(date) from public, anon, authenticated;
