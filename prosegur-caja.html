@@ -1034,7 +1034,7 @@ function armarPedido(pid,parte){
         $('pe-cuerpo').innerHTML='<div class="vacio">Trayendo de la app el menú del '+esc(fechaTxt(pv.proxima_entrega))+'…</div>';
         apiPedidos({accion:'platos',fecha:pv.proxima_entrega}).then(function(r){
             var e=PE.d.platos_estimado||{por_plato:15,fuente:'base'},por=Number(e.por_plato)||0;
-            PE.ed.items=(r.platos||[]).map(function(x){return {ref_app:x.ref_app,nombre:x.nombre,cant:por};});
+            PE.ed.items=(r.platos||[]).map(function(x){return {ref_app:x.ref_app,nombre:x.nombre,grupo:x.grupo||'',cant:por};});
             var quedan=PE.d.productos.filter(function(p){return p.tipo==='vianda'&&(p.del_dia||p.sobrante)&&p.control_stock;}).reduce(function(a,p){return a+Math.max(0,Number(p.stock));},0);
             var h='<div class="pe-head"><div class="t">Platos calientes para el '+esc(fechaTxt(pv.proxima_entrega))+'</div><div class="s">Sugerido: <b>'+por+' por plato</b> '+
                 (e.fuente==='historial'?'(promedio vendido los últimos '+e.dias+' '+esc(fechaTxt(pv.proxima_entrega).split(' ')[0])+')':'(cantidad base: todavía no hay historial suficiente)')+'. Corregí lo que haga falta.'+
@@ -1071,12 +1071,13 @@ function pieEditor(){
 }
 function enviarPedido(){
     var ed=PE.ed,b=$('pe-env');if(!ed||b.disabled)return;
-    var items=ed.items.filter(function(x){return x.cant>0;}).map(function(x){return {producto_id:x.producto_id||null,insumo_id:x.insumo_id||null,ref_app:x.ref_app||null,nombre:x.nombre,cantidad:x.cant};});
+    var items=ed.items.filter(function(x){return x.cant>0;}).map(function(x){return {producto_id:x.producto_id||null,insumo_id:x.insumo_id||null,ref_app:x.ref_app||null,nombre:x.nombre,grupo:x.grupo||'',cantidad:x.cant};});
     b.disabled=true;b.textContent='Enviando…';
     apiPedidos({accion:'enviar',proveedor_id:ed.pv.id,parte:ed.parte,fecha_entrega:ed.fecha,items:items,nota:$('pe-nota').value.trim()})
     .then(function(r){
         var m=r.pedido.mail_estado;
-        aviso(m==='enviado'?'Pedido enviado a '+ed.pv.nombre+'.':'El pedido quedó guardado, pero el mail no salió ('+(r.pedido.mail_detalle||m)+'). Avisale al proveedor.',m!=='enviado');
+        var ok=m==='enviado'||m==='planilla';
+        aviso(ok?'Pedido enviado a '+ed.pv.nombre+(m==='planilla'?' (entra en la planilla de Biel).':'.'):'El pedido quedó guardado, pero el mail no salió ('+(r.pedido.mail_detalle||m)+'). Avisale al proveedor.',!ok);
         return cargarPedidosDatos().then(pintarPedidosInicio);
     }).catch(function(err){aviso('No se pudo enviar: '+err.message,true);b.disabled=false;pieEditor();});
 }

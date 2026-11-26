@@ -1055,7 +1055,7 @@ function pintarPedidos(){
     $('lista-prov').innerHTML=d.proveedores.length?'<div class="fila cab" style="grid-template-columns:minmax(160px,1.2fr) minmax(200px,2fr) 170px 90px 110px"><div>Proveedor</div><div>Mails</div><div>Entrega</div><div>Corte</div><div></div></div>'+
         d.proveedores.map(function(p){
             return '<div class="fila'+(p.activo?'':' apagada')+'" style="grid-template-columns:minmax(160px,1.2fr) minmax(200px,2fr) 170px 90px 110px"><div><div class="nom">'+esc(p.nombre)+'</div><div class="chips">'+(p.tipo==='easylunch'?'<span class="chip dia">Nuestro (Biel)</span>':'')+(p.activo?'':'<span class="chip">Inactivo</span>')+'</div></div>'+
-                '<div style="word-break:break-all">'+(p.mails.length?esc(p.mails.join(', ')):'<span class="chip warn">Sin mail</span>')+(/example\.com/.test(p.mails.join())?' <span class="chip warn">Mail de ejemplo</span>':'')+'</div>'+
+                '<div style="word-break:break-all">'+(p.mails.length?esc(p.mails.join(', ')):p.tipo==='easylunch'?'<span class="chip">Sin mail · entra en la planilla de Biel</span>':'<span class="chip warn">Sin mail</span>')+(/example\.com/.test(p.mails.join())?' <span class="chip warn">Mail de ejemplo</span>':'')+'</div>'+
                 '<div>'+(p.dias.length===5&&p.dias.join()==='1,2,3,4,5'?'Lunes a viernes':p.dias.map(function(x){return DIAS_L[x-1];}).join(', '))+'</div><div>'+esc(p.hora_corte)+' h</div>'+
                 '<div class="acciones">'+(adm?'<button class="btn chico" data-prov="'+p.id+'" type="button">Editar</button>':'')+'</div></div>';
         }).join(''):'<div class="vacio">Todavía no hay proveedores.</div>';
@@ -1080,7 +1080,7 @@ function pintarPedidos(){
     // últimos pedidos
     $('lista-ped').innerHTML=d.pedidos.length?d.pedidos.map(function(p){
         var est=p.estado==='recibido'?'<span class="chip dia">Recibido</span>':p.estado==='cancelado'?'<span class="chip">Cancelado</span>':'<span class="chip warn">Pendiente de recibir</span>';
-        var ml=p.mail_estado==='enviado'?'<span class="chip app">Mail enviado</span>':p.mail_estado==='error'?'<span class="chip rojo" title="'+esc(p.mail_detalle)+'">Mail con error</span>':p.mail_estado==='sin_mail'?'<span class="chip rojo">Sin mail</span>':'';
+        var ml=p.mail_estado==='enviado'?'<span class="chip app">Mail enviado</span>':p.mail_estado==='planilla'?'<span class="chip app">En la planilla de Biel</span>':p.mail_estado==='error'?'<span class="chip rojo" title="'+esc(p.mail_detalle)+'">Mail con error</span>':p.mail_estado==='sin_mail'?'<span class="chip rojo">Sin mail</span>':'';
         return '<div class="fila" style="grid-template-columns:minmax(220px,2fr) minmax(200px,1.5fr) 220px"><div><div class="nom">#'+p.id+' · '+esc(p.proveedor)+(p.parte==='platos'?' · platos calientes':'')+' · entrega '+esc(fechaCorta(p.fecha_entrega))+'</div><div class="chips">'+est+ml+(p.origen==='automatico'?'<span class="chip warn">Automático</span>':'')+'</div>'+
             '<div style="font-size:12px;color:#6b7280;margin-top:4px">'+esc(p.items.map(function(i){return i.nombre+' × '+fmtCant(i.cantidad);}).join(' · '))+'</div></div>'+
             '<div style="font-size:12px;color:#6b7280">Pedido '+esc(fechaHora(p.fecha))+' por '+esc(p.usuario)+(p.recibido_fecha?'<br>Recibido '+esc(fechaHora(p.recibido_fecha))+' por '+esc(p.recibido_por):'')+(p.recibido_nota?'<br>'+esc(p.recibido_nota):'')+'</div>'+

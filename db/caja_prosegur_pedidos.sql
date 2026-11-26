@@ -77,6 +77,7 @@ create table if not exists public.caja_pedido_items (
   recibido     numeric(12,3)
 );
 create index if not exists caja_pedido_items_pedido on public.caja_pedido_items (pedido_id);
+alter table public.caja_pedido_items add column if not exists grupo text not null default '';   -- módulo de la app (categoría de la planilla de Biel)
 
 alter table public.caja_proveedores enable row level security;
 alter table public.caja_pedidos enable row level security;
@@ -175,16 +176,17 @@ begin
     if nullif(it->>'producto_id', '') is not null then
       select * into pr from public.caja_productos where id = (it->>'producto_id')::bigint and local = 'prosegur';
       if pr.id is null then raise exception 'Producto inexistente.'; end if;
-      insert into public.caja_pedido_items(pedido_id, producto_id, ref_app, nombre, unidad, factor, cantidad)
-      values (v_id, pr.id, pr.ref_app, pr.nombre, 'u', 1, v_c);
+      insert into public.caja_pedido_items(pedido_id, producto_id, ref_app, nombre, unidad, factor, cantidad, grupo)
+      values (v_id, pr.id, pr.ref_app, pr.nombre, 'u', 1, v_c, coalesce(nullif(pr.grupo, ''), pr.categoria, ''));
     elsif nullif(it->>'insumo_id', '') is not null then
       select * into ins from public.caja_insumos where id = (it->>'insumo_id')::bigint and local = 'prosegur';
       if ins.id is null then raise exception 'Insumo inexistente.'; end if;
-      insert into public.caja_pedido_items(pedido_id, insumo_id, nombre, unidad, factor, cantidad)
-      values (v_id, ins.id, ins.nombre, coalesce(nullif(ins.presentacion, ''), ins.unidad), greatest(ins.factor, 0.001), v_c);
+      insert into public.caja_pedido_items(pedido_id, insumo_id, nombre, unidad, factor, cantidad, grupo)
+      values (v_id, ins.id, ins.nombre, coalesce(nullif(ins.presentacion, ''), ins.unidad), greatest(ins.factor, 0.001), v_c, ins.categoria);
     elsif nullif(it->>'ref_app', '') is not null and coalesce(trim(it->>'nombre'), '') <> '' then
-      insert into public.caja_pedido_items(pedido_id, producto_id, ref_app, nombre, unidad, factor, cantidad)
-      values (v_id, (select id from public.caja_productos where local = 'prosegur' and ref_app = it->>'ref_app'), it->>'ref_app', trim(it->>'nombre'), 'u', 1, v_c);
+      insert into public.caja_pedido_items(pedido_id, producto_id, ref_app, nombre, unidad, factor, cantidad, grupo)
+      values (v_id, (select id from public.caja_productos where local = 'prosegur' and ref_app = it->>'ref_app'), it->>'ref_app', trim(it->>'nombre'), 'u', 1, v_c,
+              coalesce(nullif(trim(it->>'grupo'), ''), 'Plato del día'));
     else
       continue;
     end if;
@@ -432,6 +434,34 @@ create or replace function public.caja_pedido_mail_sistema(p_id bigint, p_estado
 returns void language sql security definer set search_path = public as $$
   update public.caja_pedidos set mail_estado = left(coalesce(p_estado, ''), 20), mail_detalle = left(coalesce(p_detalle, ''), 500) where id = p_id;
 $$;
+
+-- ---------- planilla de modificaciones de Biel (Apps Script "Modificación de pedidos", archivo LocalProsegur.gs) ----------
+-- Los pedidos del local a Easy Lunch (no cancelados) entran a la planilla como altas de la empresa PROSEGUR:
+-- planilla, comanda, Base, Despacho, celular, Producción y Recorridos. No se facturan (son nuestros).
+-- El Apps Script la llama con el token guardado en caja_config (clave export_planilla), copiado en LocalProsegur.gs.
+-- El token se genera acá al azar (no está en el repositorio). Para verlo: select valor #>> '{}' from caja_config where clave = 'export_planilla';
+insert into public.caja_config(local, clave, valor) values ('prosegur', 'export_planilla', to_jsonb(encode(extensions.gen_random_bytes(18), 'hex')))
+on conflict (local, clave) do nothing;
+
+create or replace function public.caja_pedidos_export(p_token text, p_desde date, p_hasta date)
+returns json language plpgsql stable security definer set search_path = public as $$
+declare v_tok text;
+begin
+  select valor #>> '{}' into v_tok from public.caja_config where local = 'prosegur' and clave = 'export_planilla';
+  if v_tok is null or p_token is distinct from v_tok then raise exception 'Token inválido.'; end if;
+  if p_hasta < p_desde or p_hasta > p_desde + 62 then raise exception 'Período inválido.'; end if;
+  return coalesce((select json_agg(json_build_object(
+      'id', p.id, 'fecha', p.fecha_entrega, 'parte', p.parte, 'estado', p.estado, 'origen', p.origen, 'usuario', p.usuario, 'nota', p.nota,
+      'items', coalesce((select json_agg(json_build_object(
+          'nombre', i.nombre, 'cantidad', i.cantidad, 'unidad', i.unidad, 'grupo', i.grupo,
+          'tipo', case when i.insumo_id is not null then 'insumo' else coalesce(pr.tipo, 'vianda') end) order by i.id)
+        from public.caja_pedido_items i left join public.caja_productos pr on pr.id = i.producto_id where i.pedido_id = p.id), '[]'))
+    order by p.fecha_entrega, p.id)
+    from public.caja_pedidos p join public.caja_proveedores pv on pv.id = p.proveedor_id
+    where p.local = 'prosegur' and pv.tipo = 'easylunch' and p.estado <> 'cancelado'
+      and p.fecha_entrega between p_desde and p_hasta), '[]');
+end $$;
+grant execute on function public.caja_pedidos_export(text, date, date) to anon, authenticated;
 
 -- ---------- permisos ----------
 revoke all on function public.caja__proxima_entrega(int[], date) from public, anon, authenticated;
