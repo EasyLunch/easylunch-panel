@@ -280,7 +280,9 @@ function doLogin(){
         setToken(r.token);document.getElementById('login-pass').value='';
         // Si vino desde la caja con "Cambiar usuario", vuelve directo a la caja (si el usuario tiene acceso).
         var v=new URLSearchParams(location.search).get('volver'),us=r.usuario||{};
-        if(v==='prosegur-caja.html'&&(us.admin||(us.tarjetas||[]).some(function(t){return t==='prosegur-caja'||t==='prosegur-precios';}))){location.href=v;return;}
+        // (el administrador va siempre al panel, desde ahí entra a la caja si quiere)
+        if(v==='prosegur-caja.html'&&!us.admin&&(us.tarjetas||[]).indexOf('prosegur-caja')!==-1){location.href=v;return;}
+        if(v)history.replaceState(null,'','index.html');
         showApp(r.usuario);
     }).catch(function(err){
         error('login-error',err.message);
