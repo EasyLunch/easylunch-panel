@@ -165,6 +165,38 @@
         .qr-est .spin{width:20px;height:20px;border-width:3px;}
         .qr-sub{text-align:center;font-size:13px;color:#64748b;margin-top:4px;}
         .modal .x{float:right;background:none;border:0;font-size:26px;line-height:1;color:#64748b;padding:4px 8px;}
+        /* pedidos a proveedores */
+        .pe-cuerpo{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch;}
+        .pe-sec{max-width:980px;margin:0 auto 22px;}
+        .pe-sec h3{font-size:13px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#64748b;margin:0 0 10px 4px;}
+        .pe-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+        .pe-card{background:white;border-radius:16px;padding:16px;box-shadow:0 1px 3px rgba(15,23,42,.08);display:flex;flex-direction:column;gap:8px;border:2px solid transparent;text-align:left;}
+        .pe-card .t{font-size:17px;font-weight:800;color:#0f172a;line-height:1.25;}
+        .pe-card .s{font-size:14px;color:#475569;line-height:1.4;}
+        .pe-card .b{display:inline-block;align-self:flex-start;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;}
+        .pe-card .b.ok{background:#dcfce7;color:#166534;} .pe-card .b.warn{background:#fef3c7;color:#92400e;} .pe-card .b.mal{background:#fee2e2;color:#b91c1c;}
+        .pe-card button.go{height:52px;border-radius:12px;border:0;background:#1d4ed8;color:white;font-size:16px;font-weight:800;margin-top:auto;}
+        .pe-card button.go.sec{background:#f1f5f9;color:#334155;}
+        .pe-card.urg{border-color:#f59e0b;}
+        .pe-head{max-width:980px;margin:0 auto 12px;background:white;border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(15,23,42,.08);}
+        .pe-head .t{font-size:19px;font-weight:800;} .pe-head .s{font-size:14px;color:#475569;margin-top:4px;line-height:1.45;}
+        .pe-it{display:flex;align-items:center;gap:12px;background:white;border-radius:14px;padding:10px 12px 10px 16px;margin-bottom:8px;box-shadow:0 1px 2px rgba(15,23,42,.06);border:2px solid transparent;}
+        .pe-it.con{border-color:#bfdbfe;background:#f8fbff;}
+        .pe-it .n{flex:1;min-width:0;} .pe-it .n b{display:block;font-size:15px;color:#0f172a;line-height:1.3;} .pe-it .n small{display:block;font-size:13px;color:#64748b;margin-top:2px;}
+        .pe-it .n small.bajo{color:#b45309;font-weight:700;}
+        .pe-step{display:flex;align-items:center;gap:6px;flex:none;}
+        .pe-step button{width:48px;height:48px;border-radius:12px;border:2px solid #e2e8f0;background:white;font-size:24px;font-weight:700;color:#334155;}
+        .pe-step input{width:64px;height:48px;border:2px solid #e2e8f0;border-radius:12px;text-align:center;font-size:19px;font-weight:800;outline:none;}
+        .pe-step input:focus{border-color:#1d4ed8;}
+        .pe-cat{max-width:980px;margin:16px auto 8px;font-size:13px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding-left:4px;}
+        .pe-lista{max-width:980px;margin:0 auto;}
+        .pe-pie{background:white;border-top:1px solid #e2e8f0;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+        .pe-pie input{flex:1;min-width:200px;height:52px;border:2px solid #e2e8f0;border-radius:12px;padding:0 14px;font-size:16px;outline:none;}
+        .pe-pie button{height:56px;border-radius:14px;border:0;padding:0 22px;font-size:17px;font-weight:800;}
+        .pe-pie .env{background:#16a34a;color:white;} .pe-pie .env:disabled{opacity:.5;}
+        .pe-pie .vol{background:#f1f5f9;color:#334155;}
+        .ico .bad-n{background:#ef4444;color:white;border-radius:999px;font-size:12px;min-width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px;}
+        .prod .ayer{display:inline-block;align-self:flex-start;background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;border-radius:6px;padding:2px 6px;}
         /* tablet vertical / pantallas angostas: el ticket pasa a una barra abajo que se abre */
         @media (max-width:900px){
             .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto;}
@@ -201,6 +233,7 @@
         <div class="quien" id="quien"></div>
         <button class="ico" id="btn-sync" type="button" title="Traer de la app los productos y el plato del día">⟳<span class="txt-l"> Sincronizar</span></button>
         <button class="ico" id="btn-retiros" type="button" title="Retiro de pedidos de la app" style="background:#166534">📦<span class="txt-l"> Retiros app</span></button>
+        <button class="ico" id="btn-pedidos" type="button" title="Pedidos a proveedores y recepción de mercadería" style="background:#1d4ed8">📋<span class="txt-l"> Pedidos</span><span class="bad-n" id="pe-badge" style="display:none"></span></button>
         <button class="ico" id="btn-ventas" type="button" title="Ventas del turno">🧾<span class="txt-l"> Ventas</span></button>
         <button class="ico" id="btn-mov" type="button" title="Ingreso o egreso de efectivo">±<span class="txt-l"> Efectivo</span></button>
         <button class="ico rojo" id="btn-cerrar" type="button" title="Cerrar caja">🔒<span class="txt-l"> Cerrar caja</span></button>
@@ -303,6 +336,18 @@
     <div class="ret-lista" id="rt-lista"></div>
 </div>
 
+<!-- pedidos a proveedores -->
+<div class="ret" id="ped" role="dialog" aria-modal="true" aria-labelledby="pe-tit">
+    <div class="ret-top" style="background:#1d4ed8">
+        <h2 id="pe-tit">Pedidos y recepción</h2>
+        <span class="sp"></span>
+        <button type="button" id="pe-act">⟳ Actualizar</button>
+        <button type="button" id="pe-cerrar">✕ Cerrar</button>
+    </div>
+    <div class="pe-cuerpo" id="pe-cuerpo"></div>
+    <div class="pe-pie" id="pe-pie" style="display:none"></div>
+</div>
+
 <!-- abrir caja -->
 <div class="fondo" id="m-abrir" role="dialog" aria-modal="true" aria-labelledby="ma-tit">
     <div class="modal">
@@ -393,7 +438,7 @@ function cargar(primera){
         var cats=EL.ordenCategorias(vendibles());
         if(!S.cat||(S.cat!=='__buscar'&&cats.indexOf(S.cat)===-1))S.cat=cats[0]||null;
         pintarTabs();pintarGrid();pintarTicket();
-        if(primera){$('carga').style.display='none';$('app').style.display='grid';setTimeout(conciliarQR,1500);setTimeout(revisarMenuDelDia,400);}
+        if(primera){$('carga').style.display='none';$('app').style.display='grid';setTimeout(conciliarQR,1500);setTimeout(revisarMenuDelDia,400);setTimeout(function(){cargarPedidosDatos().then(revisarAutoPlatos).catch(function(){});},2500);}
         return refrescarTurno();
     });
 }
@@ -442,7 +487,7 @@ function pintarGrid(){
         if(pf.desc)off='<span class="off">'+(pf.desc.tipo==='porcentaje'?'−'+String(Number(pf.desc.valor)).replace('.',',')+'%':'−'+plata(pf.ahorro))+'</span>';
         var pre=pf.lista==null?'<b>Sin precio</b>':(pf.desc?'<s>'+plata(pf.lista)+'</s>':'')+'<b>'+plata(pf.final)+'</b>';
         return '<button class="prod'+(n?' sel':'')+(pf.lista==null?' nopre':'')+'" data-id="'+p.id+'" type="button" aria-label="'+esc(p.nombre)+', '+(pf.final==null?'sin precio':plata(pf.final))+'">'+img+off+(n?'<span class="cant">'+n+'</span>':'')+
-            '<div class="info"><div class="nom">'+esc(p.nombre)+'</div><div class="pre">'+pre+'</div></div></button>';
+            '<div class="info">'+(p.sobrante?'<span class="ayer">De ayer</span>':'')+'<div class="nom">'+esc(p.nombre)+'</div><div class="pre">'+pre+'</div></div></button>';
     }).join('');
 }
 $('grid').addEventListener('click',function(e){
@@ -885,6 +930,190 @@ function revisarMenuDelDia(){
     d.addEventListener('dblclick',function(){poner(DEF,true);});
     window.addEventListener('resize',function(){var w=parseInt(getComputedStyle(app).getPropertyValue('--ancho-ticket'),10);if(w)poner(w,false);});
 })();
+
+// ─── pedidos a proveedores y recepción ───
+var PE={d:null,ed:null,auto:null};
+function horaAR(){return new Intl.DateTimeFormat('en-GB',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());}
+function fechaTxt(f){if(!f)return '';var x=String(f).slice(0,10).split('-'),dt=new Date(+x[0],+x[1]-1,+x[2]);return ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'][dt.getDay()]+' '+x[2]+'/'+x[1];}
+function cantTxt(n){var v=Math.round(Number(n||0)*100)/100;return v.toLocaleString('es-AR');}
+function apiPedidos(o){
+    o.token=S.token;
+    return fetch('/api/caja-pedidos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)})
+    .then(function(r){return r.json().catch(function(){return {message:'Respuesta inválida ('+r.status+')'};}).then(function(d){if(!r.ok||d.ok===false&&d.message)throw new Error(d.message||('Error '+r.status));return d;});});
+}
+function cargarPedidosDatos(){return EL.rpc('caja_pedidos_datos',{p_token:S.token}).then(function(d){PE.d=d;pintarBadgePedidos();return d;});}
+function porRecibir(){return PE.d?PE.d.pedidos.filter(function(p){return p.estado==='enviado';}):[];}
+function pintarBadgePedidos(){
+    var n=porRecibir().filter(function(p){return String(p.fecha_entrega)<=String(PE.d.hoy);}).length,b=$('pe-badge');
+    b.textContent=n;b.style.display=n?'inline-flex':'none';
+}
+function abrirPedidos(){
+    $('ped').style.display='flex';$('pe-pie').style.display='none';
+    $('pe-cuerpo').innerHTML='<div class="vacio">Cargando…</div>';
+    cargarPedidosDatos().then(pintarPedidosInicio).catch(function(err){$('pe-cuerpo').innerHTML='<div class="vacio">No se pudo cargar: '+esc(err.message)+'</div>';});
+}
+$('btn-pedidos').onclick=abrirPedidos;
+$('pe-cerrar').onclick=function(){$('ped').style.display='none';PE.ed=null;};
+$('pe-act').onclick=abrirPedidos;
+function pedidoDe(prov,parte,fecha){return PE.d.pedidos.filter(function(p){return p.proveedor_id===prov&&p.parte===parte&&String(p.fecha_entrega)===String(fecha)&&p.estado!=='cancelado';});}
+function itemsProveedor(pv){
+    var d=PE.d,l=[];
+    d.productos.forEach(function(p){
+        if(p.proveedor_id!==pv.id||(p.del_dia&&p.tipo==='vianda')||p.sobrante)return;
+        var st=p.control_stock?Number(p.stock):0,ideal=Number(p.stock_ideal),min=Number(p.stock_minimo);
+        l.push({producto_id:p.id,nombre:p.nombre,cat:p.categoria||'Otros',stock:p.control_stock?st:null,ideal:ideal,bajo:p.control_stock&&min>0&&st<=min,
+            sug:ideal>0?Math.max(0,Math.ceil(ideal-st)):0,uni:'u'});
+    });
+    d.insumos.forEach(function(i){
+        if(i.proveedor_id!==pv.id||!i.activo)return;
+        var st=Number(i.stock),f=Number(i.factor)||1,ideal=Number(i.stock_ideal),min=Number(i.stock_minimo);
+        l.push({insumo_id:i.id,nombre:i.nombre,cat:i.categoria||'Insumos',stock:st,ideal:ideal,bajo:min>0&&st<=min,factor:f,pres:i.presentacion,unidad:i.unidad,
+            sug:ideal>0?Math.max(0,Math.ceil((ideal-st)/f)):0,uni:i.presentacion||i.unidad});
+    });
+    return l.sort(function(a,b){return a.cat.localeCompare(b.cat,'es')||a.nombre.localeCompare(b.nombre,'es');});
+}
+function pintarPedidosInicio(){
+    PE.ed=null;$('pe-pie').style.display='none';$('pe-pie').removeAttribute('data-t');
+    var d=PE.d,h=horaAR(),html='';
+    var rec=porRecibir().sort(function(a,b){return String(a.fecha_entrega).localeCompare(String(b.fecha_entrega));});
+    if(rec.length){
+        html+='<div class="pe-sec"><h3>Para recibir</h3><div class="pe-cards">'+rec.map(function(p){
+            var hoy=String(p.fecha_entrega)<=String(d.hoy);
+            return '<div class="pe-card'+(hoy?' urg':'')+'"><div class="t">'+esc(p.proveedor)+(p.parte==='platos'?' · platos calientes':'')+'</div>'+
+                '<div class="s">Entrega del '+esc(fechaTxt(p.fecha_entrega))+' · '+p.items.length+' producto'+(p.items.length===1?'':'s')+'<br>Pedido por '+esc(p.usuario)+'</div>'+
+                (hoy?'<span class="b warn">Llega hoy</span>':'')+
+                '<button class="go" type="button" data-rec="'+p.id+'">Recibir</button></div>';
+        }).join('')+'</div></div>';
+    }
+    var cards=[];
+    d.proveedores.filter(function(p){return p.activo;}).forEach(function(pv){
+        var partes=pv.tipo==='easylunch'?['platos','general']:['general'];
+        partes.forEach(function(parte){
+            var corte=parte==='platos'?((d.config&&d.config.hora_platos)||'13:00'):pv.hora_corte;
+            var ya=pedidoDe(pv.id,parte,pv.proxima_entrega),est='',bajo=0;
+            if(parte==='general')bajo=itemsProveedor(pv).filter(function(x){return x.bajo;}).length;
+            if(ya.length){var u=ya[ya.length-1];est='<span class="b ok">✓ Pedido '+(u.origen==='automatico'?'automático':'por '+esc(u.usuario))+' a las '+esc(horaDe(u.fecha))+'</span>';}
+            else if(h>=corte)est='<span class="b mal">Pasó la hora de corte ('+esc(corte)+' h)</span>';
+            else est='<span class="b warn">Pedir antes de las '+esc(corte)+' h</span>';
+            var tit=pv.tipo==='easylunch'?(parte==='platos'?'Easy Lunch · platos calientes':'Easy Lunch · resto del pedido'):esc(pv.nombre);
+            var sub=parte==='platos'?'Cuántos platos calientes del menú del '+esc(fechaTxt(pv.proxima_entrega))+'.':
+                (pv.tipo==='easylunch'?'Viandas frías, bebidas, descartables, condimentos y demás.':'Próxima entrega: '+esc(fechaTxt(pv.proxima_entrega))+'.');
+            cards.push('<div class="pe-card'+(!ya.length&&h<corte?' urg':'')+'"><div class="t">'+tit+'</div><div class="s">'+sub+(parte!=='platos'&&pv.tipo==='easylunch'?'<br>Entrega: '+esc(fechaTxt(pv.proxima_entrega)):'')+'</div>'+est+
+                (bajo?'<span class="b mal">'+bajo+' producto'+(bajo===1?'':'s')+' bajo el mínimo</span>':'')+
+                '<button class="go'+(ya.length?' sec':'')+'" type="button" data-pedir="'+pv.id+'" data-parte="'+parte+'">'+(ya.length?'Pedir algo más':'Armar pedido')+'</button></div>');
+        });
+    });
+    html+='<div class="pe-sec"><h3>Hacer un pedido</h3><div class="pe-cards">'+(cards.join('')||'<div class="vacio">No hay proveedores activos. Se cargan en Configuración.</div>')+'</div></div>';
+    var hist=d.pedidos.filter(function(p){return p.estado!=='enviado';}).slice(0,8);
+    if(hist.length)html+='<div class="pe-sec"><h3>Últimos pedidos</h3>'+hist.map(function(p){
+        return '<div class="pe-it"><div class="n"><b>#'+p.id+' · '+esc(p.proveedor)+(p.parte==='platos'?' · platos':'')+' · '+esc(fechaTxt(p.fecha_entrega))+'</b><small>'+(p.estado==='recibido'?'Recibido por '+esc(p.recibido_por):'Cancelado')+' · '+esc(p.items.map(function(i){return i.nombre+' × '+cantTxt(i.recibido!=null?i.recibido:i.cantidad);}).join(' · '))+'</small></div></div>';
+    }).join('')+'</div>';
+    $('pe-cuerpo').innerHTML=html;$('pe-cuerpo').scrollTop=0;
+}
+$('pe-cuerpo').addEventListener('click',function(e){
+    var b=e.target.closest('[data-pedir],[data-rec],[data-mas],[data-menos]');if(!b)return;
+    if(b.hasAttribute('data-pedir'))return armarPedido(Number(b.getAttribute('data-pedir')),b.getAttribute('data-parte'));
+    if(b.hasAttribute('data-rec'))return armarRecepcion(Number(b.getAttribute('data-rec')));
+    var i=Number(b.getAttribute(b.hasAttribute('data-mas')?'data-mas':'data-menos')),it=PE.ed.items[i];
+    it.cant=Math.max(0,(Number(it.cant)||0)+(b.hasAttribute('data-mas')?1:-1));
+    var row=b.closest('.pe-it');row.querySelector('input').value=it.cant;row.classList.toggle('con',it.cant>0);pieEditor();
+});
+$('pe-cuerpo').addEventListener('input',function(e){
+    if(!e.target.matches('.pe-step input')||!PE.ed)return;
+    var i=Number(e.target.getAttribute('data-i')),v=Number(String(e.target.value).replace(',','.'));
+    PE.ed.items[i].cant=isFinite(v)&&v>0?v:0;e.target.closest('.pe-it').classList.toggle('con',PE.ed.items[i].cant>0);pieEditor();
+});
+function filaEditor(it,i,info){
+    return '<div class="pe-it'+(it.cant>0?' con':'')+'"><div class="n"><b>'+esc(it.nombre)+'</b>'+(info?'<small'+(it.bajo?' class="bajo"':'')+'>'+info+'</small>':'')+'</div>'+
+        '<div class="pe-step"><button type="button" data-menos="'+i+'" aria-label="Menos">−</button><input type="number" inputmode="numeric" min="0" step="1" data-i="'+i+'" value="'+esc(it.cant)+'" aria-label="Cantidad de '+esc(it.nombre)+'"><button type="button" data-mas="'+i+'" aria-label="Más">+</button></div></div>';
+}
+function armarPedido(pid,parte){
+    var pv=PE.d.proveedores.filter(function(p){return p.id===pid;})[0];if(!pv)return;
+    PE.ed={tipo:'pedido',pv:pv,parte:parte,fecha:pv.proxima_entrega,items:[]};
+    if(parte==='platos'){
+        $('pe-cuerpo').innerHTML='<div class="vacio">Trayendo de la app el menú del '+esc(fechaTxt(pv.proxima_entrega))+'…</div>';
+        apiPedidos({accion:'platos',fecha:pv.proxima_entrega}).then(function(r){
+            var e=PE.d.platos_estimado||{por_plato:15,fuente:'base'},por=Number(e.por_plato)||0;
+            PE.ed.items=(r.platos||[]).map(function(x){return {ref_app:x.ref_app,nombre:x.nombre,cant:por};});
+            var quedan=PE.d.productos.filter(function(p){return p.tipo==='vianda'&&(p.del_dia||p.sobrante)&&p.control_stock;}).reduce(function(a,p){return a+Math.max(0,Number(p.stock));},0);
+            var h='<div class="pe-head"><div class="t">Platos calientes para el '+esc(fechaTxt(pv.proxima_entrega))+'</div><div class="s">Sugerido: <b>'+por+' por plato</b> '+
+                (e.fuente==='historial'?'(promedio vendido los últimos '+e.dias+' '+esc(fechaTxt(pv.proxima_entrega).split(' ')[0])+')':'(cantidad base: todavía no hay historial suficiente)')+'. Corregí lo que haga falta.'+
+                (quedan?'<br>Hoy quedan <b>'+quedan+'</b> platos del día en stock: los que sobren se siguen vendiendo mañana.':'')+'<br>Producción necesita este pedido antes de las <b>'+esc((PE.d.config&&PE.d.config.hora_platos)||'13:00')+' h</b>.</div></div>';
+            if(!PE.ed.items.length)h+='<div class="vacio">La app todavía no tiene cargado el menú del '+esc(fechaTxt(pv.proxima_entrega))+' para Prosegur.<br>Avisale a producción o cargalo en la app y volvé a intentar.</div>';
+            else h+='<div class="pe-lista">'+PE.ed.items.map(function(it,i){return filaEditor(it,i,'');}).join('')+'</div>';
+            $('pe-cuerpo').innerHTML=h;$('pe-cuerpo').scrollTop=0;pieEditor();
+        }).catch(function(err){$('pe-cuerpo').innerHTML='<div class="vacio">No se pudo traer el menú: '+esc(err.message)+'<br><button class="go" type="button" onclick="pintarPedidosInicio()" style="margin-top:14px;height:48px;border:0;border-radius:12px;padding:0 18px;background:#e2e8f0;font-weight:700">Volver</button></div>';});
+        return;
+    }
+    PE.ed.items=itemsProveedor(pv).map(function(x){x.cant=x.sug;return x;});
+    var h='<div class="pe-head"><div class="t">Pedido a '+esc(pv.nombre)+(pv.tipo==='easylunch'?' (sin platos calientes)':'')+'</div><div class="s">Entrega: <b>'+esc(fechaTxt(pv.proxima_entrega))+'</b> · pedir antes de las '+esc(pv.hora_corte)+' h. Ya viene cargado lo que falta para llegar al stock ideal: corregí lo que haga falta.</div></div>';
+    if(!PE.ed.items.length)h+='<div class="vacio">Todavía no hay productos asignados a '+esc(pv.nombre)+'.<br>Se asignan en Configuración → Proveedores y pedidos.</div>';
+    var cat=null;
+    PE.ed.items.forEach(function(it,i){
+        if(it.cat!==cat){cat=it.cat;h+='<div class="pe-cat">'+esc(cat)+'</div>';}
+        var info=(it.stock!=null?'Hay '+cantTxt(it.stock)+(it.unidad&&it.unidad!=='u'?' '+it.unidad:''):'Sin control de stock')+(it.ideal?' · ideal '+cantTxt(it.ideal):'')+(it.pres?' · se pide por '+esc(it.pres):'')+(it.bajo?' · bajo el mínimo':'');
+        h+='<div class="pe-lista">'+filaEditor(it,i,info)+'</div>';
+    });
+    $('pe-cuerpo').innerHTML=h;$('pe-cuerpo').scrollTop=0;pieEditor();
+}
+function pieEditor(){
+    var ed=PE.ed,p=$('pe-pie');if(!ed){p.style.display='none';return;}
+    var n=ed.items.filter(function(x){return x.cant>0;}).length;
+    if(!p.firstChild||p.getAttribute('data-t')!==ed.tipo){
+        p.setAttribute('data-t',ed.tipo);
+        p.innerHTML='<button class="vol" type="button" id="pe-vol">← Volver</button><input type="text" id="pe-nota" maxlength="300" placeholder="'+(ed.tipo==='pedido'?'Nota para el proveedor (opcional)':'Algo para aclarar (opcional): faltó, llegó roto…')+'"><button class="env" type="button" id="pe-env"></button>';
+        $('pe-vol').onclick=pintarPedidosInicio;
+        $('pe-env').onclick=ed.tipo==='pedido'?enviarPedido:confirmarRecepcion;
+    }
+    $('pe-env').textContent=ed.tipo==='pedido'?(n?'Enviar pedido ('+n+')':'Poné alguna cantidad'):'Confirmar recepción';
+    $('pe-env').disabled=ed.tipo==='pedido'&&!n;
+    p.style.display='flex';
+}
+function enviarPedido(){
+    var ed=PE.ed,b=$('pe-env');if(!ed||b.disabled)return;
+    var items=ed.items.filter(function(x){return x.cant>0;}).map(function(x){return {producto_id:x.producto_id||null,insumo_id:x.insumo_id||null,ref_app:x.ref_app||null,nombre:x.nombre,cantidad:x.cant};});
+    b.disabled=true;b.textContent='Enviando…';
+    apiPedidos({accion:'enviar',proveedor_id:ed.pv.id,parte:ed.parte,fecha_entrega:ed.fecha,items:items,nota:$('pe-nota').value.trim()})
+    .then(function(r){
+        var m=r.pedido.mail_estado;
+        aviso(m==='enviado'?'Pedido enviado a '+ed.pv.nombre+'.':'El pedido quedó guardado, pero el mail no salió ('+(r.pedido.mail_detalle||m)+'). Avisale al proveedor.',m!=='enviado');
+        return cargarPedidosDatos().then(pintarPedidosInicio);
+    }).catch(function(err){aviso('No se pudo enviar: '+err.message,true);b.disabled=false;pieEditor();});
+}
+function armarRecepcion(id){
+    var p=PE.d.pedidos.filter(function(x){return x.id===id;})[0];if(!p)return;
+    PE.ed={tipo:'recepcion',pedido:p,items:p.items.map(function(i){return {id:i.id,nombre:i.nombre,cant:Number(i.cantidad),pedido:Number(i.cantidad),unidad:i.unidad};})};
+    var h='<div class="pe-head"><div class="t">Recibir pedido #'+p.id+' · '+esc(p.proveedor)+(p.parte==='platos'?' (platos calientes)':'')+'</div><div class="s">Contá lo que llegó. Si algo vino de menos o llegó roto, corregí la cantidad. Al confirmar, suma al stock.</div></div><div class="pe-lista">'+
+        PE.ed.items.map(function(it,i){return filaEditor(it,i,'Pedido: '+cantTxt(it.pedido)+(it.unidad&&it.unidad!=='u'?' · '+esc(it.unidad):''));}).join('')+'</div>';
+    $('pe-cuerpo').innerHTML=h;$('pe-cuerpo').scrollTop=0;pieEditor();
+}
+function confirmarRecepcion(){
+    var ed=PE.ed,b=$('pe-env');if(!ed)return;
+    b.disabled=true;b.textContent='Guardando…';
+    var dif=ed.items.filter(function(x){return x.cant!==x.pedido;}).map(function(x){return x.nombre+': pedido '+cantTxt(x.pedido)+', llegó '+cantTxt(x.cant);});
+    var nota=[$('pe-nota').value.trim()].concat(dif.length?['Diferencias: '+dif.join(' · ')]:[]).filter(Boolean).join(' — ');
+    EL.rpc('caja_pedido_recibir',{p_token:S.token,p_id:ed.pedido.id,p_items:ed.items.map(function(x){return {id:x.id,recibido:x.cant};}),p_nota:nota})
+    .then(function(r){
+        aviso(r.sin_producto&&r.sin_producto.length?'Recibido. Ojo: '+r.sin_producto.join(', ')+' todavía no está en la caja (tocá Sincronizar).':'Recibido: el stock ya está actualizado.',!!(r.sin_producto&&r.sin_producto.length));
+        cargar(false).catch(function(){});
+        return cargarPedidosDatos().then(pintarPedidosInicio);
+    }).catch(function(err){aviso('No se pudo guardar: '+err.message,true);b.disabled=false;pieEditor();});
+}
+// Platos calientes: si pasó la hora de corte y nadie los pidió, la caja los manda sola (el cron de las 13 h es el respaldo).
+function revisarAutoPlatos(){
+    if(!PE.d||$('app').style.display!=='grid')return;
+    var c=PE.d.config||{},hora=c.hora_platos||'13:00',h=horaAR(),hoy=hoyAR();
+    if(c.auto_platos===false||h<hora||h>'20:00'||PE.auto===hoy)return;
+    var el=PE.d.proveedores.filter(function(p){return p.tipo==='easylunch'&&p.activo;})[0];
+    if(!el||pedidoDe(el.id,'platos',el.proxima_entrega).length){PE.auto=hoy;return;}
+    PE.auto=hoy;
+    apiPedidos({accion:'auto'}).then(function(r){
+        if(r.hecho)aviso('Se mandó solo el pedido de platos calientes ('+r.pedido.items.length+' platos, cantidad estimada).');
+        else if(!/Ya hay|desactivado/.test(r.motivo||''))PE.auto=null;
+        return cargarPedidosDatos();
+    }).catch(function(){PE.auto=null;});
+}
+setInterval(function(){if($('app').style.display==='grid')cargarPedidosDatos().then(revisarAutoPlatos).catch(function(){});},5*60000);
 
 // ─── varios ───
 function reloj(){var d=new Date();$('reloj').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}

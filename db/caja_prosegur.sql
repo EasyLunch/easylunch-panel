@@ -43,6 +43,7 @@ alter table public.caja_productos add column if not exists img text;
 alter table public.caja_productos add column if not exists img_local text;
 -- stock (lo usan las ventas: db/caja_prosegur_ventas.sql)
 alter table public.caja_productos add column if not exists control_stock boolean not null default false;
+alter table public.caja_productos add column if not exists sobrante boolean not null default false;
 alter table public.caja_productos add column if not exists stock_minimo numeric(12,3) not null default 0;
 
 create table if not exists public.caja_descuentos (
@@ -171,7 +172,15 @@ begin
       insert into public.caja_productos(local, origen, ref_app, nombre, categoria, grupo, tipo, precio_base, del_dia, orden, ultima_sync, img, control_stock)
       values (p_local, 'app', v_ref, it->>'nombre', coalesce(it->>'categoria', ''), coalesce(it->>'grupo', ''), v_tipo,
               v_precio, coalesce((it->>'del_dia')::boolean, false), coalesce((it->>'orden')::int, 0), now(), nullif(trim(it->>'img'), ''),
-              v_tipo in ('vianda','postre','bebida'));
+              v_tipo in ('vianda','postre','bebida'))
+      returning * into p;
+      -- proveedor: el mismo que otro producto de la categoría; si no hay, Easy Lunch (tabla de db/caja_prosegur_pedidos.sql)
+      if to_regclass('public.caja_proveedores') is not null then
+        execute 'update public.caja_productos set proveedor_id = coalesce(
+                   (select proveedor_id from public.caja_productos where local = $1 and categoria = $2 and proveedor_id is not null and id <> $3 limit 1),
+                   (select id from public.caja_proveedores where local = $1 and tipo = ''easylunch'' and activo order by id limit 1))
+                 where id = $3' using p_local, p.categoria, p.id;
+      end if;
       nuevos := nuevos || (it->>'nombre');
     else
       if not p.en_app then reactivados := reactivados + 1; end if;
@@ -188,13 +197,19 @@ begin
         precio_base = coalesce(v_precio, precio_base),
         revisar_precio = revisar_precio or (v_precio is not null and precio_base is distinct from v_precio and precio_local is not null),
         del_dia = coalesce((it->>'del_dia')::boolean, false), orden = coalesce((it->>'orden')::int, 0),
-        en_app = true, ultima_sync = now(), actualizado = now()
+        en_app = true, sobrante = false, ultima_sync = now(), actualizado = now()
       where id = p.id;
     end if;
   end loop;
   -- lo que ya no está habilitado en la app queda fuera de la caja (no se borra: se conserva el historial)
   for p in select * from public.caja_productos
            where local = p_local and origen = 'app' and en_app and not (ref_app = any(refs)) loop
+    -- plato del día que sobró: sigue a la venta (como "de ayer") hasta que se termine el stock
+    if (p.del_dia or p.sobrante) and p.control_stock
+       and coalesce((select sum(cantidad) from public.caja_stock_mov where producto_id = p.id), 0) > 0 then
+      update public.caja_productos set del_dia = false, sobrante = true, actualizado = now() where id = p.id;
+      continue;
+    end if;
     if p.del_dia then sale_dia := sale_dia + 1; else quitados := quitados || p.nombre; end if;
     update public.caja_productos set en_app = false, del_dia = false, actualizado = now() where id = p.id;
   end loop;

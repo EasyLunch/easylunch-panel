@@ -22,7 +22,7 @@
 
 const APP = 'https://app.easylunch.com.ar'
 const LOGIN = process.env.EASYLUNCH_LOGIN_URL || APP + '/server/login/login-admin.php'
-const EMPRESA = process.env.CAJA_EMPRESA || 'PROSEGUR'
+export const EMPRESA = process.env.CAJA_EMPRESA || 'PROSEGUR'
 const SB = String(process.env.SUPABASE_URL || 'https://xlwcozznliafhouhqjzl.supabase.co').replace(/\/+$/, '').replace(/\/rest\/v1$/, '') + '/rest/v1'
 const ANON = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhsd2NvenpubGlhZmhvdWhxanpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NTkwMzAsImV4cCI6MjA5NjUzNTAzMH0.i-GTNnGK_5GMUum_tmUKIiX4NUkmEiJovK_M7BwGFfg'
@@ -200,7 +200,7 @@ async function tabla(nombre) {
   if (!Array.isArray(data)) throw Object.assign(new Error(`La app no devolvió una lista para "${nombre}"`), { code: 'origen' })
   return data
 }
-async function leerApp() {
+export async function leerApp() {
   const nombres = ['asignar_modulo', 'asignar_postre', 'asignar_bebidas', 'mes', 'modulos_fijos', 'platos', 'bebidas']
   const datos = await Promise.all(nombres.map(tabla))
   return Object.fromEntries(nombres.map((n, i) => [n, datos[i]]))
